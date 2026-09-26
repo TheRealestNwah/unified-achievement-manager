@@ -3,7 +3,8 @@ import path from "path";
 import { format } from "util";
 import { app, BrowserWindow, dialog, Menu, session, shell } from "electron";
 import { startDiscordPresence, stopDiscordPresence } from "./discordPresence";
-import { handleWindowClose, launchedHidden, markQuitting, showWindow, startTray, stopTray } from "./tray";
+import { handleWindowClose, launchedHidden, markQuitting, showWindow, startTray, stopTray, unlockNotificationsEnabled } from "./tray";
+import { startUnlockNotifications, stopUnlockNotifications } from "./notifications";
 import { loadWindowState, trackWindowState } from "./windowState";
 
 interface RunningApp {
@@ -170,6 +171,9 @@ async function start(): Promise<void> {
     captureLogs();
     console.log(`Starting Unified Achievement Manager ${app.getVersion()} (data: ${dataDir})`);
     buildMenu();
+    // Windows attributes notifications (see #250) to this ID; it matches
+    // electron-builder's appId so they show under the app's own name.
+    if (process.platform === "win32") app.setAppUserModelId("io.github.therealestnwah.unifiedachievementmanager");
 
     // Nothing the dashboard does needs camera, notifications, geolocation, etc.
     session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
@@ -189,7 +193,10 @@ async function start(): Promise<void> {
     // Skipped during the smoke test (see #195) - it boots and quits in
     // seconds, not worth spinning up an IPC connection attempt for.
     if (process.env.UAM_SMOKE_TEST !== "1") startDiscordPresence(running.url);
-    if (process.env.UAM_SMOKE_TEST !== "1") await startTray(running.url, () => mainWindow);
+    if (process.env.UAM_SMOKE_TEST !== "1") {
+        await startTray(running.url, () => mainWindow);
+        startUnlockNotifications(running.url, () => mainWindow, unlockNotificationsEnabled);
+    }
 
     // CI launches the packaged app with this set to prove it boots end to end.
     if (process.env.UAM_SMOKE_TEST === "1") {
@@ -224,6 +231,7 @@ if (!app.requestSingleInstanceLock()) {
         if (readyToQuit) return;
         event.preventDefault();
         stopTray();
+        stopUnlockNotifications();
         void stopServer().finally(() => {
             readyToQuit = true;
             app.quit();

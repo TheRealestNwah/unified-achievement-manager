@@ -7,6 +7,7 @@ import { getSteamGridDbApiKey, isValidSteamGridDbApiKey, removeSteamGridDbApiKey
 import { getDiscordPresenceEnabled, setDiscordPresenceEnabled } from "./discordPresence";
 import { getSearchAcronyms, saveSearchAcronyms, type SearchAcronym } from "./searchAcronyms";
 import { getDesktopSettings, isDesktopApp, updateDesktopSettings } from "./desktopSettings";
+import { getNewUnlocksSince } from "./newUnlocks";
 
 export const setupRouter = Router();
 export const settingsRouter = Router();
@@ -134,6 +135,22 @@ setupRouter.get("/desktop-settings", async (_req, res, next) => {
     try {
         res.setHeader("Cache-Control", "no-store");
         res.json(await getDesktopSettings());
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Read by the Electron main process to notify about newly synced unlocks
+// (see #250) - unauthenticated for the same reason as desktop-settings.
+setupRouter.get("/new-unlocks", async (req, res, next) => {
+    try {
+        res.setHeader("Cache-Control", "no-store");
+        const since = String(req.query.since ?? "");
+        if (!/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(since) || Number.isNaN(Date.parse(since))) {
+            res.status(400).json({ error: "since must be an ISO timestamp" });
+            return;
+        }
+        res.json(await getNewUnlocksSince(since));
     } catch (err) {
         next(err);
     }

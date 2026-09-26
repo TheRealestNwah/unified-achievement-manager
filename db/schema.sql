@@ -225,6 +225,14 @@ create table if not exists user_achievement_unlocks (
     unique (user_platform_account_id, achievement_platform_link_id)
 );
 
+-- When the app first saw an unlock, as opposed to when the platform says it
+-- was earned (unlocked_at) - a first sync can import years-old unlocks. Lets
+-- the desktop app notify about unlocks that are new to it (see #250). Rows
+-- that predate the column get the migration time, which is before the
+-- desktop app starts watching, so they never count as new.
+alter table user_achievement_unlocks add column if not exists recorded_at timestamptz not null default now();
+create index if not exists user_achievement_unlocks_recorded_at_idx on user_achievement_unlocks (recorded_at);
+
 -- games/canonical_achievements are shared, deduplicated tables across every
 -- user of the app (that's the point of the canonical model) - so "does this
 -- user own this game" can't be inferred from a game merely existing in the

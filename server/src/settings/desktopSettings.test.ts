@@ -11,13 +11,13 @@ describe("getDesktopSettings", () => {
     it("defaults everything to off when nothing has been saved (see #249)", async () => {
         const { getDesktopSettings } = await import("./desktopSettings");
         queryMock.mockResolvedValueOnce({ rows: [] });
-        await expect(getDesktopSettings()).resolves.toEqual({ keepInTray: false, startWithWindows: false });
+        await expect(getDesktopSettings()).resolves.toEqual({ keepInTray: false, startWithWindows: false, unlockNotifications: true });
     });
 
     it("reflects saved rows", async () => {
         const { getDesktopSettings } = await import("./desktopSettings");
         queryMock.mockResolvedValueOnce({ rows: [{ key: "desktop_keep_in_tray", value: "true" }] });
-        await expect(getDesktopSettings()).resolves.toEqual({ keepInTray: true, startWithWindows: false });
+        await expect(getDesktopSettings()).resolves.toEqual({ keepInTray: true, startWithWindows: false, unlockNotifications: true });
     });
 });
 
