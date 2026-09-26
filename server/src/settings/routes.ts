@@ -5,7 +5,7 @@ import { requireAuth } from "../middleware/requireAuth";
 import { isValidSteamApiKey, saveSteamApiKey, steamApiKeySource } from "./steamApiKey";
 import { getSteamGridDbApiKey, isValidSteamGridDbApiKey, removeSteamGridDbApiKey, saveSteamGridDbApiKey } from "./steamGridDbKey";
 import { getDiscordPresenceEnabled, setDiscordPresenceEnabled } from "./discordPresence";
-import { getSearchAcronyms, saveSearchAcronyms, type SearchAcronym } from "./searchAcronyms";
+import { findDuplicateAcronym, getSearchAcronyms, saveSearchAcronyms, type SearchAcronym } from "./searchAcronyms";
 import { getDesktopSettings, isDesktopApp, updateDesktopSettings } from "./desktopSettings";
 import { getNewUnlocksSince } from "./newUnlocks";
 
@@ -72,6 +72,11 @@ settingsRouter.put("/search-acronyms", requireAuth, async (req, res, next) => {
                 return;
             }
             acronyms.push({ acronym, expansion });
+        }
+        const duplicate = findDuplicateAcronym(acronyms);
+        if (duplicate) {
+            res.status(400).json({ error: `"${duplicate}" is already in your list - edit that entry instead.` });
+            return;
         }
         await saveSearchAcronyms(acronyms);
         res.status(204).end();

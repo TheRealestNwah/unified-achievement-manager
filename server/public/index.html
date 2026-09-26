@@ -442,6 +442,7 @@
     .platform-actions > button { width: 100%; grid-row: 1; }
     .platform-actions > .slot-1 { grid-column: 1; }
     .platform-actions > .slot-2 { grid-column: 2; }
+    .acronym-override { color: var(--text-dimmer); }
     .platform-help { flex-basis: 100%; margin: 2px 0 0; font-size: 12px; color: var(--text-dim); }
     .settings-heading { font-size: 14px; font-weight: 700; margin: 28px 0 4px; color: var(--text); }
     .settings-subnote { font-size: 12px; color: var(--text-dim); margin: 0 0 10px; }
@@ -3901,17 +3902,22 @@ function renderSearchAcronymsList(customAcronyms) {
         return;
     }
     list.innerHTML = customAcronyms
-        .map(
-            (a, i) => `
+        .map((a, i) => {
+            // Say so when a custom entry replaces a built-in one (see #291).
+            const builtIn = SearchText.DEFAULT_ACRONYMS[SearchText.normalizeSearchText(a.acronym)];
+            return `
         <div class="platform-row" data-index="${i}">
             <span class="platform-name">${escapeHtml(a.acronym)}</span>
-            <span class="platform-note">${escapeHtml(a.expansion)}</span>
+            <span class="platform-note">${escapeHtml(a.expansion)}${
+                builtIn && builtIn !== a.expansion ? ` <span class="acronym-override">(replaces built-in “${escapeHtml(builtIn)}”)</span>` : ""
+            }</span>
             <div class="platform-actions">
-                <button type="button" class="secondary slot-2 remove-acronym-btn">Remove</button>
+                <button type="button" class="secondary slot-1 edit-acronym-btn" aria-label="Edit ${escapeHtml(a.acronym)}">Edit</button>
+                <button type="button" class="secondary slot-2 remove-acronym-btn" aria-label="Remove ${escapeHtml(a.acronym)}">Remove</button>
             </div>
         </div>
-    `
-        )
+    `;
+        })
         .join("");
     list.querySelectorAll(".remove-acronym-btn").forEach((btn) => {
         btn.addEventListener("click", async () => {
@@ -3920,6 +3926,25 @@ function renderSearchAcronymsList(customAcronyms) {
             await saveSearchAcronyms(next);
         });
     });
+    list.querySelectorAll(".edit-acronym-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const index = Number(btn.closest(".platform-row").dataset.index);
+            const entry = state.customSearchAcronyms[index];
+            const expansion = (await askText(`What should "${entry.acronym}" expand to?`, { okLabel: "Save", initialValue: entry.expansion }))?.trim();
+            if (!expansion || expansion === entry.expansion) return;
+            try {
+                await saveSearchAcronyms(state.customSearchAcronyms.map((a, i) => (i === index ? { ...a, expansion } : a)));
+            } catch (err) {
+                showMessage(err.message || "Couldn't save that acronym.");
+            }
+        });
+    });
+}
+
+// Adding an acronym that's already in the list updates it instead of adding a
+// second, silently shadowed copy (see #291).
+function acronymKey(acronym) {
+    return SearchText.normalizeSearchText(acronym).replace(/\s+/g, "");
 }
 
 async function saveSearchAcronyms(customAcronyms) {
@@ -3950,8 +3975,17 @@ async function initSearchAcronymsRow() {
         const acronym = acronymInput.value.trim();
         const expansion = expansionInput.value.trim();
         if (!acronym || !expansion) return;
+        const existing = state.customSearchAcronyms.findIndex((a) => acronymKey(a.acronym) === acronymKey(acronym));
+        if (existing !== -1) {
+            const current = state.customSearchAcronyms[existing];
+            if (!(await askConfirm(`"${current.acronym}" already expands to "${current.expansion}". Change it to "${expansion}"?`, { okLabel: "Change" }))) return;
+        }
         try {
-            await saveSearchAcronyms([...state.customSearchAcronyms, { acronym, expansion }]);
+            await saveSearchAcronyms(
+                existing === -1
+                    ? [...state.customSearchAcronyms, { acronym, expansion }]
+                    : state.customSearchAcronyms.map((a, i) => (i === existing ? { ...a, expansion } : a))
+            );
             acronymInput.value = "";
             expansionInput.value = "";
         } catch (err) {
