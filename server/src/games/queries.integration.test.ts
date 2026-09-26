@@ -107,5 +107,14 @@ integration("getFunStats tier totals", () => {
         expect(excluded.totalGold).toBe(before.totalGold - 1);
         expect(excluded.fullyCompletedGames).toBe(before.fullyCompletedGames - 1);
         expect((await getRecentActivity(userId)).some((a) => a.game_id === otherGameId)).toBe(false);
+
+        // Its own page still finds it, with its visibility, even though the
+        // library list leaves it out (#237).
+        const { getGamesForUser } = await import("./queries");
+        expect((await getGamesForUser(userId)).some((g) => g.id === otherGameId)).toBe(false);
+        const [single] = await getGamesForUser(userId, { gameId: otherGameId });
+        expect(single.title).toBe("Other Game");
+        expect(single.visibility).toBe("excluded");
+        expect(Number(single.unlocked_achievements)).toBe(1);
     });
 });

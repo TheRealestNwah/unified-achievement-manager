@@ -588,6 +588,19 @@
     }
     .game-title-link:hover { text-decoration: underline; }
     #game-view-back-btn { margin-bottom: 16px; }
+    .visibility-banner {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        margin-bottom: 16px;
+        border-radius: 10px;
+        background: var(--chip-accent-bg);
+        border: 1px solid var(--chip-accent-border);
+        font-size: 13px;
+    }
+    .visibility-banner span { flex: 1; }
+    .visibility-banner button { padding: 5px 12px; font-size: 12px; }
     .game-view-header {
         display: flex;
         align-items: center;
@@ -932,6 +945,10 @@
                         <h2 id="game-view-title"></h2>
                         <div id="game-view-progress" class="game-progress-text"></div>
                     </div>
+                </div>
+                <div class="visibility-banner hidden" id="game-view-visibility" role="status">
+                    <span id="game-view-visibility-text"></span>
+                    <button type="button" class="secondary" id="game-view-unhide-btn">Unhide</button>
                 </div>
                 <div id="game-view-achievements"></div>
             </section>
@@ -2051,17 +2068,46 @@ function escapeHtml(value) {
 // title on an achievement (Recent activity, Fun stats) - see #186. Reuses
 // the same per-platform section renderer as the expanded game row.
 async function showGameView(gameId, { pushState = true } = {}) {
-    const game = state.games.find((g) => g.id === gameId);
     document.getElementById("dashboard-view").classList.add("hidden");
     document.getElementById("settings-view").classList.add("hidden");
     document.getElementById("game-view").classList.remove("hidden");
+    // Paint straight away from the library list when the game is in it, then
+    // fetch the game itself: a hidden or excluded game isn't in the list at
+    // all, and would otherwise sit on "Loading..." forever (see #237).
+    renderGameViewHeader(state.games.find((g) => g.id === gameId) ?? null);
+    if (pushState) history.pushState({ gameView: gameId }, "");
+    const header = api(`/api/me/games/${gameId}`)
+        .then((game) => {
+            if (state.gameViewId === gameId) renderGameViewHeader(game);
+        })
+        .catch((err) => {
+            if (state.gameViewId === gameId) document.getElementById("game-view-title").textContent = `Couldn't load this game: ${err.message}`;
+        });
+    state.gameViewId = gameId;
+    await Promise.all([header, loadAchievementsPanel(document.getElementById("game-view-achievements"), gameId)]);
+}
+
+function renderGameViewHeader(game) {
     document.getElementById("game-view-title").textContent = game?.title ?? "Loading...";
     document.getElementById("game-view-progress").textContent = game
         ? `${game.unlocked_achievements}/${game.total_achievements}`
         : "";
     document.getElementById("game-view-cover").innerHTML = game ? ImageControls.gameCoverMarkup(game.cover_image_url) : "";
-    if (pushState) history.pushState({ gameView: gameId }, "");
-    await loadAchievementsPanel(document.getElementById("game-view-achievements"), gameId);
+    const banner = document.getElementById("game-view-visibility");
+    banner.classList.toggle("hidden", !game?.visibility);
+    if (game?.visibility) {
+        document.getElementById("game-view-visibility-text").textContent =
+            game.visibility === "excluded"
+                ? "This game is hidden from your library and excluded from your score."
+                : "This game is hidden from your library. It still counts toward your score.";
+        const unhide = document.getElementById("game-view-unhide-btn");
+        unhide.disabled = false;
+        unhide.onclick = async () => {
+            unhide.disabled = true;
+            await clearGameVisibility(game.id);
+            renderGameViewHeader({ ...game, visibility: null });
+        };
+    }
 }
 
 function hideGameView() {

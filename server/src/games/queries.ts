@@ -1,11 +1,25 @@
 import { pool } from "../db";
 import { TIER_POINTS, qualifiesForCompletionPlatinum, GameCompletionCounts } from "../scoring/tier";
 
-export async function getGamesForUser(userId: string, { includeHidden = false }: { includeHidden?: boolean } = {}) {
+interface GamesQueryOptions {
+    // Keep hidden (but not excluded) games - for totals, see #236.
+    includeHidden?: boolean;
+    // Just this one game, whatever its visibility - for its own page, see #237.
+    gameId?: string;
+}
+
+export async function getGamesForUser(userId: string, { includeHidden = false, gameId }: GamesQueryOptions = {}) {
+    const visibilityFilter = gameId
+        ? "and g.id = $2"
+        : `and not exists (
+             select 1 from user_game_visibility ugv where ugv.user_id = $1 and ugv.game_id = g.id
+             ${includeHidden ? "and ugv.mode = 'excluded'" : ""}
+         )`;
     const result = await pool.query(
         `select
             g.id,
             g.title,
+            (select mode from user_game_visibility where user_id = $1 and game_id = g.id) as visibility,
             -- A user's own pasted cover art (see #32) wins over the
             -- auto-detected one on games.cover_image_url.
             coalesce(
@@ -69,14 +83,12 @@ export async function getGamesForUser(userId: string, { includeHidden = false }:
          -- A game the user hid or excluded (see #192) is left out of the
          -- library view entirely, whichever mode. Totals (getFunStats) pass
          -- includeHidden, since a hidden game still counts toward the score
-         -- and only an excluded one drops out (see #236).
-         and not exists (
-             select 1 from user_game_visibility ugv where ugv.user_id = $1 and ugv.game_id = g.id
-             ${includeHidden ? "and ugv.mode = 'excluded'" : ""}
-         )
+         -- and only an excluded one drops out (see #236). A single game's
+         -- own page (gameId) shows it whatever its visibility (see #237).
+         ${visibilityFilter}
          group by g.id, g.title, g.cover_image_url
          order by unlocked_achievements desc, g.title`,
-        [userId]
+        gameId ? [userId, gameId] : [userId]
     );
     return result.rows.map((row) => {
         const totalAchievements = Number(row.total_achievements);
