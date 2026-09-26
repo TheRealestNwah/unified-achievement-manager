@@ -884,6 +884,10 @@
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8.2l1.8 1.8 3.2-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <span class="nav-item-label">Completed</span>
             </button>
+            <button type="button" class="nav-item" data-nav="almost-there">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M8 2a6 6 0 0 1 5.7 7.9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+                <span class="nav-item-label">Almost There</span>
+            </button>
         </div>
         <div class="sidebar-footer" id="header-actions"></div>
     </nav>
@@ -984,13 +988,24 @@
                             type="text"
                             id="games-filter"
                             placeholder="Filter your games..."
+                            aria-label="Filter your games by title"
                             style="flex: 1; background: var(--input-bg); border: 1px solid var(--border); border-radius: 7px; padding: 9px 16px; color: var(--text); font-size: 14px;"
                         />
                         <select
+                            id="games-platform-filter"
+                            aria-label="Show games from"
+                            style="background: var(--input-bg); border: 1px solid var(--border); border-radius: 7px; padding: 9px 16px; color: var(--text); font-size: 14px;"
+                        >
+                            <option value="">All platforms</option>
+                        </select>
+                        <select
                             id="games-sort"
+                            aria-label="Sort games"
                             style="background: var(--input-bg); border: 1px solid var(--border); border-radius: 7px; padding: 9px 16px; color: var(--text); font-size: 14px;"
                         >
                             <option value="unlocked-desc">Most unlocked</option>
+                            <option value="recent">Recently unlocked</option>
+                            <option value="xp-desc">Most XP earned</option>
                             <option value="completion-desc">Completion % (high to low)</option>
                             <option value="completion-asc">Completion % (low to high)</option>
                             <option value="alpha">Alphabetical</option>
@@ -1521,6 +1536,10 @@ function completionPct(game) {
 
 const gameSorters = {
     "unlocked-desc": (a, b) => b.unlocked_achievements - a.unlocked_achievements || a.title.localeCompare(b.title),
+    recent: (a, b) =>
+        (b.last_unlocked_at ? Date.parse(b.last_unlocked_at) : 0) - (a.last_unlocked_at ? Date.parse(a.last_unlocked_at) : 0) ||
+        a.title.localeCompare(b.title),
+    "xp-desc": (a, b) => Number(b.points_earned) - Number(a.points_earned) || a.title.localeCompare(b.title),
     "completion-desc": (a, b) => completionPct(b) - completionPct(a) || a.title.localeCompare(b.title),
     "completion-asc": (a, b) => completionPct(a) - completionPct(b) || a.title.localeCompare(b.title),
     alpha: (a, b) => a.title.localeCompare(b.title),
@@ -2004,6 +2023,7 @@ function uploadAchievementIcon(achievementId, reload) {
 const PRESET_LABELS = {
     "in-progress": "In Progress",
     completed: "Completed",
+    "almost-there": "Almost There (80% or more, not finished)",
 };
 
 function presetMatches(game) {
@@ -2012,7 +2032,57 @@ function presetMatches(game) {
     const unlocked = Number(game.unlocked_achievements);
     if (state.completionPreset === "in-progress") return total > 0 && unlocked < total;
     if (state.completionPreset === "completed") return total > 0 && unlocked === total;
+    if (state.completionPreset === "almost-there") return total > 0 && unlocked < total && unlocked / total >= 0.8;
     return true;
+}
+
+// Platform filter (see #246): one option per platform, plus one per console
+// variant ("psn (PS5)") where the library has them. Values are "psn" or
+// "psn:PS5".
+function platformFilterMatches(game, value) {
+    if (!value) return true;
+    const [platform, variant] = value.split(":");
+    if (!(game.platforms || []).includes(platform)) return false;
+    return !variant || (game.console_variants?.[platform] || []).includes(variant);
+}
+
+function renderPlatformFilterOptions(games) {
+    const select = document.getElementById("games-platform-filter");
+    const options = new Map();
+    for (const game of games) {
+        for (const platform of game.platforms || []) {
+            options.set(platform, platform);
+            for (const variant of game.console_variants?.[platform] || []) options.set(`${platform}:${variant}`, `${platform} (${variant})`);
+        }
+    }
+    const current = select.value || getGamesListPrefs().platform || "";
+    select.replaceChildren(new Option("All platforms", ""), ...[...options].sort(([a], [b]) => a.localeCompare(b)).map(([value, label]) => new Option(label, value)));
+    select.value = options.has(current) ? current : "";
+}
+
+// The games list's sort and platform choices are remembered per viewer.
+const GAMES_LIST_PREFS_KEY = "unified-achievement-manager:gamesList";
+
+function getGamesListPrefs() {
+    try {
+        return JSON.parse(localStorage.getItem(GAMES_LIST_PREFS_KEY) || "{}");
+    } catch {
+        return {};
+    }
+}
+
+function saveGamesListPrefs() {
+    try {
+        localStorage.setItem(
+            GAMES_LIST_PREFS_KEY,
+            JSON.stringify({
+                sort: document.getElementById("games-sort").value,
+                platform: document.getElementById("games-platform-filter").value,
+            })
+        );
+    } catch {
+        // Storage unavailable - the choice still applies until reload.
+    }
 }
 
 function renderPresetChip() {
@@ -2030,11 +2100,14 @@ function renderGames(games) {
     document.getElementById("games-heading").textContent =
         `Your games (${games.length})`;
 
+    renderPlatformFilterOptions(games);
     const filterText = document.getElementById("games-filter").value;
     const sortMode = document.getElementById("games-sort").value;
+    const platformFilter = document.getElementById("games-platform-filter").value;
     const visible = games
         .filter((g) => SearchText.titleMatchesSearch(g.title, filterText, state.searchAcronyms))
         .filter(presetMatches)
+        .filter((g) => platformFilterMatches(g, platformFilter))
         .sort(gameSorters[sortMode] || gameSorters["unlocked-desc"]);
 
     renderPresetChip();
@@ -3562,6 +3635,7 @@ const NAV_SECTIONS = {
     overview: "section-overview",
     games: "section-games",
     "in-progress": "section-games",
+    "almost-there": "section-games",
     completed: "section-games",
 };
 const NAV_TITLES = {
@@ -3570,6 +3644,7 @@ const NAV_TITLES = {
     games: "All Games",
     review: "Review",
     "in-progress": "In Progress",
+    "almost-there": "Almost There",
     completed: "Completed",
 };
 
@@ -3676,7 +3751,7 @@ function initSidebarNav() {
                 return;
             }
             hideSettingsView();
-            state.completionPreset = key === "in-progress" || key === "completed" ? key : null;
+            state.completionPreset = PRESET_LABELS[key] ? key : null;
             document.getElementById(NAV_SECTIONS[key])?.scrollIntoView({ behavior: "smooth", block: "start" });
             renderGames(state.games);
         });
@@ -3759,7 +3834,16 @@ async function init() {
     document.getElementById("review-shortcut-btn").addEventListener("click", () => openReviewPage());
     document.getElementById("activity-more-btn").addEventListener("click", (e) => loadMoreActivity(e.currentTarget));
     document.getElementById("games-filter").addEventListener("input", () => renderGames(state.games));
-    document.getElementById("games-sort").addEventListener("change", () => renderGames(state.games));
+    const listPrefs = getGamesListPrefs();
+    if (listPrefs.sort && gameSorters[listPrefs.sort]) document.getElementById("games-sort").value = listPrefs.sort;
+    document.getElementById("games-sort").addEventListener("change", () => {
+        saveGamesListPrefs();
+        renderGames(state.games);
+    });
+    document.getElementById("games-platform-filter").addEventListener("change", () => {
+        saveGamesListPrefs();
+        renderGames(state.games);
+    });
     document.getElementById("export-json-btn").addEventListener("click", () => {
         window.location.href = "/api/me/export?format=json";
     });
