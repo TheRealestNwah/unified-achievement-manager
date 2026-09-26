@@ -806,7 +806,7 @@
             </svg>
             <span>Achievements</span>
         </div>
-        <div class="sidebar-section">
+        <div class="sidebar-section hidden" data-signed-in-only>
             <span class="sidebar-label">Library</span>
             <button type="button" class="nav-item active" data-nav="overview">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M8 8L11 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
@@ -821,7 +821,7 @@
                 <span class="nav-item-label">All Games</span>
             </button>
         </div>
-        <div class="sidebar-section">
+        <div class="sidebar-section hidden" data-signed-in-only>
             <span class="sidebar-label">Smart Views</span>
             <button type="button" class="nav-item" data-nav="in-progress">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M8 5v3l2.2 2.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -3296,6 +3296,7 @@ function initSidebarNav() {
 async function init() {
     const setup = await api("/api/setup/status");
     if (!setup.steamApiKeyConfigured) {
+        document.getElementById("topbar-title").textContent = "Welcome";
         showSetup();
         return;
     }
@@ -3305,10 +3306,14 @@ async function init() {
         user = await api("/auth/me");
     } catch {
         document.getElementById("signin-view").classList.remove("hidden");
+        document.getElementById("topbar-title").textContent = "Sign in";
         return;
     }
 
     document.getElementById("dashboard-view").classList.remove("hidden");
+    // The section nav only works once signed in (initSidebarNav below), so
+    // it stays hidden on the first-run and sign-in screens (see #243).
+    document.querySelectorAll("[data-signed-in-only]").forEach((el) => el.classList.remove("hidden"));
     document.getElementById("header-actions").innerHTML = `
         <span style="color: var(--text-dim);">${escapeHtml(user.username)}</span>
         <button type="button" class="secondary" id="logout-btn" style="margin-left: auto;">Log out</button>
