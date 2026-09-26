@@ -581,6 +581,17 @@
     }
     input[type="checkbox"]:checked::before { transform: translateX(17px); }
     .game-title { flex: 1; font-weight: 600; }
+    .game-actions-btn {
+        background: none;
+        color: var(--text-dim);
+        padding: 2px 8px;
+        font-size: 16px;
+        line-height: 1;
+        border-radius: 6px;
+        flex-shrink: 0;
+    }
+    .game-actions-btn:hover, .game-actions-btn:focus-visible { color: var(--text); background: var(--card-hover); }
+    .image-action-menu button:focus-visible { background: var(--card-hover); outline-offset: -2px; }
     .game-title-link {
         color: inherit;
         text-decoration: none;
@@ -1342,6 +1353,47 @@ const gameSorters = {
     platform: (a, b) => (a.platforms || []).join(",").localeCompare((b.platforms || []).join(",")) || a.title.localeCompare(b.title),
 };
 
+// Makes a non-button element (a game row, an icon, a section header) usable
+// from the keyboard: focusable, announced as a button, and activated by Enter
+// or Space like a real one (see #241).
+function makeKeyboardButton(el, label) {
+    el.setAttribute("role", "button");
+    el.tabIndex = 0;
+    if (label) el.setAttribute("aria-label", label);
+    el.addEventListener("keydown", (e) => {
+        if (e.target !== el) return;
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            el.click();
+        }
+    });
+}
+
+// Shared popover behavior: menu roles, focus moves into the menu, arrow keys
+// move between items, and Escape or Tab closes it and returns focus to
+// whatever opened it (see #241).
+function wireMenu(menu, returnFocusTo, close) {
+    menu.setAttribute("role", "menu");
+    const items = () => [...menu.querySelectorAll("button, input")];
+    menu.querySelectorAll("button").forEach((b) => b.setAttribute("role", "menuitem"));
+    menu.addEventListener("keydown", (e) => {
+        const list = items();
+        const index = list.indexOf(document.activeElement);
+        if (e.key === "Escape" || e.key === "Tab") {
+            e.preventDefault();
+            close();
+            returnFocusTo?.focus();
+        } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            list[(index + 1) % list.length]?.focus();
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            list[(index - 1 + list.length) % list.length]?.focus();
+        }
+    });
+    items()[0]?.focus();
+}
+
 // Small popover anchored to the clicked cover/icon, offering the two ways to
 // replace it. Anchoring here (instead of a modal) keeps the choice next to
 // the image the user just clicked instead of somewhere else on screen.
@@ -1389,13 +1441,14 @@ function showImageActionMenu(anchorEl, { onUpload, onPaste, onSteamGridDb }) {
         onSteamGridDb();
     });
     setTimeout(() => document.addEventListener("click", onDocClick, true), 0);
+    wireMenu(menu, anchorEl, close);
 }
 
 // Right-click menu on a game row to hide it from the library (still counts
 // toward score) or exclude it entirely (also deducts its points) - see #192.
 // Reuses .image-action-menu's styling since it's the same anchored-popover
 // shape, just positioned at the cursor instead of under an element.
-function showGameContextMenu(x, y, game) {
+function showGameContextMenu(x, y, game, anchorEl = null) {
     document.querySelectorAll(".image-action-menu").forEach((m) => m.remove());
 
     const menu = document.createElement("div");
@@ -1444,6 +1497,7 @@ function showGameContextMenu(x, y, game) {
         setGameVisibility(game.id, "excluded");
     });
     setTimeout(() => document.addEventListener("click", onDocClick, true), 0);
+    wireMenu(menu, anchorEl, close);
 }
 
 async function changeGameDisplayName(game) {
@@ -1493,7 +1547,7 @@ function renderHiddenGamesPanel(games) {
             <span class="review-compare">${escapeHtml(g.title)}</span>
             <span class="review-confidence">${g.mode}</span>
             <span class="review-actions">
-                <button class="confirm">Unhide</button>
+                <button class="confirm" aria-label="Unhide ${escapeHtml(g.title)}">Unhide</button>
             </span>
         </div>
     `
@@ -1819,9 +1873,27 @@ function renderGames(games) {
                 ${platformBadges(game)}
                 <div class="tier-pips">${tierDots(game)}</div>
                 <div class="game-progress-text">${game.unlocked_achievements}/${game.total_achievements}</div>
+                <button type="button" class="game-actions-btn" aria-haspopup="menu" aria-label="Actions for ${escapeHtml(game.title)}" title="Game actions">&hellip;</button>
             </div>
         `;
         const row = el.querySelector(".game-row");
+        const titleEl = el.querySelector(".game-title");
+        makeKeyboardButton(titleEl);
+        titleEl.setAttribute("aria-expanded", "false");
+        const actionsBtn = el.querySelector(".game-actions-btn");
+        actionsBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const rect = actionsBtn.getBoundingClientRect();
+            showGameContextMenu(rect.left, rect.bottom + 4, game, actionsBtn);
+        });
+        // The keyboard's own context-menu keys open the same menu as a right-click.
+        row.addEventListener("keydown", (e) => {
+            if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+                e.preventDefault();
+                const rect = (document.activeElement ?? row).getBoundingClientRect();
+                showGameContextMenu(rect.left, rect.bottom + 4, game, document.activeElement);
+            }
+        });
         if (state.linkMode) {
             if (state.linkSelection === game.id) row.classList.add("link-selected");
             row.addEventListener("click", () => handleLinkClick(game));
@@ -2025,6 +2097,7 @@ function showDashboardCustomizeMenu(anchorEl) {
         });
     });
     setTimeout(() => document.addEventListener("click", onDocClick, true), 0);
+    wireMenu(menu, anchorEl, close);
 }
 
 function initDashboardCustomization() {
@@ -2068,10 +2141,13 @@ function hideGameView() {
 
 async function toggleAchievements(gameEl, gameId) {
     const existing = gameEl.querySelector(".achievements");
+    const titleEl = gameEl.querySelector(".game-title");
     if (existing) {
         existing.remove();
+        titleEl?.setAttribute("aria-expanded", "false");
         return;
     }
+    titleEl?.setAttribute("aria-expanded", "true");
     const panel = document.createElement("div");
     panel.className = "achievements";
     gameEl.appendChild(panel);
@@ -2169,10 +2245,13 @@ async function loadAchievementsPanel(panel, gameId) {
     }
 
     panel.querySelectorAll(".platform-section-header").forEach((header) => {
+        makeKeyboardButton(header);
+        header.setAttribute("aria-expanded", String(!header.closest(".platform-section").classList.contains("collapsed")));
         header.addEventListener("click", (e) => {
             e.stopPropagation();
             const section = header.closest(".platform-section");
             const collapsed = section.classList.toggle("collapsed");
+            header.setAttribute("aria-expanded", String(!collapsed));
             toggleCollapsedPlatform(section.dataset.collapseKey, collapsed);
             // Expanding also clears an older whole-platform preference, or
             // the list would collapse again next time.
@@ -2181,6 +2260,9 @@ async function loadAchievementsPanel(panel, gameId) {
     });
     panel.querySelectorAll(".achievement-icon-wrap").forEach((wrap) => {
         const achievementId = wrap.closest(".achievement").dataset.achievementId;
+        const achievementName = wrap.closest(".achievement").querySelector(".achievement-name")?.firstChild?.textContent?.trim();
+        makeKeyboardButton(wrap, achievementName ? `Change icon for ${achievementName}` : "Change achievement icon");
+        wrap.setAttribute("aria-haspopup", "menu");
         wrap.addEventListener("click", (e) => {
             e.stopPropagation();
             showImageActionMenu(e.currentTarget, {
@@ -2337,8 +2419,8 @@ function renderReviewPanel(candidates) {
             </span>
             <span class="review-confidence">${Math.round(c.confidence * 100)}%</span>
             <span class="review-actions">
-                <button class="confirm">Same</button>
-                <button class="reject">Different</button>
+                <button class="confirm" aria-label="Same achievement: ${escapeHtml(c.candidate_name)} and ${escapeHtml(c.target_name)}">Same</button>
+                <button class="reject" aria-label="Different achievements: ${escapeHtml(c.candidate_name)} and ${escapeHtml(c.target_name)}">Different</button>
             </span>
         </div>
     `
@@ -2393,8 +2475,8 @@ function renderGameReviewPanel(candidates) {
             </span>
             <span class="review-confidence">${Math.round(c.confidence * 100)}%</span>
             <span class="review-actions">
-                <button class="confirm">Same game</button>
-                <button class="reject">Different</button>
+                <button class="confirm" aria-label="Same game: ${escapeHtml(c.game_a_title)} and ${escapeHtml(c.game_b_title)}">Same game</button>
+                <button class="reject" aria-label="Different games: ${escapeHtml(c.game_a_title)} and ${escapeHtml(c.game_b_title)}">Different</button>
             </span>
         </div>
     `
@@ -2442,8 +2524,8 @@ function renderSplitReviewPanel(candidates) {
                 ${(c.other_platforms || []).map((p) => `<span class="platform-badge">${p}</span>`).join(" ")}
             </span>
             <span class="review-actions">
-                <button class="confirm">Split apart</button>
-                <button class="reject">Keep merged</button>
+                <button class="confirm" aria-label="Split ${escapeHtml(c.candidate_platform_title)} out of ${escapeHtml(c.game_title)}">Split apart</button>
+                <button class="reject" aria-label="Keep ${escapeHtml(c.candidate_platform_title)} merged into ${escapeHtml(c.game_title)}">Keep merged</button>
             </span>
         </div>
     `
