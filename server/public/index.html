@@ -364,6 +364,24 @@
     .score-info { flex: 1; min-width: 0; }
     .score-info .points { font-family: var(--font-mono); font-size: 14px; color: var(--text-dim); }
     #level-tier-counts { margin-top: 8px; }
+    .sync-problems {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        margin-bottom: 16px;
+        border-radius: 12px;
+        border: 1px solid #FCA5A5;
+        background: rgba(252, 165, 165, 0.15);
+        font-size: 13px;
+    }
+    .sync-problems span { flex: 1; min-width: 200px; }
+    .sync-problems a, .platform-sync-error { color: #B91C1C; }
+    :root[data-theme="dark"] .sync-problems a, :root[data-theme="dark"] .platform-sync-error { color: #FCA5A5; }
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) .sync-problems a, :root:not([data-theme="light"]) .platform-sync-error { color: #FCA5A5; }
+    }
     .sync-freshness { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--text-dim); }
     .sync-freshness button { padding: 4px 12px; font-size: 12px; }
     .toast {
@@ -966,6 +984,7 @@
             </section>
 
             <section id="dashboard-view" class="hidden">
+                <div class="sync-problems hidden" id="sync-problems" role="alert"></div>
                 <div class="score-card" id="section-overview">
                     <div class="level-ring">
                         <svg width="108" height="108" viewBox="0 0 108 108">
@@ -1488,8 +1507,17 @@ async function pollSyncStatus({ silent = false } = {}) {
     }
     renderSyncFreshness(status.lastSyncedAt);
     const changed = state.knownSyncAt !== undefined && status.lastSyncedAt !== state.knownSyncAt;
+    // A failed background sync doesn't move lastSyncedAt, but its error
+    // should still show up without a reload (see #282).
+    const newError = state.knownSyncErrorAt !== undefined && status.lastSyncErrorAt !== state.knownSyncErrorAt;
     state.knownSyncAt = status.lastSyncedAt;
-    if (!changed || silent || state.userSyncs > 0) return;
+    state.knownSyncErrorAt = status.lastSyncErrorAt;
+    if (silent || state.userSyncs > 0) return;
+    if (newError && !changed) {
+        await refreshPlatforms().catch((err) => console.error(err));
+        return;
+    }
+    if (!changed) return;
     try {
         await refreshGamesAndScore();
         await refreshActivity();
@@ -3495,6 +3523,17 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
     }
 
     row.append(name, note, actions);
+    if (account?.last_sync_error) {
+        // The failure itself, until a sync succeeds again (see #282).
+        const error = document.createElement("p");
+        error.className = "platform-help platform-sync-error";
+        error.setAttribute("role", "alert");
+        const when = document.createElement("span");
+        when.dataset.relativeTime = account.last_sync_error_at;
+        when.textContent = relativeTime(account.last_sync_error_at);
+        error.append("Last sync failed ", when, `: ${account.last_sync_error}`);
+        row.appendChild(error);
+    }
     return row;
 }
 
@@ -3684,8 +3723,35 @@ function renderPlatforms(accounts) {
 }
 
 async function refreshPlatforms() {
-    renderPlatforms(await api("/api/me/accounts"));
+    const accounts = await api("/api/me/accounts");
+    renderPlatforms(accounts);
+    renderSyncProblems(accounts);
 }
+
+// A dashboard banner for platforms whose last sync failed (see #282) - the
+// Settings row has the details and the fix.
+function renderSyncProblems(accounts) {
+    const banner = document.getElementById("sync-problems");
+    const failing = accounts.filter((a) => a.last_sync_error);
+    banner.classList.toggle("hidden", failing.length === 0);
+    if (failing.length === 0) return;
+    const names = failing.map((a) => PLATFORM_LABELS[a.platform_id] || a.platform_id);
+    const text = document.createElement("span");
+    text.textContent =
+        failing.length === 1
+            ? `${names[0]} couldn't sync: ${failing[0].last_sync_error}`
+            : `${names.join(", ")} couldn't sync.`;
+    const link = document.createElement("a");
+    link.href = "#";
+    link.textContent = "Fix in Settings";
+    link.addEventListener("click", (e) => {
+        e.preventDefault();
+        document.querySelector('[data-nav="platforms"]').click();
+    });
+    banner.replaceChildren(text, link);
+}
+
+const PLATFORM_LABELS = { steam: "Steam", xbox: "Xbox", psn: "PSN", retroachievements: "RetroAchievements", gog: "GOG" };
 
 async function saveSteamApiKey(apiKey) {
     await api("/api/setup/steam-api-key", {

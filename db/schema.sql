@@ -79,6 +79,12 @@ create table if not exists user_platform_accounts (
     unique (platform_id, platform_account_id)
 );
 
+-- The most recent sync failure for an account, cleared by the next success,
+-- so an expired token or revoked key shows up in the app instead of only in
+-- the log (see #282).
+alter table user_platform_accounts add column if not exists last_sync_error text;
+alter table user_platform_accounts add column if not exists last_sync_error_at timestamptz;
+
 -- ---------------------------------------------------------------------------
 -- Games: one canonical row per real-world game, linked out to each
 -- platform's own copy of it.

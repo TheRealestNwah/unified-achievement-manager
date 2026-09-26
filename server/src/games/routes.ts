@@ -59,7 +59,7 @@ gamesRouter.delete("/account", requireAuth, async (req, res, next) => {
 gamesRouter.get("/accounts", requireAuth, async (req, res, next) => {
     try {
         const result = await pool.query(
-            "select platform_id, display_name, linked_at, last_synced_at from user_platform_accounts where user_id = $1 order by platform_id",
+            "select platform_id, display_name, linked_at, last_synced_at, last_sync_error, last_sync_error_at from user_platform_accounts where user_id = $1 order by platform_id",
             [req.user!.id]
         );
         res.json(result.rows);
@@ -110,10 +110,10 @@ gamesRouter.get("/sync-status", requireAuth, async (req, res, next) => {
     try {
         res.setHeader("Cache-Control", "no-store");
         const result = await pool.query(
-            "select max(last_synced_at) as last_synced_at from user_platform_accounts where user_id = $1",
+            "select max(last_synced_at) as last_synced_at, max(last_sync_error_at) as last_sync_error_at from user_platform_accounts where user_id = $1",
             [req.user!.id]
         );
-        res.json({ lastSyncedAt: result.rows[0]?.last_synced_at ?? null });
+        res.json({ lastSyncedAt: result.rows[0]?.last_synced_at ?? null, lastSyncErrorAt: result.rows[0]?.last_sync_error_at ?? null });
     } catch (err) {
         next(err);
     }

@@ -26,6 +26,34 @@ export interface PlatformAccountRow {
 // (scheduler.ts) so this per-platform logic - including PSN's token refresh -
 // only lives in one place.
 export async function runAccountSync(account: PlatformAccountRow): Promise<SyncSummary> {
+    try {
+        const summary = await syncByPlatform(account);
+        await pool.query("update user_platform_accounts set last_sync_error = null, last_sync_error_at = null where id = $1", [account.id]);
+        return summary;
+    } catch (err) {
+        await recordSyncError(account.id, err);
+        throw err;
+    }
+}
+
+// Kept per account so both scheduled and manual failures reach the dashboard
+// (see #282). Trimmed - some platform errors carry whole response bodies.
+const MAX_SYNC_ERROR_LENGTH = 500;
+
+export async function recordSyncError(accountId: string, err: unknown): Promise<void> {
+    const message = (err instanceof Error ? err.message : String(err)).trim() || "Unknown error";
+    try {
+        await pool.query("update user_platform_accounts set last_sync_error = $2, last_sync_error_at = now() where id = $1", [
+            accountId,
+            message.slice(0, MAX_SYNC_ERROR_LENGTH),
+        ]);
+    } catch (recordErr) {
+        // Never hide the original sync error behind a failure to record it.
+        console.error("Couldn't record a sync error:", recordErr);
+    }
+}
+
+async function syncByPlatform(account: PlatformAccountRow): Promise<SyncSummary> {
     const accessToken = account.access_token ? decryptCredential(account.access_token, config.credentialEncryptionKey) : null;
     const refreshToken = account.refresh_token ? decryptCredential(account.refresh_token, config.credentialEncryptionKey) : null;
 
