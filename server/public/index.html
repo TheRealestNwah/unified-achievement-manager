@@ -1308,24 +1308,89 @@ function showMessage(message) {
     return openPromptDialog(message, { withCancel: false });
 }
 
+// Theme is System (follow Windows, the default), Light, or Dark (see #286).
+// Only an explicit Light/Dark choice is stored; System clears it.
 const THEME_KEY = "uam-theme";
-function isDarkActive() {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved) return saved === "dark";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" };
+const systemDarkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+function getThemeChoice() {
+    try {
+        const saved = localStorage.getItem(THEME_KEY);
+        return saved === "light" || saved === "dark" ? saved : "system";
+    } catch {
+        return "system";
+    }
 }
+
+function isDarkActive() {
+    const choice = getThemeChoice();
+    return choice === "system" ? systemDarkQuery.matches : choice === "dark";
+}
+
+function setThemeChoice(choice) {
+    try {
+        if (choice === "system") localStorage.removeItem(THEME_KEY);
+        else localStorage.setItem(THEME_KEY, choice);
+    } catch {
+        // Storage unavailable - still applies until reload.
+    }
+    if (choice === "system") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", choice);
+    updateThemeToggle();
+}
+
 function updateThemeToggle() {
     const dark = isDarkActive();
     document.getElementById("theme-icon-moon").classList.toggle("hidden", dark);
     document.getElementById("theme-icon-sun").classList.toggle("hidden", !dark);
-    document.getElementById("theme-toggle-btn").setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+    const label = `Theme: ${THEME_LABELS[getThemeChoice()]}`;
+    const btn = document.getElementById("theme-toggle-btn");
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
 }
-document.getElementById("theme-toggle-btn").addEventListener("click", () => {
-    const next = isDarkActive() ? "light" : "dark";
-    localStorage.setItem(THEME_KEY, next);
-    document.documentElement.setAttribute("data-theme", next);
-    updateThemeToggle();
-});
+
+function showThemeMenu(anchorEl) {
+    document.querySelectorAll(".image-action-menu").forEach((m) => m.remove());
+    const current = getThemeChoice();
+    const menu = document.createElement("div");
+    menu.className = "image-action-menu";
+    for (const [choice, label] of Object.entries(THEME_LABELS)) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = `${choice === current ? "✓ " : ""}${label}`;
+        item.addEventListener("click", (e) => {
+            e.stopPropagation();
+            close();
+            setThemeChoice(choice);
+            anchorEl.focus();
+        });
+        menu.appendChild(item);
+    }
+    document.body.appendChild(menu);
+    const rect = anchorEl.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + 6}px`;
+    menu.style.left = `${Math.max(4, rect.right - menu.getBoundingClientRect().width)}px`;
+    function close() {
+        menu.remove();
+        document.removeEventListener("click", onDocClick, true);
+    }
+    function onDocClick(e) {
+        if (!menu.contains(e.target) && e.target !== anchorEl && !anchorEl.contains(e.target)) close();
+    }
+    setTimeout(() => document.addEventListener("click", onDocClick, true), 0);
+    wireMenu(menu, anchorEl, close);
+    // Mark the current choice for screen readers too.
+    menu.querySelectorAll("button").forEach((b, i) => {
+        b.setAttribute("role", "menuitemradio");
+        b.setAttribute("aria-checked", String(Object.keys(THEME_LABELS)[i] === current));
+    });
+}
+
+document.getElementById("theme-toggle-btn").setAttribute("aria-haspopup", "menu");
+document.getElementById("theme-toggle-btn").addEventListener("click", (e) => showThemeMenu(e.currentTarget));
+// Following the system means following it live, too.
+systemDarkQuery.addEventListener("change", updateThemeToggle);
 updateThemeToggle();
 
 let csrfTokenPromise;
