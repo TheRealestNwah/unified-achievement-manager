@@ -734,6 +734,8 @@
     .review-confidence { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); width: 50px; flex-shrink: 0; text-align: right; }
     .review-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .review-actions button { padding: 5px 12px; font-size: 12px; }
+    .review-row { flex-wrap: wrap; }
+    .review-row-error { flex-basis: 100%; font-size: 12px; color: #B91C1C; }
     .review-actions button.reject { background: transparent; color: var(--text-dim); border: 1px solid var(--border); box-shadow: none; }
 
     input[type="search"], input[type="text"], select {
@@ -1500,10 +1502,12 @@ function renderHiddenGamesPanel(games) {
         )
         .join("");
     panel.querySelectorAll(".review-row").forEach((row) => {
-        row.querySelector(".confirm").addEventListener("click", async () => {
-            await clearGameVisibility(row.dataset.id);
-            renderHiddenGamesPanel(await api("/api/me/games/hidden"));
-        });
+        row.querySelector(".confirm").addEventListener("click", () =>
+            runRowAction(row, async () => {
+                await clearGameVisibility(row.dataset.id);
+                await loadPanel(panel, () => api("/api/me/games/hidden"), renderHiddenGamesPanel);
+            })
+        );
     });
 }
 
@@ -2347,9 +2351,44 @@ function renderReviewPanel(candidates) {
 
     panel.querySelectorAll(".review-row").forEach((row) => {
         const id = row.dataset.id;
-        row.querySelector(".confirm").addEventListener("click", () => resolveCandidate(id, "confirm"));
-        row.querySelector(".reject").addEventListener("click", () => resolveCandidate(id, "reject"));
+        row.querySelector(".confirm").addEventListener("click", () => runRowAction(row, () => resolveCandidate(id, "confirm")));
+        row.querySelector(".reject").addEventListener("click", () => runRowAction(row, () => resolveCandidate(id, "reject")));
     });
+}
+
+// Runs one review-row decision with the row's buttons disabled, so a double
+// click can't send it twice, and shows a failure on the row itself instead
+// of leaving it silently unchanged (see #239).
+async function runRowAction(row, action) {
+    const buttons = row.querySelectorAll("button");
+    buttons.forEach((b) => (b.disabled = true));
+    row.querySelector(".review-row-error")?.remove();
+    try {
+        await action();
+    } catch (err) {
+        buttons.forEach((b) => (b.disabled = false));
+        const error = document.createElement("span");
+        error.className = "review-row-error";
+        error.setAttribute("role", "alert");
+        error.textContent = `Couldn't save that: ${err.message}`;
+        row.appendChild(error);
+        console.error(err);
+    }
+}
+
+// Loads a toggled panel's contents, showing a failure in the panel instead
+// of leaving "Loading..." on screen forever.
+async function loadPanel(panel, load, render) {
+    try {
+        render(await load());
+    } catch (err) {
+        panel.innerHTML = "";
+        const note = document.createElement("div");
+        note.className = "loading-note";
+        note.textContent = `Couldn't load this list: ${err.message}`;
+        panel.appendChild(note);
+        console.error(err);
+    }
 }
 
 async function resolveCandidate(id, action) {
@@ -2403,8 +2442,8 @@ function renderGameReviewPanel(candidates) {
 
     panel.querySelectorAll(".review-row").forEach((row) => {
         const id = row.dataset.id;
-        row.querySelector(".confirm").addEventListener("click", () => resolveGameCandidate(id, "confirm"));
-        row.querySelector(".reject").addEventListener("click", () => resolveGameCandidate(id, "reject"));
+        row.querySelector(".confirm").addEventListener("click", () => runRowAction(row, () => resolveGameCandidate(id, "confirm")));
+        row.querySelector(".reject").addEventListener("click", () => runRowAction(row, () => resolveGameCandidate(id, "reject")));
     });
 }
 
@@ -2452,8 +2491,8 @@ function renderSplitReviewPanel(candidates) {
 
     panel.querySelectorAll(".review-row").forEach((row) => {
         const id = row.dataset.id;
-        row.querySelector(".confirm").addEventListener("click", () => resolveSplitCandidate(id, "confirm"));
-        row.querySelector(".reject").addEventListener("click", () => resolveSplitCandidate(id, "reject"));
+        row.querySelector(".confirm").addEventListener("click", () => runRowAction(row, () => resolveSplitCandidate(id, "confirm")));
+        row.querySelector(".reject").addEventListener("click", () => runRowAction(row, () => resolveSplitCandidate(id, "reject")));
     });
 }
 
@@ -3149,7 +3188,7 @@ async function init() {
         panel.classList.remove("hidden");
         panel.className = "review-list";
         panel.innerHTML = `<div class="loading-note">Loading...</div>`;
-        renderReviewPanel(await api("/api/matching/candidates"));
+        await loadPanel(panel, () => api("/api/matching/candidates"), renderReviewPanel);
     });
     document.getElementById("review-games-btn").addEventListener("click", async () => {
         const panel = document.getElementById("review-games-panel");
@@ -3160,7 +3199,7 @@ async function init() {
         panel.classList.remove("hidden");
         panel.className = "review-list";
         panel.innerHTML = `<div class="loading-note">Loading...</div>`;
-        renderGameReviewPanel(await api("/api/matching/game-candidates"));
+        await loadPanel(panel, () => api("/api/matching/game-candidates"), renderGameReviewPanel);
     });
     document.getElementById("review-splits-btn").addEventListener("click", async () => {
         const panel = document.getElementById("review-splits-panel");
@@ -3171,7 +3210,7 @@ async function init() {
         panel.classList.remove("hidden");
         panel.className = "review-list";
         panel.innerHTML = `<div class="loading-note">Loading...</div>`;
-        renderSplitReviewPanel(await api("/api/matching/game-split-candidates"));
+        await loadPanel(panel, () => api("/api/matching/game-split-candidates"), renderSplitReviewPanel);
     });
     document.getElementById("hidden-games-btn").addEventListener("click", async () => {
         const panel = document.getElementById("hidden-games-panel");
@@ -3182,7 +3221,7 @@ async function init() {
         panel.classList.remove("hidden");
         panel.className = "review-list";
         panel.innerHTML = `<div class="loading-note">Loading...</div>`;
-        renderHiddenGamesPanel(await api("/api/me/games/hidden"));
+        await loadPanel(panel, () => api("/api/me/games/hidden"), renderHiddenGamesPanel);
     });
     document.getElementById("games-filter").addEventListener("input", () => renderGames(state.games));
     document.getElementById("games-sort").addEventListener("change", () => renderGames(state.games));
