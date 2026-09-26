@@ -1202,12 +1202,12 @@ function renderActivity(items) {
         <div class="activity-item">
             ${
                 a.icon_url
-                    ? `<img class="achievement-icon" src="${a.icon_url}" alt="" loading="lazy" />`
+                    ? `<img class="achievement-icon" src="${escapeHtml(a.icon_url)}" alt="" loading="lazy" />`
                     : `<div class="achievement-icon"></div>`
             }
             <span class="tier-tag ${a.tier}">${a.tier}</span>
             <div class="activity-body">
-                <div class="activity-name">${a.name}${
+                <div class="activity-name">${escapeHtml(a.name)}${
                     a.points != null ? ` <span class="achievement-points">+${a.points} XP</span>` : ""
                 }</div>
                 <div class="activity-meta">${gameTitleLink(a.game_id, a.game_title)} <span class="platform-badge">${a.platform_id}</span></div>
@@ -1259,7 +1259,7 @@ function renderStats(stats) {
         cards.push(
             statCard(
                 "Rarest achievement owned",
-                r.name,
+                escapeHtml(r.name),
                 `${gameTitleLink(r.game_id, r.game_title)} (${r.platform_id}) — ${Number(r.global_unlock_rarity).toFixed(2)}% of players`
             )
         );
@@ -1286,7 +1286,7 @@ function renderStats(stats) {
         cards.push(
             statCard(
                 "Oldest unlock still tracked",
-                stats.oldestUnlock.name,
+                escapeHtml(stats.oldestUnlock.name),
                 `${gameTitleLink(stats.oldestUnlock.game_id, stats.oldestUnlock.game_title)} — ${new Date(stats.oldestUnlock.unlocked_at).toLocaleDateString()}`
             )
         );
@@ -1805,7 +1805,7 @@ function renderGames(games) {
     const list = document.getElementById("games-list");
     list.innerHTML = "";
     if (visible.length === 0) {
-        list.innerHTML = `<div class="loading-note">No games match${filterText ? ` "${filterText}"` : " this view"}.</div>`;
+        list.innerHTML = `<div class="loading-note">No games match${filterText ? ` "${escapeHtml(filterText)}"` : " this view"}.</div>`;
         return;
     }
 
@@ -2140,18 +2140,18 @@ async function loadAchievementsPanel(panel, gameId) {
                     <div class="achievement-icon-wrap" title="Click to change icon">
                         ${
                             a.icon_url
-                                ? `<img class="achievement-icon" src="${a.icon_url}" alt="" loading="lazy" />`
+                                ? `<img class="achievement-icon" src="${escapeHtml(a.icon_url)}" alt="" loading="lazy" />`
                                 : `<div class="achievement-icon"></div>`
                         }
                     </div>
                     <span class="tier-tag ${a.tier}">${a.tier}</span>
                     <div class="achievement-body">
-                        <div class="achievement-name">${a.name}${
+                        <div class="achievement-name">${escapeHtml(a.name)}${
                             a.unlocked && a.points != null ? ` <span class="achievement-points">+${a.points} XP</span>` : ""
                         }${
                             tagRows ? ` <span class="platform-badge achievement-platform-tag">${safeLabel}</span>` : ""
                         }</div>
-                        ${a.description ? `<div class="achievement-desc">${a.description}</div>` : ""}
+                        ${a.description ? `<div class="achievement-desc">${escapeHtml(a.description)}</div>` : ""}
                     </div>
                     <div class="achievement-rarity">${a.global_unlock_rarity != null ? Number(a.global_unlock_rarity).toFixed(1) + "%" : ""}</div>
                 </div>
@@ -2330,10 +2330,10 @@ function renderReviewPanel(candidates) {
         <div class="review-row" data-id="${c.id}">
             <span class="review-game">${escapeHtml(c.game_title)}</span>
             <span class="review-compare">
-                <span class="platform-badge">${c.candidate_platform}</span> ${c.candidate_name}
+                <span class="platform-badge">${escapeHtml(c.candidate_platform)}</span> ${escapeHtml(c.candidate_name)}
                 <span class="arrow">vs</span>
                 ${(c.target_platforms || []).map((p) => `<span class="platform-badge">${p}</span>`).join(" ")}
-                ${c.target_name} <span class="tier-tag ${c.target_tier}">${c.target_tier}</span>
+                ${escapeHtml(c.target_name)} <span class="tier-tag ${c.target_tier}">${c.target_tier}</span>
             </span>
             <span class="review-confidence">${Math.round(c.confidence * 100)}%</span>
             <span class="review-actions">
@@ -2386,10 +2386,10 @@ function renderGameReviewPanel(candidates) {
             <span class="review-game">${GAME_CANDIDATE_REASON_LABELS[c.reason] || c.reason}</span>
             <span class="review-compare">
                 ${(c.game_a_platforms || []).map((p) => `<span class="platform-badge">${p}</span>`).join(" ")}
-                ${c.game_a_title}
+                ${escapeHtml(c.game_a_title)}
                 <span class="arrow">vs</span>
                 ${(c.game_b_platforms || []).map((p) => `<span class="platform-badge">${p}</span>`).join(" ")}
-                ${c.game_b_title}
+                ${escapeHtml(c.game_b_title)}
             </span>
             <span class="review-confidence">${Math.round(c.confidence * 100)}%</span>
             <span class="review-actions">
@@ -3100,7 +3100,7 @@ async function init() {
 
     document.getElementById("dashboard-view").classList.remove("hidden");
     document.getElementById("header-actions").innerHTML = `
-        <span style="color: var(--text-dim);">${user.username}</span>
+        <span style="color: var(--text-dim);">${escapeHtml(user.username)}</span>
         <button type="button" class="secondary" id="logout-btn" style="margin-left: auto;">Log out</button>
     `;
     document.getElementById("logout-btn").addEventListener("click", async () => {
