@@ -6,6 +6,7 @@ import { isValidSteamApiKey, saveSteamApiKey, steamApiKeySource } from "./steamA
 import { getSteamGridDbApiKey, isValidSteamGridDbApiKey, removeSteamGridDbApiKey, saveSteamGridDbApiKey } from "./steamGridDbKey";
 import { getDiscordPresenceEnabled, setDiscordPresenceEnabled } from "./discordPresence";
 import { getSearchAcronyms, saveSearchAcronyms, type SearchAcronym } from "./searchAcronyms";
+import { getDesktopSettings, isDesktopApp, updateDesktopSettings } from "./desktopSettings";
 
 export const setupRouter = Router();
 export const settingsRouter = Router();
@@ -22,6 +23,22 @@ settingsRouter.put("/discord-rich-presence", requireAuth, async (req, res, next)
     try {
         await setDiscordPresenceEnabled(Boolean(req.body?.enabled));
         res.status(204).end();
+    } catch (err) {
+        next(err);
+    }
+});
+
+settingsRouter.get("/desktop", requireAuth, async (_req, res, next) => {
+    try {
+        res.json(await getDesktopSettings());
+    } catch (err) {
+        next(err);
+    }
+});
+
+settingsRouter.put("/desktop", requireAuth, async (req, res, next) => {
+    try {
+        res.json(await updateDesktopSettings(req.body ?? {}));
     } catch (err) {
         next(err);
     }
@@ -105,8 +122,21 @@ setupRouter.get("/status", (req, res) => {
     res.json({
         steamApiKeyConfigured: source !== null,
         steamApiKeyEditable: source !== "env",
+        desktopApp: isDesktopApp(),
         csrfToken: getCsrfToken(req),
     });
+});
+
+// Unauthenticated and read-only for the same reason as discord-presence-data
+// below: the Electron main process reads it to decide what closing the
+// window does and whether to register with Windows startup (see #249).
+setupRouter.get("/desktop-settings", async (_req, res, next) => {
+    try {
+        res.setHeader("Cache-Control", "no-store");
+        res.json(await getDesktopSettings());
+    } catch (err) {
+        next(err);
+    }
 });
 
 // Unauthenticated like /status above - this is read by the Electron main

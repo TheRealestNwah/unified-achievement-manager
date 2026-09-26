@@ -3,6 +3,7 @@ import path from "path";
 import { format } from "util";
 import { app, BrowserWindow, dialog, Menu, session, shell } from "electron";
 import { startDiscordPresence, stopDiscordPresence } from "./discordPresence";
+import { handleWindowClose, launchedHidden, markQuitting, showWindow, startTray, stopTray } from "./tray";
 
 interface RunningApp {
     url: string;
@@ -100,7 +101,12 @@ function createWindow(): BrowserWindow {
             sandbox: true,
         },
     });
-    window.once("ready-to-show", () => window.show());
+    // A login-time launch starts in the tray; startTray() shows the window if
+    // the tray setting turns out to be off.
+    window.once("ready-to-show", () => {
+        if (!launchedHidden()) window.show();
+    });
+    window.on("close", (event) => handleWindowClose(event, window));
     window.webContents.setWindowOpenHandler(({ url }) => {
         openExternally(url);
         return { action: "deny" };
@@ -167,6 +173,9 @@ async function start(): Promise<void> {
     mainWindow = createWindow();
     mainWindow.on("closed", () => (mainWindow = null));
 
+    // Tells the in-process server it's inside the desktop app, so the
+    // dashboard offers the desktop-only settings (see #249).
+    process.env.UAM_DESKTOP = "1";
     const { startApp } = require(serverEntry()) as { startApp(options: { dataDir: string }): Promise<RunningApp> };
     running = await startApp({ dataDir });
     appOrigin = new URL(running.url).origin;
@@ -176,6 +185,7 @@ async function start(): Promise<void> {
     // Skipped during the smoke test (see #195) - it boots and quits in
     // seconds, not worth spinning up an IPC connection attempt for.
     if (process.env.UAM_SMOKE_TEST !== "1") startDiscordPresence(running.url);
+    if (process.env.UAM_SMOKE_TEST !== "1") await startTray(running.url, () => mainWindow);
 
     // CI launches the packaged app with this set to prove it boots end to end.
     if (process.env.UAM_SMOKE_TEST === "1") {
@@ -199,18 +209,17 @@ if (!app.requestSingleInstanceLock()) {
     // database; hand focus to it instead of starting a second server.
     app.quit();
 } else {
-    app.on("second-instance", () => {
-        if (!mainWindow) return;
-        if (mainWindow.isMinimized()) mainWindow.restore();
-        mainWindow.focus();
-    });
+    // Also brings the window back from the tray.
+    app.on("second-instance", () => showWindow(mainWindow));
 
     app.on("window-all-closed", () => app.quit());
 
     let readyToQuit = false;
     app.on("before-quit", (event) => {
+        markQuitting();
         if (readyToQuit) return;
         event.preventDefault();
+        stopTray();
         void stopServer().finally(() => {
             readyToQuit = true;
             app.quit();

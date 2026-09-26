@@ -17,7 +17,7 @@ The program itself is installed separately (by default in `%LOCALAPPDATA%\Progra
 
 ## Backing up and moving to a new PC
 
-1. Quit Unified Achievement Manager (closing the window quits it).
+1. Quit Unified Achievement Manager (closing the window quits it, unless **Keep running in the tray** is on in Settings; then right-click the tray icon and choose **Quit**).
 2. Copy the whole `%APPDATA%\Unified Achievement Manager` folder somewhere safe.
 
 To restore, or to move to another PC: install Unified Achievement Manager, don't launch it (or quit it), replace `%APPDATA%\Unified Achievement Manager` with your copy, and start the app. Always copy the folder as a whole. `secrets.json` and `postgres\` only work together, and a copy taken while the app is running may not be consistent.
