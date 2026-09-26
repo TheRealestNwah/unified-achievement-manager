@@ -401,7 +401,19 @@
     .settings-subnote { font-size: 12px; color: var(--text-dim); margin: 0 0 10px; }
     .danger-row { border-color: #FCA5A5; }
     button.danger-btn { color: #B91C1C; border-color: #FCA5A5; }
-    .platform-row input[type="text"] {
+    .secret-input { flex: 1; display: flex; position: relative; min-width: 0; }
+    .secret-input input { flex: 1; min-width: 0; padding-right: 58px !important; }
+    .secret-toggle {
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        color: var(--accent);
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+    .platform-row input[type="text"], .platform-row input[type="password"] {
         flex: 1;
         background: var(--input-bg);
         border: 1px solid var(--border);
@@ -819,7 +831,7 @@
                     <li>Copy the key it shows and paste it below.</li>
                 </ol>
                 <form class="platform-row" id="setup-form">
-                    <input type="text" id="setup-key-input" placeholder="Paste your Steam Web API key" autocomplete="off" spellcheck="false" />
+                    <input type="password" id="setup-key-input" placeholder="Paste your Steam Web API key" autocomplete="off" spellcheck="false" />
                     <button type="submit" id="setup-save-btn">Save</button>
                 </form>
                 <div id="setup-error" role="alert"></div>
@@ -1050,7 +1062,7 @@ const state = { games: [], linkMode: false, linkSelection: null, completionPrese
 // In-page replacements for window.prompt/confirm/alert. The desktop app's
 // Electron shell doesn't implement prompt(), and after a native confirm() or
 // showMessage() closes on Windows, text inputs can't be focused again (see #208).
-function openPromptDialog(message, { okLabel = "OK", withInput = false, withCancel = true, initialValue = "" } = {}) {
+function openPromptDialog(message, { okLabel = "OK", withInput = false, withCancel = true, initialValue = "", secret = false } = {}) {
     const dialog = document.getElementById("text-prompt");
     const form = document.getElementById("text-prompt-form");
     const input = document.getElementById("text-prompt-input");
@@ -1061,6 +1073,7 @@ function openPromptDialog(message, { okLabel = "OK", withInput = false, withCanc
     input.classList.toggle("hidden", !withInput);
     cancelBtn.classList.toggle("hidden", !withCancel);
     input.value = initialValue;
+    input.type = secret ? "password" : "text";
     return new Promise((resolve) => {
         const finish = (value) => {
             form.removeEventListener("submit", onSubmit);
@@ -1086,8 +1099,8 @@ function openPromptDialog(message, { okLabel = "OK", withInput = false, withCanc
 }
 
 // Resolves to the entered text, or null on cancel.
-function askText(message, { okLabel = "OK", initialValue = "" } = {}) {
-    return openPromptDialog(message, { okLabel, withInput: true, initialValue });
+function askText(message, { okLabel = "OK", initialValue = "", secret = false } = {}) {
+    return openPromptDialog(message, { okLabel, withInput: true, initialValue, secret });
 }
 
 function askConfirm(message, { okLabel = "OK" } = {}) {
@@ -2692,6 +2705,91 @@ function appendPlatformHelp(row, html) {
     row.appendChild(help);
 }
 
+// A secret field (API key, token, code) with a show/hide toggle, so it
+// isn't sitting in plain view on screen (see #242).
+function secretInput(id, placeholder, { maxWidth } = {}) {
+    const wrap = document.createElement("span");
+    wrap.className = "secret-input";
+    if (maxWidth) wrap.style.maxWidth = maxWidth;
+    const input = document.createElement("input");
+    input.type = "password";
+    input.id = id;
+    input.placeholder = placeholder;
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "secret-toggle";
+    toggle.textContent = "Show";
+    toggle.setAttribute("aria-label", `Show ${placeholder.toLowerCase()}`);
+    toggle.addEventListener("click", () => {
+        const showing = input.type === "text";
+        input.type = showing ? "password" : "text";
+        toggle.textContent = showing ? "Show" : "Hide";
+        toggle.setAttribute("aria-label", `${showing ? "Show" : "Hide"} ${placeholder.toLowerCase()}`);
+    });
+    wrap.append(input, toggle);
+    return wrap;
+}
+
+function plainInput(id, placeholder, { maxWidth } = {}) {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = id;
+    input.placeholder = placeholder;
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    if (maxWidth) input.style.maxWidth = maxWidth;
+    return input;
+}
+
+// Every not-yet-connected platform is a <form>, so Enter in any field submits
+// it, Connect stays disabled until every field has something in it, and the
+// server's own error message is shown on failure (see #242).
+function connectPlatformForm({ label, fields, help, connectPath, body, fallbackError, extra }) {
+    const form = document.createElement("form");
+    form.className = "platform-row";
+    const name = document.createElement("span");
+    name.className = "platform-name";
+    name.textContent = label;
+    form.appendChild(name);
+    if (extra) form.appendChild(extra);
+    for (const field of fields) form.appendChild(field);
+    const actions = document.createElement("div");
+    actions.className = "platform-actions";
+    const btn = document.createElement("button");
+    btn.type = "submit";
+    btn.className = "slot-2";
+    btn.textContent = "Connect";
+    actions.appendChild(btn);
+    form.appendChild(actions);
+    if (help) appendPlatformHelp(form, help);
+
+    const inputs = [...form.querySelectorAll("input")];
+    const updateEnabled = () => (btn.disabled = inputs.some((i) => !i.value.trim()));
+    inputs.forEach((i) => i.addEventListener("input", updateEnabled));
+    updateEnabled();
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+            await api(connectPath, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body(...inputs.map((i) => i.value.trim()))),
+            });
+            await refreshPlatforms();
+        } catch (err) {
+            showMessage(err.message || fallbackError);
+            console.error(err);
+            updateEnabled();
+        }
+    });
+    return form;
+}
+
 function renderPlatforms(accounts) {
     const byPlatform = Object.fromEntries(accounts.map((a) => [a.platform_id, a]));
     const list = document.getElementById("platforms-list");
@@ -2700,126 +2798,64 @@ function renderPlatforms(accounts) {
     // Steam is always connected here - it's how you signed in.
     list.appendChild(connectedPlatformRow("steam", "Steam", byPlatform.steam, { canDisconnect: false }));
 
-    const xboxRow = document.createElement("div");
-    xboxRow.className = "platform-row";
     if (byPlatform.xbox) {
         list.appendChild(connectedPlatformRow("xbox", "Xbox", byPlatform.xbox));
     } else {
-        xboxRow.innerHTML = `
-            <span class="platform-name">Xbox</span>
-            <input type="text" id="xbox-key-input" placeholder="Paste your OpenXBL API key" />
-            <div class="platform-actions"><button id="xbox-connect-btn" class="slot-2">Connect</button></div>
-        `;
-        appendPlatformHelp(
-            xboxRow,
-            `Xbox uses OpenXBL. Get an API key from the <a href="https://xbl.io/dashboard" target="_blank">OpenXBL dashboard</a>.`
+        list.appendChild(
+            connectPlatformForm({
+                label: "Xbox",
+                fields: [secretInput("xbox-key-input", "Paste your OpenXBL API key")],
+                help: `Xbox uses OpenXBL. Get an API key from the <a href="https://xbl.io/dashboard" target="_blank">OpenXBL dashboard</a>.`,
+                connectPath: "/api/xbox/connect",
+                body: (apiKey) => ({ apiKey }),
+                fallbackError: "Couldn't connect that Xbox account. Double check the API key.",
+            })
         );
-        list.appendChild(xboxRow);
-        xboxRow.querySelector("#xbox-connect-btn").addEventListener("click", async () => {
-            const input = xboxRow.querySelector("#xbox-key-input");
-            const btn = xboxRow.querySelector("#xbox-connect-btn");
-            btn.disabled = true;
-            try {
-                await api("/api/xbox/connect", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ apiKey: input.value.trim() }),
-                });
-                await refreshPlatforms();
-            } catch (err) {
-                showMessage("Couldn't connect that Xbox account. Double check the API key.");
-                console.error(err);
-            } finally {
-                btn.disabled = false;
-            }
-        });
     }
 
-    const psnRow = document.createElement("div");
-    psnRow.className = "platform-row";
     if (byPlatform.psn) {
         list.appendChild(connectedPlatformRow("psn", "PSN", byPlatform.psn));
     } else {
-        psnRow.innerHTML = `
-            <span class="platform-name">PSN</span>
-            <input type="text" id="psn-key-input" placeholder="Paste your NPSSO token" />
-            <div class="platform-actions"><button id="psn-connect-btn" class="slot-2">Connect</button></div>
-        `;
-        appendPlatformHelp(
-            psnRow,
-            `PSN has no public login. Sign in at <a href="https://www.playstation.com" target="_blank">playstation.com</a>, then open <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank">this page</a> in the same browser and copy the <code>npsso</code> value.`
+        list.appendChild(
+            connectPlatformForm({
+                label: "PSN",
+                fields: [secretInput("psn-key-input", "Paste your NPSSO token")],
+                help: `PSN has no public login. Sign in at <a href="https://www.playstation.com" target="_blank">playstation.com</a>, then open <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank">this page</a> in the same browser and copy the <code>npsso</code> value.`,
+                connectPath: "/api/psn/connect",
+                body: (npsso) => ({ npsso }),
+                fallbackError: "Couldn't connect that PlayStation account.",
+            })
         );
-        list.appendChild(psnRow);
-        psnRow.querySelector("#psn-connect-btn").addEventListener("click", async () => {
-            const input = psnRow.querySelector("#psn-key-input");
-            const btn = psnRow.querySelector("#psn-connect-btn");
-            btn.disabled = true;
-            try {
-                await api("/api/psn/connect", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ npsso: input.value.trim() }),
-                });
-                await refreshPlatforms();
-            } catch (err) {
-                showMessage(err.message || "Couldn't connect that PlayStation account.");
-                console.error(err);
-            } finally {
-                btn.disabled = false;
-            }
-        });
     }
 
-    const retroRow = document.createElement("div");
-    retroRow.className = "platform-row";
     if (byPlatform.retroachievements) {
         list.appendChild(connectedPlatformRow("retroachievements", "RetroAchievements", byPlatform.retroachievements));
     } else {
-        retroRow.innerHTML = `
-            <span class="platform-name">RetroAchievements</span>
-            <input type="text" id="retro-user-input" placeholder="Username" style="max-width: 140px;" />
-            <input type="text" id="retro-key-input" placeholder="Paste your Web API key" />
-            <div class="platform-actions"><button id="retro-connect-btn" class="slot-2">Connect</button></div>
-        `;
-        appendPlatformHelp(
-            retroRow,
-            `Get a Web API key from your RetroAchievements <a href="https://retroachievements.org/settings" target="_blank">account settings</a>.`
+        list.appendChild(
+            connectPlatformForm({
+                label: "RetroAchievements",
+                fields: [
+                    plainInput("retro-user-input", "Username", { maxWidth: "140px" }),
+                    secretInput("retro-key-input", "Paste your Web API key"),
+                ],
+                help: `Get a Web API key from your RetroAchievements <a href="https://retroachievements.org/settings" target="_blank">account settings</a>.`,
+                connectPath: "/api/retro/connect",
+                body: (username, apiKey) => ({ username, apiKey }),
+                fallbackError: "Couldn't connect that RetroAchievements account.",
+            })
         );
-        list.appendChild(retroRow);
-        retroRow.querySelector("#retro-connect-btn").addEventListener("click", async () => {
-            const userInput = retroRow.querySelector("#retro-user-input");
-            const keyInput = retroRow.querySelector("#retro-key-input");
-            const btn = retroRow.querySelector("#retro-connect-btn");
-            btn.disabled = true;
-            try {
-                await api("/api/retro/connect", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ username: userInput.value.trim(), apiKey: keyInput.value.trim() }),
-                });
-                await refreshPlatforms();
-            } catch (err) {
-                showMessage(err.message || "Couldn't connect that RetroAchievements account.");
-                console.error(err);
-            } finally {
-                btn.disabled = false;
-            }
-        });
     }
 
-    const gogRow = document.createElement("div");
-    gogRow.className = "platform-row";
     if (byPlatform.gog) {
         list.appendChild(connectedPlatformRow("gog", "GOG", byPlatform.gog));
     } else {
-        gogRow.innerHTML = `
-            <span class="platform-name">GOG</span>
-            <a href="#" id="gog-login-link" target="_blank" rel="noopener">Log in at GOG</a>
-            <input type="text" id="gog-code-input" placeholder="Paste the code from the redirect URL" />
-            <div class="platform-actions"><button id="gog-connect-btn" class="slot-2">Connect</button></div>
-        `;
-        list.appendChild(gogRow);
-        gogRow.querySelector("#gog-login-link").addEventListener("click", async (e) => {
+        const loginLink = document.createElement("a");
+        loginLink.href = "#";
+        loginLink.id = "gog-login-link";
+        loginLink.target = "_blank";
+        loginLink.rel = "noopener";
+        loginLink.textContent = "Log in at GOG";
+        loginLink.addEventListener("click", async (e) => {
             e.preventDefault();
             try {
                 const { url } = await api("/api/gog/login-url");
@@ -2829,24 +2865,16 @@ function renderPlatforms(accounts) {
                 console.error(err);
             }
         });
-        gogRow.querySelector("#gog-connect-btn").addEventListener("click", async () => {
-            const input = gogRow.querySelector("#gog-code-input");
-            const btn = gogRow.querySelector("#gog-connect-btn");
-            btn.disabled = true;
-            try {
-                await api("/api/gog/connect", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ code: input.value.trim() }),
-                });
-                await refreshPlatforms();
-            } catch (err) {
-                showMessage(err.message || "Couldn't connect that GOG account. The code may have expired - try logging in again.");
-                console.error(err);
-            } finally {
-                btn.disabled = false;
-            }
-        });
+        list.appendChild(
+            connectPlatformForm({
+                label: "GOG",
+                extra: loginLink,
+                fields: [secretInput("gog-code-input", "Paste the code from the redirect URL")],
+                connectPath: "/api/gog/connect",
+                body: (code) => ({ code }),
+                fallbackError: "Couldn't connect that GOG account. The code may have expired - try logging in again.",
+            })
+        );
     }
 }
 
@@ -2888,7 +2916,7 @@ function initSteamKeyRow(setup) {
     document.getElementById("steam-key-row").classList.remove("hidden");
     const btn = document.getElementById("steam-key-change-btn");
     btn.addEventListener("click", async () => {
-        const apiKey = await askText("Paste your new Steam Web API key (from steamcommunity.com/dev/apikey):", { okLabel: "Save" });
+        const apiKey = await askText("Paste your new Steam Web API key (from steamcommunity.com/dev/apikey):", { okLabel: "Save", secret: true });
         if (!apiKey) return;
         btn.disabled = true;
         try {
@@ -2917,7 +2945,7 @@ async function initSteamGridDbKeyRow() {
     }
 
     setBtn.addEventListener("click", async () => {
-        const apiKey = await askText("Paste your SteamGridDB API key (from steamgriddb.com/profile/preferences/api):", { okLabel: "Save" });
+        const apiKey = await askText("Paste your SteamGridDB API key (from steamgriddb.com/profile/preferences/api):", { okLabel: "Save", secret: true });
         if (!apiKey) return;
         setBtn.disabled = true;
         try {
