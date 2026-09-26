@@ -33,10 +33,10 @@ Links like these open in your normal web browser. Only Steam sign-in happens ins
 
 - **Sync:** pulls each platform's library and unlocks and recomputes your score. While the app is open it also re-syncs every linked platform automatically every 6 hours.
 - **Find matches:** links the same real-world game and achievement across platforms so they share one tier, with PSN's own tier always winning. Your score isn't collapsed: unlocking the same achievement on two platforms still counts both.
-- **Review matches:** high-confidence matches merge automatically. Anything uncertain waits here for you to confirm or reject.
+- **Review:** high-confidence matches merge automatically. Anything uncertain (achievement matches, game merges, and possible bad merges) waits on the **Review** page in the sidebar, with a count of what's waiting, for you to confirm or reject.
 - **Link games:** automatic matching only merges exact titles, so it misses cases like "Skyrim" on PSN vs "The Elder Scrolls V: Skyrim" on Steam. Click **Link games**, click the game whose title you want to keep, then click the duplicate.
 - **Cover art and icons:** click a game's cover or an achievement's icon to paste an image URL or upload your own (PNG, JPEG, WebP, or GIF, up to 5 MB).
-- **Export:** download your full unlock history as JSON or CSV.
+- **Export:** download your full unlock history as JSON or CSV from **Settings → Export**.
 - **Disconnect:** Xbox, PSN, RetroAchievements, and GOG can each be unlinked, which removes that platform's synced games and achievements. Steam can't be disconnected because it's how you sign in.
 - **Delete account:** permanently removes your account and everything linked to it after you type `DELETE` to confirm.
 
