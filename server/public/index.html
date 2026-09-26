@@ -773,6 +773,27 @@
     .achievement-desc { font-size: 12px; color: var(--text-dim); }
     .achievement-rarity { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
     .achievement-points { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+    .achievement-unlocked-at { font-size: 11px; color: var(--text-dimmer); margin-top: 2px; }
+    .achievement-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0 10px; cursor: default; }
+    .achievement-controls select {
+        background: var(--input-bg);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: 5px 10px;
+        color: var(--text);
+        font-size: 12px;
+    }
+    .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+    .segmented button {
+        background: var(--input-bg);
+        color: var(--text-dim);
+        border-radius: 0;
+        padding: 5px 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .segmented button + button { border-left: 1px solid var(--border); }
+    .segmented button[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 600; }
 
     .loading-note { color: var(--text-dim); font-size: 13px; padding: 16px; }
 
@@ -2356,6 +2377,90 @@ async function toggleAchievements(gameEl, gameId) {
     await loadAchievementsPanel(panel, gameId);
 }
 
+// Which achievements a panel shows and in what order (see #247) - a
+// per-viewer preference kept in localStorage, applied to every game.
+const ACHIEVEMENT_VIEW_KEY = "unified-achievement-manager:achievementView";
+const ACHIEVEMENT_SHOW_OPTIONS = [
+    ["all", "All"],
+    ["unlocked", "Unlocked"],
+    ["locked", "Locked"],
+];
+const ACHIEVEMENT_SORTS = {
+    default: { label: "Default order", compare: null },
+    rarest: {
+        label: "Rarest first",
+        compare: (a, b) => (a.global_unlock_rarity ?? Infinity) - (b.global_unlock_rarity ?? Infinity),
+    },
+    tier: {
+        label: "Tier",
+        compare: (a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier),
+    },
+    recent: {
+        label: "Recently unlocked",
+        compare: (a, b) => (b.unlocked_at ? Date.parse(b.unlocked_at) : -Infinity) - (a.unlocked_at ? Date.parse(a.unlocked_at) : -Infinity),
+    },
+};
+const TIER_ORDER = ["platinum", "gold", "silver", "bronze"];
+
+function getAchievementView() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(ACHIEVEMENT_VIEW_KEY) || "{}");
+        return {
+            show: ACHIEVEMENT_SHOW_OPTIONS.some(([value]) => value === saved.show) ? saved.show : "all",
+            sort: ACHIEVEMENT_SORTS[saved.sort] ? saved.sort : "default",
+        };
+    } catch {
+        return { show: "all", sort: "default" };
+    }
+}
+
+function setAchievementView(view) {
+    try {
+        localStorage.setItem(ACHIEVEMENT_VIEW_KEY, JSON.stringify(view));
+    } catch {
+        // Storage unavailable - the choice still applies to this panel.
+    }
+}
+
+function applyAchievementView(list, view) {
+    const shown = list.filter((a) => view.show === "all" || (view.show === "unlocked" ? a.unlocked : !a.unlocked));
+    const compare = ACHIEVEMENT_SORTS[view.sort].compare;
+    return compare ? [...shown].sort(compare) : shown;
+}
+
+function achievementControls(view, onChange) {
+    const bar = document.createElement("div");
+    bar.className = "achievement-controls";
+    bar.addEventListener("click", (e) => e.stopPropagation());
+
+    const group = document.createElement("div");
+    group.className = "segmented";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "Show");
+    for (const [value, label] of ACHIEVEMENT_SHOW_OPTIONS) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.setAttribute("aria-pressed", String(view.show === value));
+        button.addEventListener("click", () => onChange({ ...view, show: value }));
+        group.appendChild(button);
+    }
+
+    const sort = document.createElement("select");
+    sort.setAttribute("aria-label", "Sort achievements");
+    for (const [value, { label }] of Object.entries(ACHIEVEMENT_SORTS)) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        sort.appendChild(option);
+    }
+    sort.value = view.sort;
+    sort.addEventListener("change", () => onChange({ ...view, sort: sort.value }));
+
+    bar.append(group, sort);
+    return bar;
+}
+
 // Fills a panel with a game's achievements, one section per trophy list.
 // Shared by the expanded game row and the game's own page (see #186).
 async function loadAchievementsPanel(panel, gameId) {
@@ -2366,6 +2471,11 @@ async function loadAchievementsPanel(panel, gameId) {
         api(`/api/me/games/${gameId}/achievements`),
         api(`/api/me/games/${gameId}/platforms`),
     ]);
+    renderAchievementsPanel(panel, gameId, achievements, platformLinks, reload);
+}
+
+function renderAchievementsPanel(panel, gameId, achievements, platformLinks, reload) {
+    const view = getAchievementView();
 
     // One row per (achievement, platform link), so the same real achievement
     // matched across platforms appears once per platform - each with that
@@ -2404,6 +2514,7 @@ async function loadAchievementsPanel(panel, gameId) {
             // Collapse is remembered per list label ("psn (PS5)"). A bare
             // platform saved before #175 still collapses all of its lists.
             const collapsed = collapsedPlatforms.has(label) || collapsedPlatforms.has(platformId);
+            const shown = applyAchievementView(list, view);
             return `
         <div class="platform-section${collapsed ? " collapsed" : ""}" data-platform-id="${platformId}" data-collapse-key="${safeLabel}">
             <div class="platform-section-header">
@@ -2411,7 +2522,8 @@ async function loadAchievementsPanel(panel, gameId) {
                 <span class="platform-badge">${safeLabel}</span>
                 <span>${unlockedCount}/${list.length}</span>
             </div>
-            ${list
+            ${shown.length === 0 ? `<div class="achievement loading-note">No ${view.show} achievements in this list.</div>` : ""}
+            ${shown
                 .map(
                     (a) => `
                 <div class="achievement ${a.unlocked ? "" : "locked"}" data-achievement-id="${a.id}">
@@ -2430,6 +2542,11 @@ async function loadAchievementsPanel(panel, gameId) {
                             tagRows ? ` <span class="platform-badge achievement-platform-tag">${safeLabel}</span>` : ""
                         }</div>
                         ${a.description ? `<div class="achievement-desc">${escapeHtml(a.description)}</div>` : ""}
+                        ${
+                            a.unlocked && a.unlocked_at && new Date(a.unlocked_at).getFullYear() >= 2000
+                                ? `<div class="achievement-unlocked-at" title="${escapeHtml(new Date(a.unlocked_at).toLocaleString())}">Unlocked ${escapeHtml(new Date(a.unlocked_at).toLocaleDateString())}</div>`
+                                : ""
+                        }
                     </div>
                     <div class="achievement-rarity">${a.global_unlock_rarity != null ? Number(a.global_unlock_rarity).toFixed(1) + "%" : ""}</div>
                 </div>
@@ -2440,6 +2557,13 @@ async function loadAchievementsPanel(panel, gameId) {
     `;
         })
         .join("");
+
+    panel.prepend(
+        achievementControls(view, (next) => {
+            setAchievementView(next);
+            renderAchievementsPanel(panel, gameId, achievements, platformLinks, reload);
+        })
+    );
 
     if (platformLinks.length > 1) {
         const game = state.games.find((g) => g.id === gameId);
