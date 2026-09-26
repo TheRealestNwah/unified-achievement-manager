@@ -73,6 +73,15 @@ integration("getFunStats tier totals", () => {
         expect(stats.totalBronze).toBe(0);
     });
 
+    it("pages the activity feed without overlap (#253)", async () => {
+        const { getRecentActivity } = await import("./queries");
+        const all = await getRecentActivity(userId, 100, 0);
+        expect(all.length).toBeGreaterThanOrEqual(4);
+        const first = await getRecentActivity(userId, 2, 0);
+        const second = await getRecentActivity(userId, 2, 2);
+        expect([...first, ...second].map((a) => a.name)).toEqual(all.slice(0, 4).map((a) => a.name));
+    });
+
     it("keeps a hidden game in the totals, drops an excluded one, and leaves both out of the activity feed (#236)", async () => {
         const { getRecentActivity } = await import("./queries");
         const otherGameId = await canonicalStore.getOrCreateCanonicalGame("steam", "fun-stats-other-app", "Other Game");

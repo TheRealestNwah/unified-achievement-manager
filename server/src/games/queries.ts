@@ -173,7 +173,9 @@ export async function getGameCompletionCountsForUser(userId: string): Promise<Ga
     }));
 }
 
-export async function getRecentActivity(userId: string, limit = 20) {
+// Paged with limit/offset so the dashboard can show more than the latest 20
+// (see #253).
+export async function getRecentActivity(userId: string, limit = 20, offset = 0) {
     const result = await pool.query(
         `select
             ca.name, ca.tier, ca.points,
@@ -195,9 +197,11 @@ export async function getRecentActivity(userId: string, limit = 20) {
            and not exists (
                select 1 from user_game_visibility ugv where ugv.user_id = $1 and ugv.game_id = g.id
            )
-         order by uau.unlocked_at desc
-         limit $2`,
-        [userId, limit]
+         -- apl.id breaks ties so pages don't overlap or skip rows that
+         -- share an unlock time.
+         order by uau.unlocked_at desc, apl.id
+         limit $2 offset $3`,
+        [userId, limit, offset]
     );
     return result.rows;
 }
