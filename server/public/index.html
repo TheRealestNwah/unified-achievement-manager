@@ -1303,10 +1303,24 @@ function renderStats(stats) {
     if (stats.longestPlatinumGapDays !== null) {
         cards.push(statCard("Longest platinum drought", `${stats.longestPlatinumGapDays} days`, "between two platinums"));
     }
-    cards.push(statCard("Platinums earned", `${stats.totalPlatinums}`));
-    cards.push(statCard("Golds earned", `${stats.totalGold}`));
-    cards.push(statCard("Silvers earned", `${stats.totalSilver}`));
-    cards.push(statCard("Bronzes earned", `${stats.totalBronze}`));
+    // One card for the whole tier breakdown (see #240) - the platinum count
+    // already has its own card above, and four near-identical cards pushed
+    // the more interesting stats off screen.
+    const tierTotal = stats.totalPlatinums + stats.totalGold + stats.totalSilver + stats.totalBronze;
+    cards.push(
+        statCard(
+            "Tier breakdown",
+            `${tierTotal.toLocaleString()} unlocked`,
+            `<span class="tier-pips">${[
+                ["platinum", stats.totalPlatinums],
+                ["gold", stats.totalGold],
+                ["silver", stats.totalSilver],
+                ["bronze", stats.totalBronze],
+            ]
+                .map(([tier, count]) => `<span class="pip" title="${tier}"><span class="dot ${tier}"></span>${count.toLocaleString()}</span>`)
+                .join("")}</span>`
+        )
+    );
 
     grid.innerHTML = cards.length > 0 ? cards.join("") : `<div class="loading-note">Not enough data yet.</div>`;
     bindGameTitleLinks(grid);
