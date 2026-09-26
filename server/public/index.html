@@ -2509,7 +2509,7 @@ async function syncAllPlatforms(button, statusEl) {
                 renderScore(summary.score);
                 results.push(`${account.platform_id}: ${formatSyncSummary(summary)}`);
             } catch (err) {
-                results.push(`${account.platform_id}: failed (${err.message})`);
+                results.push(`${account.platform_id}: ${syncErrorMessage(account.platform_id, err)}`);
                 console.error(err);
             }
         }
@@ -2548,7 +2548,16 @@ function formatSyncSummary(summary) {
     }`;
 }
 
-async function syncPlatform(platformId, button, noteEl) {
+// Names the platform that actually hit the limit (see #238) - every platform's
+// sync can come back rate limited, not just Xbox's.
+function syncErrorMessage(label, err) {
+    const message = err?.message || "";
+    return message.includes("429") || message.toLowerCase().includes("rate limit")
+        ? `Rate limited by ${label} — wait a bit and try again.`
+        : `Sync failed: ${message}`;
+}
+
+async function syncPlatform(platformId, label, button, noteEl) {
     button.disabled = true;
     noteEl.textContent = platformId === "steam"
         ? "Syncing... this can take a few minutes for a large library."
@@ -2561,9 +2570,7 @@ async function syncPlatform(platformId, button, noteEl) {
         await refreshActivity();
         await refreshStats();
     } catch (err) {
-        noteEl.textContent = err.message?.includes("429") || err.message?.toLowerCase().includes("rate limit")
-            ? "Rate limited by Xbox's API — wait a bit and try again."
-            : `Sync failed: ${err.message}`;
+        noteEl.textContent = syncErrorMessage(label, err);
         console.error(err);
     } finally {
         button.disabled = false;
@@ -2611,7 +2618,7 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
     syncBtn.className = "secondary slot-1";
     syncBtn.id = `${PLATFORM_NOTE_PREFIXES[platformId]}-sync-btn`;
     syncBtn.textContent = "Sync";
-    syncBtn.addEventListener("click", (e) => syncPlatform(PLATFORM_SYNC_SLUGS[platformId], e.currentTarget, note));
+    syncBtn.addEventListener("click", (e) => syncPlatform(PLATFORM_SYNC_SLUGS[platformId], label, e.currentTarget, note));
     actions.appendChild(syncBtn);
     if (canDisconnect) {
         const disconnectBtn = document.createElement("button");
