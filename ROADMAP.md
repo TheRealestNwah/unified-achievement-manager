@@ -52,6 +52,7 @@ Working discipline for unmonitored runs is unchanged: one focused PR per item, `
 - **EA/Origin** — no public API, no realistic path without violating ToS. Revisit only if a reliable third-party data source turns up.
 - **Ubisoft Connect** — won't build. There's no public achievements API, the only known sign-in takes the user's raw email and password, and Ubisoft's terms prohibit unofficial API access with account sanctions as the penalty. Putting users' accounts at risk of a ban isn't worth it. See [#148](https://github.com/TheRealestNwah/unified-achievement-manager/issues/148) and [#31](https://github.com/TheRealestNwah/unified-achievement-manager/issues/31).
 - **Epic Games Store** — achievements need per-game developer credentials, and most titles have none. See [#31](https://github.com/TheRealestNwah/unified-achievement-manager/issues/31).
+- **Amazon Games / Prime Gaming** — no public API for library or achievements, and most titles have no platform-native achievement system to begin with, so there's nothing to sync even with an unofficial client. Known community tools (e.g. Playnite) only do local install/registry scraping for library detection, not achievements. See [#231](https://github.com/TheRealestNwah/unified-achievement-manager/issues/231).
 
 ## Suggested order
 
