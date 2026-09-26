@@ -23,11 +23,15 @@
         --border: #E5E5E7;
         --border-2: #EDEDEF;
         --text: #1D1D1F;
-        --text-dim: #6E6E73;
-        --text-dimmer: #9A9A9E;
+        /* Both dim text colors clear WCAG AA (4.5:1) on the page, sidebar,
+           and card backgrounds (see #281). */
+        --text-dim: #636368;
+        --text-dimmer: #6E6E73;
         --accent: #0071E3;
+        /* Fill behind white button text - #0071E3 is already 4.7:1. */
+        --accent-fill: #0071E3;
         --active: #248A46;
-        --bronze: #9C6B45;
+        --bronze: #A87650;
         --silver: #A9AEBB;
         --gold: #D6AD57;
         --platinum: #C9CEDB;
@@ -52,9 +56,11 @@
             --border: rgba(255,255,255,.08);
             --border-2: rgba(255,255,255,.05);
             --text: #F2F2F2;
-            --text-dim: #9A9A9E;
-            --text-dimmer: #6E6E73;
+            --text-dim: #AEAEB2;
+            --text-dimmer: #98989D;
             --accent: #0A84FF;
+            /* White on #0A84FF is 3.65:1; buttons use a deeper blue (5.1:1). */
+            --accent-fill: #0A6CD6;
             --ring-bg: #3A3A3C;
             --ring-track: rgba(255,255,255,0.08);
             --placeholder-bg: rgba(255,255,255,0.06);
@@ -74,9 +80,10 @@
         --border: rgba(255,255,255,.08);
         --border-2: rgba(255,255,255,.05);
         --text: #F2F2F2;
-        --text-dim: #9A9A9E;
-        --text-dimmer: #6E6E73;
+        --text-dim: #AEAEB2;
+        --text-dimmer: #98989D;
         --accent: #0A84FF;
+        --accent-fill: #0A6CD6;
         --ring-bg: #3A3A3C;
         --ring-track: rgba(255,255,255,0.08);
         --placeholder-bg: rgba(255,255,255,0.06);
@@ -163,7 +170,7 @@
         height: 18px;
         padding: 0 6px;
         border-radius: 999px;
-        background: var(--accent);
+        background: var(--accent-fill);
         color: #fff;
         font-size: 11px;
         font-weight: 700;
@@ -181,7 +188,7 @@
     }
     .review-tab[aria-selected="true"] { background: var(--card); color: var(--text); border-color: var(--border); }
     .nav-item.active {
-        background: var(--accent);
+        background: var(--accent-fill);
         color: #fff;
         font-weight: 600;
     }
@@ -225,7 +232,7 @@
     main { width: 100%; max-width: 1040px; margin: 0 auto; padding: 28px; }
 
     button {
-        background: var(--accent);
+        background: var(--accent-fill);
         color: #fff;
         border: none;
         padding: 9px 18px;
@@ -627,7 +634,7 @@
         transition: transform .15s ease;
     }
     input[type="checkbox"]:checked {
-        background: var(--accent);
+        background: var(--accent-fill);
         border-color: var(--accent);
     }
     input[type="checkbox"]:checked::before { transform: translateX(17px); }
@@ -809,7 +816,7 @@
         font-weight: 500;
     }
     .segmented button + button { border-left: 1px solid var(--border); }
-    .segmented button[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 600; }
+    .segmented button[aria-pressed="true"] { background: var(--accent-fill); color: #fff; font-weight: 600; }
 
     .loading-note { color: var(--text-dim); font-size: 13px; padding: 16px; }
 
