@@ -60,6 +60,8 @@ export async function getGamesForUser(userId: string, { includeHidden = false, g
             count(ca.id) as total_achievements,
             count(uau.id) as unlocked_achievements,
             coalesce(sum(ca.points) filter (where uau.id is not null), 0) as points_earned,
+            -- For the "Recently unlocked" sort (see #246).
+            max(uau.unlocked_at) as last_unlocked_at,
             count(*) filter (where ca.tier = 'platinum' and uau.id is not null) as platinum_unlocked,
             count(*) filter (where ca.tier = 'gold' and uau.id is not null) as gold_unlocked,
             count(*) filter (where ca.tier = 'silver' and uau.id is not null) as silver_unlocked,
