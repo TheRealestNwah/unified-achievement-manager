@@ -873,7 +873,19 @@
        into the content area or forcing horizontal scroll. */
     @media (max-width: 900px) {
         .sidebar { width: 60px; align-items: center; }
-        .sidebar-brand span, .sidebar-label, .nav-item-label { display: none; }
+        .sidebar-brand span, .sidebar-label { display: none; }
+        /* Visually hidden, not display:none, so each icon button keeps its
+           accessible name in the compact rail (see #280). */
+        .nav-item-label {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+        .nav-item { position: relative; }
+        .nav-item .nav-badge { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; font-size: 10px; padding: 0 4px; }
         .sidebar-brand { justify-content: center; padding: 18px 0 16px; }
         .sidebar-section { padding: 0 8px; width: 100%; }
         .nav-item { justify-content: center; padding: 0; width: 40px; height: 34px; margin: 0 auto 4px; }
@@ -4046,6 +4058,10 @@ function openReviewPage(tab) {
 }
 
 function initSidebarNav() {
+    // Tooltips for the compact icon-only rail (see #280).
+    document.querySelectorAll(".nav-item").forEach((btn) => {
+        btn.title = btn.querySelector(".nav-item-label")?.textContent.trim() ?? "";
+    });
     document.querySelectorAll(".nav-item").forEach((btn) => {
         btn.addEventListener("click", () => {
             const key = btn.dataset.nav;
