@@ -3,6 +3,7 @@ import path from "path";
 import { format } from "util";
 import { app, BrowserWindow, dialog, Menu, session, shell } from "electron";
 import { startDiscordPresence, stopDiscordPresence } from "./discordPresence";
+import { loadWindowState, trackWindowState } from "./windowState";
 
 interface RunningApp {
     url: string;
@@ -86,9 +87,9 @@ const LOADING_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!docty
 <body><div style="text-align:center"><h2>Unified Achievement Manager</h2><p>Starting up&hellip; the first launch takes a few seconds longer.</p></div></body></html>`)}`;
 
 function createWindow(): BrowserWindow {
+    const saved = loadWindowState(dataDir);
     const window = new BrowserWindow({
-        width: 1280,
-        height: 860,
+        ...saved.bounds,
         minWidth: 720,
         minHeight: 520,
         title: "Unified Achievement Manager",
@@ -100,7 +101,11 @@ function createWindow(): BrowserWindow {
             sandbox: true,
         },
     });
-    window.once("ready-to-show", () => window.show());
+    window.once("ready-to-show", () => {
+        if (saved.maximized) window.maximize();
+        window.show();
+    });
+    trackWindowState(window, dataDir);
     window.webContents.setWindowOpenHandler(({ url }) => {
         openExternally(url);
         return { action: "deny" };
