@@ -308,6 +308,19 @@ gamesRouter.get("/games/hidden", requireAuth, async (req, res, next) => {
     }
 });
 
+// One game's header data (title, cover, platforms, progress, visibility) for
+// its own page, including hidden/excluded games the library list leaves out
+// (see #237). Declared after /games/hidden so that path isn't read as an id.
+gamesRouter.get("/games/:gameId", requireAuth, async (req, res, next) => {
+    try {
+        const [game] = await getGamesForUser(req.user!.id, { gameId: req.params.gameId });
+        if (!game) return res.status(404).json({ error: "Game not found in your library" });
+        res.json(game);
+    } catch (err) {
+        next(err);
+    }
+});
+
 // Only checks that the URL is well-formed http(s) - deliberately doesn't
 // fetch it server-side to validate content-type, which would let a pasted
 // URL make the server issue requests to arbitrary (including internal)
