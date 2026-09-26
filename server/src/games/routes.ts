@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
+import { exportFileName } from "./exportFile";
 import { getGamesForUser, getAchievementsForGame, getRecentActivity, getFunStats, getFullExportData } from "./queries";
 import { recomputeUserScore } from "../scoring";
 import {
@@ -156,10 +157,10 @@ gamesRouter.get("/export", requireAuth, async (req, res, next) => {
 
         if (wantsCsv) {
             res.setHeader("Content-Type", "text/csv");
-            res.setHeader("Content-Disposition", 'attachment; filename="unified-achievement-manager-export.csv"');
+            res.setHeader("Content-Disposition", `attachment; filename="${exportFileName("csv")}"`);
             res.send(toCsv(rows));
         } else {
-            res.setHeader("Content-Disposition", 'attachment; filename="unified-achievement-manager-export.json"');
+            res.setHeader("Content-Disposition", `attachment; filename="${exportFileName("json")}"`);
             res.json(rows);
         }
     } catch (err) {
