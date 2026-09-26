@@ -16,8 +16,9 @@ interface GameRow {
 }
 
 // Matches platforms.id in schema.sql - not the short "retro" name used
-// elsewhere in comments/prose, which isn't the real stored value.
-const RETRO_PLATFORM_ID = "retroachievements";
+// elsewhere in comments/prose, which isn't the real stored value. Exported
+// for legacySignalSplitDetector.ts, which needs the same legacy-signal check.
+export const RETRO_PLATFORM_ID = "retroachievements";
 
 // A platform link that's known to be an older-hardware-only release of a
 // title, same risk category as RetroAchievements (see #225): a modern

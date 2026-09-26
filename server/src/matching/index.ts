@@ -1,5 +1,6 @@
 import { pool } from "../db";
 import { matchGames } from "./gameMatcher";
+import { detectLegacySignalSplitCandidates } from "./legacySignalSplitDetector";
 import { matchAchievementsForAllGames } from "./achievementMatcher";
 import { enrichGamesWithSteamCatalog } from "./steamCatalogEnrichment";
 import { enrichGamesWithXboxCatalog } from "./xboxCatalogEnrichment";
@@ -16,6 +17,7 @@ export interface MatchingSummary {
     retroCatalogGamesEnriched: number;
     achievementsMerged: number;
     achievementCandidatesRecorded: number;
+    gameSplitCandidatesRecorded: number;
     usersRescored: number;
 }
 
@@ -25,6 +27,13 @@ export interface MatchingSummary {
 // every user's cached score is recomputed afterward.
 export async function runMatching(): Promise<MatchingSummary> {
     const gameResult = await matchGames();
+
+    // Flags existing games that already combine a legacy-signal platform
+    // link with a non-legacy one - a shape matchGames itself now refuses to
+    // create, so any game already in it was very likely merged before that
+    // exclusion existed (see #230). Detection only; a human reviews and
+    // splits via the existing undo path, same as game merge candidates.
+    const splitDetectResult = await detectLegacySignalSplitCandidates();
 
     // Backfills real Steam/Xbox/RetroAchievements achievement/rarity data
     // for games no user has actually linked that platform for - runs before
@@ -57,6 +66,7 @@ export async function runMatching(): Promise<MatchingSummary> {
         retroCatalogGamesEnriched: retroCatalogResult.gamesEnriched,
         achievementsMerged: achievementResult.achievementsMerged,
         achievementCandidatesRecorded: achievementResult.candidatesRecorded,
+        gameSplitCandidatesRecorded: splitDetectResult.candidatesRecorded,
         usersRescored: users.rows.length,
     };
 }

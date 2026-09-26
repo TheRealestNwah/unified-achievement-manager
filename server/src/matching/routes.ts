@@ -5,6 +5,7 @@ import { runMatching } from "./index";
 import { confirmMatchCandidate, rejectMatchCandidate, matchAchievementsForGame } from "./achievementMatcher";
 import { mergeGames, confirmGameMergeCandidate, rejectGameMergeCandidate } from "./gameMatcher";
 import { splitPlatformLink, GameSplitError } from "./gameSplitter";
+import { confirmGameSplitCandidate, rejectGameSplitCandidate } from "./legacySignalSplitDetector";
 import { recomputeUserScore } from "../scoring";
 import { normalizeRarityTiersForAllGames, normalizeRarityTiersForGame } from "../scoring/rarityNormalization";
 
@@ -235,6 +236,76 @@ matchingRouter.post("/game-candidates/:id/confirm", requireAuth, async (req, res
 matchingRouter.post("/game-candidates/:id/reject", requireAuth, async (req, res, next) => {
     try {
         await rejectGameMergeCandidate(req.params.id);
+        res.status(204).end();
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Games already combining a legacy-signal platform link (RetroAchievements,
+// or a legacy-only PSN/Xbox release) with a non-legacy one - almost always a
+// merge from before matchGames refused to create that shape (see #230).
+// "Confirm" here means "yes, split it" (reusing splitPlatformLink, the same
+// undo path "Link games" exposes manually); "reject" means a human looked
+// and decided this really is the same release, so stop suggesting it.
+matchingRouter.get("/game-split-candidates", requireAuth, async (_req, res, next) => {
+    try {
+        const result = await pool.query(`
+            select
+                gsc.id,
+                gsc.reason,
+                g.title as game_title,
+                gpl.platform_id as candidate_platform,
+                gpl.console_variant as candidate_console_variant,
+                gpl.platform_title as candidate_platform_title,
+                (select array_agg(distinct platform_id || coalesce(' (' || console_variant || ')', ''))
+                 from game_platform_links where game_id = g.id and id != gsc.game_platform_link_id) as other_platforms
+            from game_split_candidates gsc
+            join games g on g.id = gsc.game_id
+            join game_platform_links gpl on gpl.id = gsc.game_platform_link_id
+            where gsc.status = 'pending'
+            order by g.title
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        next(err);
+    }
+});
+
+matchingRouter.post("/game-split-candidates/:id/confirm", requireAuth, async (req, res, next) => {
+    try {
+        const candidate = await pool.query("select game_id from game_split_candidates where id = $1", [req.params.id]);
+        if (!candidate.rows[0]) return res.status(404).json({ error: "Game split candidate not found" });
+        const sourceGameId = candidate.rows[0].game_id;
+
+        let result;
+        try {
+            result = await confirmGameSplitCandidate(req.params.id);
+        } catch (err) {
+            if (err instanceof GameSplitError) return res.status(400).json({ error: err.message });
+            throw err;
+        }
+
+        await normalizeRarityTiersForGame(sourceGameId);
+        await normalizeRarityTiersForGame(result.newGameId);
+
+        const affectedUsers = await pool.query(
+            `select distinct upa.user_id from user_owned_games uog
+             join user_platform_accounts upa on upa.id = uog.user_platform_account_id
+             where uog.game_id in ($1, $2)`,
+            [sourceGameId, result.newGameId]
+        );
+        for (const user of affectedUsers.rows) await recomputeUserScore(user.user_id);
+
+        res.json({ ...result, usersRescored: affectedUsers.rows.length });
+    } catch (err) {
+        next(err);
+    }
+});
+
+matchingRouter.post("/game-split-candidates/:id/reject", requireAuth, async (req, res, next) => {
+    try {
+        await rejectGameSplitCandidate(req.params.id);
         res.status(204).end();
     } catch (err) {
         next(err);

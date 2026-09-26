@@ -876,6 +876,7 @@
                             <div class="button-group">
                                 <button type="button" class="secondary" id="review-btn">Review matches</button>
                                 <button type="button" class="secondary" id="review-games-btn">Review game merges</button>
+                                <button type="button" class="secondary" id="review-splits-btn">Review possible bad merges</button>
                                 <button type="button" class="secondary" id="match-btn">Find matches</button>
                                 <button type="button" class="secondary" id="link-games-btn">Link games</button>
                                 <button type="button" class="secondary" id="hidden-games-btn">Hidden games</button>
@@ -890,6 +891,7 @@
 
                     <div id="review-panel" class="hidden"></div>
                     <div id="review-games-panel" class="hidden"></div>
+                    <div id="review-splits-panel" class="hidden"></div>
                     <div id="hidden-games-panel" class="hidden"></div>
 
                     <div class="filter-chip" id="preset-filter-chip">
@@ -2413,6 +2415,55 @@ async function resolveGameCandidate(id, action) {
     if (action === "confirm") await refreshGamesAndScore();
 }
 
+async function refreshSplitReviewCount() {
+    const candidates = await api("/api/matching/game-split-candidates");
+    const btn = document.getElementById("review-splits-btn");
+    btn.textContent = candidates.length > 0 ? `Review possible bad merges (${candidates.length})` : "Review possible bad merges";
+    return candidates;
+}
+
+function renderSplitReviewPanel(candidates) {
+    const panel = document.getElementById("review-splits-panel");
+    if (candidates.length === 0) {
+        panel.innerHTML = `<div class="loading-note">No possible bad merges waiting for review.</div>`;
+        return;
+    }
+
+    panel.innerHTML = candidates
+        .map(
+            (c) => `
+        <div class="review-row" data-id="${c.id}">
+            <span class="review-game">${GAME_CANDIDATE_REASON_LABELS[c.reason] || c.reason}</span>
+            <span class="review-compare">
+                ${escapeHtml(c.game_title)}:
+                <span class="platform-badge">${c.candidate_platform}${c.candidate_console_variant ? ` (${c.candidate_console_variant})` : ""}</span>
+                ${escapeHtml(c.candidate_platform_title)}
+                <span class="arrow">merged with</span>
+                ${(c.other_platforms || []).map((p) => `<span class="platform-badge">${p}</span>`).join(" ")}
+            </span>
+            <span class="review-actions">
+                <button class="confirm">Split apart</button>
+                <button class="reject">Keep merged</button>
+            </span>
+        </div>
+    `
+        )
+        .join("");
+
+    panel.querySelectorAll(".review-row").forEach((row) => {
+        const id = row.dataset.id;
+        row.querySelector(".confirm").addEventListener("click", () => resolveSplitCandidate(id, "confirm"));
+        row.querySelector(".reject").addEventListener("click", () => resolveSplitCandidate(id, "reject"));
+    });
+}
+
+async function resolveSplitCandidate(id, action) {
+    await api(`/api/matching/game-split-candidates/${id}/${action}`, { method: "POST" });
+    const candidates = await refreshSplitReviewCount();
+    renderSplitReviewPanel(candidates);
+    if (action === "confirm") await refreshGamesAndScore();
+}
+
 // /api/me/accounts reports platform_id the way the DB stores it
 // ("retroachievements"), but that platform's routes are mounted at
 // /api/retro (see index.ts) - this is the single source of truth for that
@@ -3078,10 +3129,11 @@ async function init() {
         status.textContent = "Matching games and achievements across platforms...";
         try {
             const summary = await api("/api/matching/run", { method: "POST" });
-            status.textContent = `Merged ${summary.gameGroupsMerged} game(s), ${summary.achievementsMerged} achievement(s). ${summary.steamCatalogGamesEnriched} Steam, ${summary.xboxCatalogGamesEnriched} Xbox, ${summary.retroCatalogGamesEnriched} RetroAchievements game(s) enriched with real tier data. ${summary.achievementCandidatesRecorded} possible achievement match(es) and ${summary.gameCandidatesRecorded} possible game merge(s) queued for review.`;
+            status.textContent = `Merged ${summary.gameGroupsMerged} game(s), ${summary.achievementsMerged} achievement(s). ${summary.steamCatalogGamesEnriched} Steam, ${summary.xboxCatalogGamesEnriched} Xbox, ${summary.retroCatalogGamesEnriched} RetroAchievements game(s) enriched with real tier data. ${summary.achievementCandidatesRecorded} possible achievement match(es), ${summary.gameCandidatesRecorded} possible game merge(s), and ${summary.gameSplitCandidatesRecorded} possible bad merge(s) queued for review.`;
             await refreshGamesAndScore();
             await refreshReviewCount();
             await refreshGameReviewCount();
+            await refreshSplitReviewCount();
         } catch (err) {
             status.textContent = `Matching failed: ${err.message}`;
         } finally {
@@ -3109,6 +3161,17 @@ async function init() {
         panel.className = "review-list";
         panel.innerHTML = `<div class="loading-note">Loading...</div>`;
         renderGameReviewPanel(await api("/api/matching/game-candidates"));
+    });
+    document.getElementById("review-splits-btn").addEventListener("click", async () => {
+        const panel = document.getElementById("review-splits-panel");
+        if (!panel.classList.contains("hidden")) {
+            panel.classList.add("hidden");
+            return;
+        }
+        panel.classList.remove("hidden");
+        panel.className = "review-list";
+        panel.innerHTML = `<div class="loading-note">Loading...</div>`;
+        renderSplitReviewPanel(await api("/api/matching/game-split-candidates"));
     });
     document.getElementById("hidden-games-btn").addEventListener("click", async () => {
         const panel = document.getElementById("hidden-games-panel");
@@ -3147,6 +3210,7 @@ async function init() {
     await refreshStats();
     await refreshReviewCount();
     await refreshGameReviewCount();
+    await refreshSplitReviewCount();
 }
 
 init();

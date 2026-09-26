@@ -192,6 +192,27 @@ create table if not exists game_merge_candidates (
     unique (game_a_id, game_b_id)
 );
 
+-- Games that already have a legacy-signal platform link (RetroAchievements,
+-- or a PSN/Xbox link known to be an older-hardware-only release - see
+-- isLegacyOnlyLink in gameMatcher.ts) merged in alongside a non-legacy
+-- platform, the exact configuration current auto-merge rules refuse to
+-- create going forward (#225, #227). These are almost always merges from
+-- before that review-gate existed - a modern remake/remaster silently fused
+-- with an older classic-system release of the same title (see #230, the
+-- Resident Evil case) - since mergeGames deletes the losing game row, there
+-- is no other record of when or how they were joined. Surfaced for a human
+-- to split back apart (or dismiss as a genuine same-release match) via the
+-- existing splitPlatformLink undo path, one legacy platform link at a time.
+create table if not exists game_split_candidates (
+    id                   uuid primary key default uuid_generate_v4(),
+    game_id              uuid not null references games(id) on delete cascade,
+    game_platform_link_id uuid not null references game_platform_links(id) on delete cascade,
+    reason               text not null,
+    status               match_status not null default 'pending',
+    reviewed_at          timestamptz,
+    unique (game_platform_link_id)
+);
+
 -- ---------------------------------------------------------------------------
 -- Unlocks & scoring
 -- ---------------------------------------------------------------------------
