@@ -2306,7 +2306,11 @@ function renderPresetChip() {
     }
 }
 
-function renderGames(games) {
+// refetchExpanded: re-fetch the achievements of games left expanded, for when
+// the underlying data changed (not just the filter or sort).
+function renderGames(games, { refetchExpanded = false } = {}) {
+    const pane = document.querySelector(".content-pane");
+    const scrollTop = pane.scrollTop;
     document.getElementById("games-heading").textContent =
         `Your games (${games.length})`;
 
@@ -2387,7 +2391,12 @@ function renderGames(games) {
             showGameContextMenu(e.clientX, e.clientY, game);
         });
         list.appendChild(el);
+        if (!state.linkMode && expandedGameIds.has(game.id)) {
+            openAchievementsPanel(el, game.id, { refetch: refetchExpanded }).catch((err) => console.error(err));
+        }
     }
+    // Rebuilding the list briefly shrinks the page; keep the reader's place.
+    pane.scrollTop = scrollTop;
 }
 
 // Enters link-selection mode, optionally pre-selecting `game` as the one to
@@ -2685,17 +2694,14 @@ function hideGameView() {
 
 async function toggleAchievements(gameEl, gameId) {
     const existing = gameEl.querySelector(".achievements");
-    const titleEl = gameEl.querySelector(".game-title");
     if (existing) {
         existing.remove();
-        titleEl?.setAttribute("aria-expanded", "false");
+        expandedGameIds.delete(gameId);
+        gameEl.querySelector(".game-title")?.setAttribute("aria-expanded", "false");
         return;
     }
-    titleEl?.setAttribute("aria-expanded", "true");
-    const panel = document.createElement("div");
-    panel.className = "achievements";
-    gameEl.appendChild(panel);
-    await loadAchievementsPanel(panel, gameId);
+    expandedGameIds.add(gameId);
+    await openAchievementsPanel(gameEl, gameId, { refetch: true });
 }
 
 // Which achievements a panel shows and in what order (see #247) - a
@@ -2785,14 +2791,36 @@ function achievementControls(view, onChange) {
 // Fills a panel with a game's achievements, one section per trophy list.
 // Shared by the expanded game row and the game's own page (see #186).
 async function loadAchievementsPanel(panel, gameId) {
-    panel.innerHTML = `<div class="loading-note">Loading achievements...</div>`;
+    // A refresh of a panel that's already showing keeps its content on screen
+    // until the new data arrives, instead of flashing "Loading...".
+    if (!panel.childElementCount) panel.innerHTML = `<div class="loading-note">Loading achievements...</div>`;
     const reload = () => loadAchievementsPanel(panel, gameId);
 
     const [achievements, platformLinks] = await Promise.all([
         api(`/api/me/games/${gameId}/achievements`),
         api(`/api/me/games/${gameId}/platforms`),
     ]);
-    renderAchievementsPanel(panel, gameId, achievements, platformLinks, reload);
+    achievementPanelCache.set(gameId, { achievements, platformLinks });
+    if (panel.isConnected) renderAchievementsPanel(panel, gameId, achievements, platformLinks, reload);
+}
+
+// Which games are expanded in the list, and their last-fetched achievements,
+// so a re-render (filtering, sorting, a cover change, a background sync)
+// puts them back open instead of collapsing them (see #278).
+const expandedGameIds = new Set();
+const achievementPanelCache = new Map();
+
+function openAchievementsPanel(gameEl, gameId, { refetch }) {
+    gameEl.querySelector(".game-title")?.setAttribute("aria-expanded", "true");
+    const panel = document.createElement("div");
+    panel.className = "achievements";
+    gameEl.appendChild(panel);
+    const cached = achievementPanelCache.get(gameId);
+    if (cached) {
+        renderAchievementsPanel(panel, gameId, cached.achievements, cached.platformLinks, () => loadAchievementsPanel(panel, gameId));
+        if (!refetch) return Promise.resolve();
+    }
+    return loadAchievementsPanel(panel, gameId);
 }
 
 function renderAchievementsPanel(panel, gameId, achievements, platformLinks, reload) {
@@ -3011,7 +3039,7 @@ async function refreshGamesAndScore() {
     const [score, games, stats] = await Promise.all([api("/api/me/score"), api("/api/me/games"), api("/api/me/stats")]);
     state.games = games;
     renderScore(score);
-    renderGames(games);
+    renderGames(games, { refetchExpanded: true });
     renderStats(stats);
     // A rename, hide, cover change, or merge made from a game's own page
     // shows up in its header too.
