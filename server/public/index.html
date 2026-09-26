@@ -652,8 +652,10 @@
         gap: 16px;
         margin-bottom: 20px;
     }
-    .game-view-header .game-cover-wrap { pointer-events: none; }
+    .game-view-header-info { flex: 1; min-width: 0; }
     .game-view-header-info h2 { font-size: 20px; margin: 0 0 6px; }
+    .game-view-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .game-view-header .game-progress-text { text-align: left; }
     .game-progress-text { font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); width: 90px; text-align: right; }
     .tier-pips { display: flex; gap: 6px; font-size: 12px; }
     .pip { display: flex; align-items: center; gap: 3px; }
@@ -983,8 +985,10 @@
                     <div id="game-view-cover"></div>
                     <div class="game-view-header-info">
                         <h2 id="game-view-title"></h2>
+                        <div class="game-view-meta" id="game-view-meta"></div>
                         <div id="game-view-progress" class="game-progress-text"></div>
                     </div>
+                    <button type="button" class="game-actions-btn hidden" id="game-view-actions-btn" aria-haspopup="menu" aria-label="Game actions" title="Game actions">&hellip;</button>
                 </div>
                 <div class="visibility-banner hidden" id="game-view-visibility" role="status">
                     <span id="game-view-visibility-text"></span>
@@ -2022,6 +2026,13 @@ function renderGames(games) {
 // keep - lets the right-click menu jump straight to "now pick the other
 // entry" instead of forcing a scroll back up to the toolbar button first.
 function enterLinkMode(game) {
+    // Picking the other entry happens in the library list, so a game page
+    // hands over to it.
+    if (state.gameViewId) {
+        state.gameViewReturn = { view: "dashboard-view", navKey: "games", scrollTop: 0 };
+        hideGameView();
+        document.getElementById("section-games").scrollIntoView({ block: "start" });
+    }
     state.linkMode = true;
     state.linkSelection = game?.id ?? null;
     document.getElementById("link-games-btn").textContent = "Cancel linking";
@@ -2215,32 +2226,66 @@ function escapeHtml(value) {
 // A dedicated page for one game's own achievements, opened by clicking its
 // title on an achievement (Recent activity, Fun stats) - see #186. Reuses
 // the same per-platform section renderer as the expanded game row.
-async function showGameView(gameId, { pushState = true } = {}) {
-    document.getElementById("dashboard-view").classList.add("hidden");
-    document.getElementById("settings-view").classList.add("hidden");
-    document.getElementById("game-view").classList.remove("hidden");
+async function showGameView(gameId) {
+    // Remember where the page was opened from, so Back returns there - not
+    // always to the dashboard (see #245).
+    if (!state.gameViewId) {
+        state.gameViewReturn = {
+            view: MAIN_VIEWS.find((view) => !document.getElementById(view).classList.contains("hidden")) || "dashboard-view",
+            navKey: state.activeNav,
+            scrollTop: document.querySelector(".content-pane").scrollTop,
+        };
+    }
+    showOnlyView("game-view");
+    setActiveNav(null);
+    document.querySelector(".content-pane").scrollTop = 0;
+    state.gameViewId = gameId;
     // Paint straight away from the library list when the game is in it, then
     // fetch the game itself: a hidden or excluded game isn't in the list at
     // all, and would otherwise sit on "Loading..." forever (see #237).
     renderGameViewHeader(state.games.find((g) => g.id === gameId) ?? null);
-    if (pushState) history.pushState({ gameView: gameId }, "");
-    const header = api(`/api/me/games/${gameId}`)
-        .then((game) => {
-            if (state.gameViewId === gameId) renderGameViewHeader(game);
-        })
-        .catch((err) => {
-            if (state.gameViewId === gameId) document.getElementById("game-view-title").textContent = `Couldn't load this game: ${err.message}`;
-        });
-    state.gameViewId = gameId;
-    await Promise.all([header, loadAchievementsPanel(document.getElementById("game-view-achievements"), gameId)]);
+    await Promise.all([refreshGameViewHeader(), loadAchievementsPanel(document.getElementById("game-view-achievements"), gameId)]);
 }
 
+async function refreshGameViewHeader() {
+    const gameId = state.gameViewId;
+    if (!gameId) return;
+    try {
+        const game = await api(`/api/me/games/${gameId}`);
+        if (state.gameViewId === gameId) renderGameViewHeader(game);
+    } catch (err) {
+        if (state.gameViewId === gameId) document.getElementById("game-view-title").textContent = `Couldn't load this game: ${err.message}`;
+    }
+}
+
+// The game page's header mirrors a library row (see #245): cover you can
+// change, platform badges, tier pips, progress, and the same actions menu.
 function renderGameViewHeader(game) {
     document.getElementById("game-view-title").textContent = game?.title ?? "Loading...";
+    document.getElementById("topbar-title").textContent = game?.title ?? "Game";
     document.getElementById("game-view-progress").textContent = game
         ? `${game.unlocked_achievements}/${game.total_achievements}`
         : "";
-    document.getElementById("game-view-cover").innerHTML = game ? ImageControls.gameCoverMarkup(game.cover_image_url) : "";
+    document.getElementById("game-view-meta").innerHTML = game
+        ? `${platformBadges(game)}<span class="tier-pips">${tierDots(game)}</span>`
+        : "";
+    const coverSlot = document.getElementById("game-view-cover");
+    coverSlot.innerHTML = game ? ImageControls.gameCoverMarkup(game.cover_image_url) : "";
+    coverSlot.querySelector(".game-cover-wrap")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        showImageActionMenu(e.currentTarget, {
+            onUpload: () => uploadCoverArt(game.id),
+            onPaste: () => setCoverArt(game.id),
+            onSteamGridDb: () => openSteamGridDbPicker(game),
+        });
+    });
+    const actionsBtn = document.getElementById("game-view-actions-btn");
+    actionsBtn.classList.toggle("hidden", !game);
+    actionsBtn.onclick = (e) => {
+        e.stopPropagation();
+        const rect = actionsBtn.getBoundingClientRect();
+        showGameContextMenu(rect.left, rect.bottom + 4, game, actionsBtn);
+    };
     const banner = document.getElementById("game-view-visibility");
     banner.classList.toggle("hidden", !game?.visibility);
     if (game?.visibility) {
@@ -2259,7 +2304,12 @@ function renderGameViewHeader(game) {
 }
 
 function hideGameView() {
-    showOnlyView("dashboard-view");
+    const back = state.gameViewReturn || { view: "dashboard-view", navKey: "overview", scrollTop: 0 };
+    state.gameViewId = null;
+    state.gameViewReturn = null;
+    showOnlyView(back.view);
+    setActiveNav(back.navKey || "overview");
+    document.querySelector(".content-pane").scrollTop = back.scrollTop || 0;
 }
 
 async function toggleAchievements(gameEl, gameId) {
@@ -2489,6 +2539,9 @@ async function refreshGamesAndScore() {
     renderScore(score);
     renderGames(games);
     renderStats(stats);
+    // A rename, hide, cover change, or merge made from a game's own page
+    // shows up in its header too.
+    await refreshGameViewHeader();
 }
 
 // Achievements earned per tier, alongside the level ring (see #189). Taken
@@ -3304,11 +3357,14 @@ const NAV_TITLES = {
     completed: "Completed",
 };
 
+// A null key (a game's own page, see #245) highlights nothing and leaves the
+// title to the page itself.
 function setActiveNav(key) {
+    state.activeNav = key;
     document.querySelectorAll(".nav-item").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.nav === key);
     });
-    document.getElementById("topbar-title").textContent = NAV_TITLES[key] || "Overview";
+    if (key !== null) document.getElementById("topbar-title").textContent = NAV_TITLES[key] || "Overview";
 }
 
 // Settings (Platforms, API keys, Account - see #191) is its own page rather
@@ -3319,6 +3375,7 @@ const MAIN_VIEWS = ["dashboard-view", "settings-view", "game-view", "review-view
 
 function showOnlyView(id) {
     MAIN_VIEWS.forEach((view) => document.getElementById(view).classList.toggle("hidden", view !== id));
+    if (id !== "game-view") state.gameViewId = null;
     // Customizing only means anything on the dashboard itself.
     document.getElementById("customize-dashboard-btn").classList.toggle("hidden", id !== "dashboard-view" || !state.dashboardCustomizable);
 }
@@ -3450,11 +3507,7 @@ async function init() {
     initSearchAcronymsRow();
     initAccountDeletion();
     initSidebarNav();
-    document.getElementById("game-view-back-btn").addEventListener("click", () => history.back());
-    window.addEventListener("popstate", (e) => {
-        if (e.state?.gameView) showGameView(e.state.gameView, { pushState: false });
-        else hideGameView();
-    });
+    document.getElementById("game-view-back-btn").addEventListener("click", () => hideGameView());
     initDashboardCustomization();
     document.getElementById("sync-all-btn").addEventListener("click", (e) => {
         syncAllPlatforms(e.target, document.getElementById("sync-all-status"));
