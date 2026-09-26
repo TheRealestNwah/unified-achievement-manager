@@ -797,6 +797,33 @@
     .review-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .review-actions button { padding: 5px 12px; font-size: 12px; }
     .review-row { flex-wrap: wrap; }
+    .review-row:focus-visible { outline-offset: -2px; }
+    .review-bulk, .review-undo {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border-bottom: 1px solid var(--border-2);
+        font-size: 12px;
+        color: var(--text-dim);
+    }
+    .review-bulk-hint { flex: 1; min-width: 200px; }
+    .review-bulk button, .review-group-header button { padding: 5px 12px; font-size: 12px; }
+    .review-undo a { color: var(--accent); }
+    kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--input-bg); }
+    .review-group-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px 18px 4px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text);
+    }
+    .review-group-count { color: var(--text-dim); font-weight: 500; margin-left: 4px; }
+    .review-group .review-game { display: none; }
     .review-row-error { flex-basis: 100%; font-size: 12px; color: #B91C1C; }
     .review-actions button.reject { background: transparent; color: var(--text-dim); border: 1px solid var(--border); box-shadow: none; }
 
@@ -2611,16 +2638,131 @@ async function refreshReviewCount() {
     return candidates;
 }
 
+// Achievement matches are grouped by game, with bulk actions for the whole
+// queue and per game, Y/N keys on a focused row, and an undo for the last
+// rejection (see #252).
+const BULK_CONFIRM_THRESHOLD = 0.9;
+
 function renderReviewPanel(candidates) {
     const panel = document.getElementById("review-panel");
+    const undo = state.lastRejectedCandidate
+        ? `<div class="review-undo" role="status">Marked "${escapeHtml(state.lastRejectedCandidate.name)}" as different. <a href="#" id="review-undo-link">Undo</a></div>`
+        : "";
     if (candidates.length === 0) {
-        panel.innerHTML = `<div class="loading-note">No matches waiting for review.</div>`;
+        panel.innerHTML = `${undo}<div class="loading-note">No matches waiting for review.</div>`;
+        bindReviewUndo(panel);
         return;
     }
 
-    panel.innerHTML = candidates
-        .map(
-            (c) => `
+    const confident = candidates.filter((c) => Number(c.confidence) >= BULK_CONFIRM_THRESHOLD);
+    const byGame = new Map();
+    for (const c of candidates) {
+        if (!byGame.has(c.game_title)) byGame.set(c.game_title, []);
+        byGame.get(c.game_title).push(c);
+    }
+
+    panel.innerHTML = `
+        ${undo}
+        <div class="review-bulk">
+            <span class="review-bulk-hint">Tip: focus a row and press <kbd>Y</kbd> for same or <kbd>N</kbd> for different.</span>
+            <button type="button" class="secondary" data-bulk="confident" ${confident.length === 0 ? "disabled" : ""}>Confirm all ≥ ${Math.round(BULK_CONFIRM_THRESHOLD * 100)}% (${confident.length})</button>
+            <button type="button" class="secondary" data-bulk="reject-all">Reject all (${candidates.length})</button>
+        </div>
+        ${[...byGame]
+            .map(
+                ([gameTitle, list]) => `
+        <div class="review-group" data-game-title="${escapeHtml(gameTitle)}">
+            <div class="review-group-header">
+                <span>${escapeHtml(gameTitle)} <span class="review-group-count">${list.length}</span></span>
+                ${list.length > 1 ? `<button type="button" class="secondary" data-bulk="game">Confirm all for this game</button>` : ""}
+            </div>
+            ${list.map((c) => reviewRowHtml(c)).join("")}
+        </div>`
+            )
+            .join("")}
+    `;
+    bindReviewUndo(panel);
+
+    const bulk = async (button, ids, action, message) => {
+        if (!(await askConfirm(message, { okLabel: action === "confirm" ? "Confirm" : "Reject" }))) return;
+        button.disabled = true;
+        try {
+            const result = await api("/api/matching/candidates/bulk", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids, action }),
+            });
+            state.lastRejectedCandidate = null;
+            renderReviewPanel(await refreshReviewCount());
+            if (action === "confirm" && result.resolved > 0) await refreshGamesAndScore();
+        } catch (err) {
+            button.disabled = false;
+            showMessage(`Couldn't finish that: ${err.message}`);
+        }
+    };
+    panel.querySelector('[data-bulk="confident"]').addEventListener("click", (e) =>
+        bulk(e.currentTarget, confident.map((c) => c.id), "confirm", `Confirm all ${confident.length} matches that are ${Math.round(BULK_CONFIRM_THRESHOLD * 100)}% or more likely? Each pair gets merged into one achievement.`)
+    );
+    panel.querySelector('[data-bulk="reject-all"]').addEventListener("click", (e) =>
+        bulk(e.currentTarget, candidates.map((c) => c.id), "reject", `Mark all ${candidates.length} suggested matches as different achievements?`)
+    );
+    panel.querySelectorAll('[data-bulk="game"]').forEach((button) => {
+        const group = button.closest(".review-group");
+        const list = byGame.get(group.dataset.gameTitle) || [];
+        button.addEventListener("click", () =>
+            bulk(button, list.map((c) => c.id), "confirm", `Confirm all ${list.length} suggested matches for ${group.dataset.gameTitle}?`)
+        );
+    });
+
+    const rows = [...panel.querySelectorAll(".review-row")];
+    rows.forEach((row, index) => {
+        const id = row.dataset.id;
+        const candidate = candidates.find((c) => c.id === id);
+        row.tabIndex = 0;
+        row.setAttribute("aria-keyshortcuts", "Y N");
+        const decide = (action) =>
+            runRowAction(row, async () => {
+                state.reviewFocusIndex = index;
+                await resolveCandidate(id, action, candidate);
+            });
+        row.querySelector(".confirm").addEventListener("click", () => decide("confirm"));
+        row.querySelector(".reject").addEventListener("click", () => decide("reject"));
+        row.addEventListener("keydown", (e) => {
+            if (e.target !== row || e.ctrlKey || e.metaKey || e.altKey) return;
+            const key = e.key.toLowerCase();
+            if (key === "y" || key === "n") {
+                e.preventDefault();
+                decide(key === "y" ? "confirm" : "reject");
+            } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                rows[index + (e.key === "ArrowDown" ? 1 : -1)]?.focus();
+            }
+        });
+    });
+    // After a keyboard decision, keep the user's place: focus the row that
+    // moved up into the resolved one's spot.
+    if (state.reviewFocusIndex != null) {
+        (rows[state.reviewFocusIndex] || rows[rows.length - 1])?.focus();
+        state.reviewFocusIndex = null;
+    }
+}
+
+function bindReviewUndo(panel) {
+    panel.querySelector("#review-undo-link")?.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const last = state.lastRejectedCandidate;
+        state.lastRejectedCandidate = null;
+        try {
+            await api(`/api/matching/candidates/${last.id}/reopen`, { method: "POST" });
+        } catch (err) {
+            showMessage(`Couldn't undo that: ${err.message}`);
+        }
+        renderReviewPanel(await refreshReviewCount());
+    });
+}
+
+function reviewRowHtml(c) {
+    return `
         <div class="review-row" data-id="${c.id}">
             <span class="review-game">${escapeHtml(c.game_title)}</span>
             <span class="review-compare">
@@ -2635,15 +2777,7 @@ function renderReviewPanel(candidates) {
                 <button class="reject" aria-label="Different achievements: ${escapeHtml(c.candidate_name)} and ${escapeHtml(c.target_name)}">Different</button>
             </span>
         </div>
-    `
-        )
-        .join("");
-
-    panel.querySelectorAll(".review-row").forEach((row) => {
-        const id = row.dataset.id;
-        row.querySelector(".confirm").addEventListener("click", () => runRowAction(row, () => resolveCandidate(id, "confirm")));
-        row.querySelector(".reject").addEventListener("click", () => runRowAction(row, () => resolveCandidate(id, "reject")));
-    });
+    `;
 }
 
 // Runs one review-row decision with the row's buttons disabled, so a double
@@ -2681,8 +2815,9 @@ async function loadPanel(panel, load, render) {
     }
 }
 
-async function resolveCandidate(id, action) {
+async function resolveCandidate(id, action, candidate) {
     await api(`/api/matching/candidates/${id}/${action}`, { method: "POST" });
+    state.lastRejectedCandidate = action === "reject" ? { id, name: candidate?.candidate_name ?? "that match" } : null;
     const candidates = await refreshReviewCount();
     renderReviewPanel(candidates);
     if (action === "confirm") await refreshGamesAndScore();

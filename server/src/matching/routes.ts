@@ -2,7 +2,13 @@ import { Router } from "express";
 import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
 import { runMatching } from "./index";
-import { confirmMatchCandidate, rejectMatchCandidate, matchAchievementsForGame } from "./achievementMatcher";
+import {
+    confirmMatchCandidate,
+    rejectMatchCandidate,
+    reopenMatchCandidate,
+    resolveMatchCandidates,
+    matchAchievementsForGame,
+} from "./achievementMatcher";
 import { mergeGames, confirmGameMergeCandidate, rejectGameMergeCandidate } from "./gameMatcher";
 import { splitPlatformLink, GameSplitError } from "./gameSplitter";
 import { confirmGameSplitCandidate, rejectGameSplitCandidate } from "./legacySignalSplitDetector";
@@ -169,6 +175,42 @@ matchingRouter.post("/candidates/:id/reject", requireAuth, async (req, res, next
     try {
         await rejectMatchCandidate(req.params.id);
         res.status(204).end();
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Undo for a rejection (see #252).
+matchingRouter.post("/candidates/:id/reopen", requireAuth, async (req, res, next) => {
+    try {
+        if (!(await reopenMatchCandidate(req.params.id))) {
+            return res.status(409).json({ error: "Only a rejected match can be put back for review." });
+        }
+        res.status(204).end();
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Bulk confirm/reject (see #252). Rescoring runs once for the whole batch
+// instead of once per candidate, which is what makes this worth having.
+const MAX_BULK_CANDIDATES = 1000;
+matchingRouter.post("/candidates/bulk", requireAuth, async (req, res, next) => {
+    try {
+        const { ids, action } = req.body ?? {};
+        if (action !== "confirm" && action !== "reject") {
+            return res.status(400).json({ error: "action must be 'confirm' or 'reject'" });
+        }
+        if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_BULK_CANDIDATES || !ids.every((id) => typeof id === "string")) {
+            return res.status(400).json({ error: `ids must be 1-${MAX_BULK_CANDIDATES} candidate ids` });
+        }
+        const result = await resolveMatchCandidates(ids, action);
+        if (action === "confirm" && result.resolved > 0) {
+            await normalizeRarityTiersForAllGames();
+            const users = await pool.query("select id from users");
+            for (const user of users.rows) await recomputeUserScore(user.id);
+        }
+        res.json(result);
     } catch (err) {
         next(err);
     }

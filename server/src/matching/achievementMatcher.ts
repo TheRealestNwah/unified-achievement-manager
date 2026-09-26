@@ -219,6 +219,48 @@ export async function confirmMatchCandidate(candidateId: string): Promise<void> 
     ]);
 }
 
+// Puts a rejected candidate back in the review queue - the undo for a
+// "Different" click (see #252). Confirmed ones can't be reopened, since
+// confirming already merged the two achievements.
+export async function reopenMatchCandidate(candidateId: string): Promise<boolean> {
+    const result = await pool.query(
+        "update achievement_match_candidates set status = 'pending', reviewed_at = null where id = $1 and status = 'rejected'",
+        [candidateId]
+    );
+    return (result.rowCount ?? 0) > 0;
+}
+
+// Confirms or rejects several candidates in one go (see #252), skipping any
+// that are no longer pending - an earlier confirm in the same batch can
+// already have merged a later candidate's two sides together.
+export async function resolveMatchCandidates(
+    candidateIds: string[],
+    action: "confirm" | "reject"
+): Promise<{ resolved: number; skipped: number }> {
+    let resolved = 0;
+    let skipped = 0;
+    for (const id of candidateIds) {
+        const current = await pool.query(
+            `select amc.status, apl.canonical_achievement_id as source_id, amc.candidate_canonical_achievement_id as target_id
+             from achievement_match_candidates amc
+             join achievement_platform_links apl on apl.id = amc.achievement_platform_link_id
+             where amc.id = $1`,
+            [id]
+        );
+        const row = current.rows[0];
+        if (!row || row.status !== "pending") {
+            skipped++;
+            continue;
+        }
+        if (action === "reject") await rejectMatchCandidate(id);
+        else if (row.source_id === row.target_id) {
+            await pool.query("update achievement_match_candidates set status = 'confirmed', reviewed_at = now() where id = $1", [id]);
+        } else await confirmMatchCandidate(id);
+        resolved++;
+    }
+    return { resolved, skipped };
+}
+
 export async function rejectMatchCandidate(candidateId: string): Promise<void> {
     await pool.query("update achievement_match_candidates set status = 'rejected', reviewed_at = now() where id = $1", [
         candidateId,
