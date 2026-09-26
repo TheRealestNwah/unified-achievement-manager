@@ -6,6 +6,7 @@ import { runAccountSync, PlatformAccountRow } from "../sync/runAccountSync";
 import { runMatchingAndGetScore } from "../matching";
 import { config } from "../config";
 import { encryptCredential } from "../security/credentials";
+import { assertSameAccountOnReconnect, clearSyncError, DifferentAccountError } from "../sync/reconnect";
 
 export const retroRouter = Router();
 
@@ -30,6 +31,8 @@ retroRouter.post("/connect", requireAuth, async (req, res, next) => {
 
         const account = await verifyAccount(username, apiKey);
 
+        await assertSameAccountOnReconnect(req.user!.id, "retroachievements", account.username, "RetroAchievements");
+
         await pool.query(
             `insert into user_platform_accounts (user_id, platform_id, platform_account_id, display_name, access_token)
              values ($1, 'retroachievements', $2, $3, $4)
@@ -40,8 +43,11 @@ retroRouter.post("/connect", requireAuth, async (req, res, next) => {
             [req.user!.id, account.username, account.username, encryptCredential(apiKey, config.credentialEncryptionKey)]
         );
 
+        await clearSyncError(req.user!.id, "retroachievements");
+
         res.json({ username: account.username });
     } catch (err) {
+        if (err instanceof DifferentAccountError) return res.status(409).json({ error: err.message });
         if (err instanceof RetroApiError && (err.status === 401 || err.status === 404)) {
             return res.status(400).json({ error: err.message });
         }

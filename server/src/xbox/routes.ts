@@ -6,6 +6,7 @@ import { runAccountSync, PlatformAccountRow } from "../sync/runAccountSync";
 import { runMatchingAndGetScore } from "../matching";
 import { config } from "../config";
 import { encryptCredential } from "../security/credentials";
+import { assertSameAccountOnReconnect, clearSyncError, DifferentAccountError } from "../sync/reconnect";
 
 export const xboxRouter = Router();
 
@@ -29,6 +30,8 @@ xboxRouter.post("/connect", requireAuth, async (req, res, next) => {
 
         const account = await getAccount(apiKey);
 
+        await assertSameAccountOnReconnect(req.user!.id, "xbox", account.xuid, "Xbox");
+
         await pool.query(
             `insert into user_platform_accounts (user_id, platform_id, platform_account_id, display_name, access_token)
              values ($1, 'xbox', $2, $3, $4)
@@ -39,8 +42,11 @@ xboxRouter.post("/connect", requireAuth, async (req, res, next) => {
             [req.user!.id, account.xuid, account.gamertag, encryptCredential(apiKey, config.credentialEncryptionKey)]
         );
 
+        await clearSyncError(req.user!.id, "xbox");
+
         res.json({ gamertag: account.gamertag, gamerscore: account.gamerscore });
     } catch (err) {
+        if (err instanceof DifferentAccountError) return res.status(409).json({ error: err.message });
         if (err instanceof XboxApiError && err.status === 401) {
             return res.status(400).json({ error: "That API key was rejected by OpenXBL - check it and try again." });
         }
