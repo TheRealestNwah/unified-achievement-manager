@@ -1,7 +1,7 @@
 import { pool } from "../db";
 import { TIER_POINTS, qualifiesForCompletionPlatinum, GameCompletionCounts } from "../scoring/tier";
 
-export async function getGamesForUser(userId: string) {
+export async function getGamesForUser(userId: string, { includeHidden = false }: { includeHidden?: boolean } = {}) {
     const result = await pool.query(
         `select
             g.id,
@@ -67,10 +67,12 @@ export async function getGamesForUser(userId: string) {
              where upa.user_id = $1 and uog.game_id = g.id
          )
          -- A game the user hid or excluded (see #192) is left out of the
-         -- library view entirely, whichever mode - the distinction between
-         -- the two only matters for scoring (recomputeUserScore below).
+         -- library view entirely, whichever mode. Totals (getFunStats) pass
+         -- includeHidden, since a hidden game still counts toward the score
+         -- and only an excluded one drops out (see #236).
          and not exists (
              select 1 from user_game_visibility ugv where ugv.user_id = $1 and ugv.game_id = g.id
+             ${includeHidden ? "and ugv.mode = 'excluded'" : ""}
          )
          group by g.id, g.title, g.cover_image_url
          order by unlocked_achievements desc, g.title`,
@@ -163,6 +165,11 @@ export async function getRecentActivity(userId: string, limit = 20) {
          join canonical_achievements ca on ca.id = apl.canonical_achievement_id
          join games g on g.id = ca.game_id
          where upa.user_id = $1
+           -- Like the library list, the feed leaves out hidden and excluded
+           -- games alike (see #236).
+           and not exists (
+               select 1 from user_game_visibility ugv where ugv.user_id = $1 and ugv.game_id = g.id
+           )
          order by uau.unlocked_at desc
          limit $2`,
         [userId, limit]
@@ -182,6 +189,15 @@ export async function getRecentActivity(userId: string, limit = 20) {
 // it only ever excludes garbage, never a real early unlock.
 const UNLOCK_TIMESTAMP_FLOOR = "2000-01-01";
 
+// An excluded game (see #192) is removed from the score, so it's removed from
+// every stat too; a merely hidden one still counts (see #236).
+function notExcluded(gameIdColumn: string): string {
+    return `not exists (
+        select 1 from user_game_visibility ugv
+        where ugv.user_id = $1 and ugv.game_id = ${gameIdColumn} and ugv.mode = 'excluded'
+    )`;
+}
+
 export async function getFunStats(userId: string) {
     const rarest = await pool.query(
         `select ca.name, g.id as game_id, g.title as game_title, apl.platform_id, apl.global_unlock_rarity
@@ -190,7 +206,7 @@ export async function getFunStats(userId: string) {
          join achievement_platform_links apl on apl.id = uau.achievement_platform_link_id
          join canonical_achievements ca on ca.id = apl.canonical_achievement_id
          join games g on g.id = ca.game_id
-         where upa.user_id = $1 and apl.global_unlock_rarity is not null
+         where upa.user_id = $1 and apl.global_unlock_rarity is not null and ${notExcluded("g.id")}
          order by apl.global_unlock_rarity asc
          limit 1`,
         [userId]
@@ -202,7 +218,7 @@ export async function getFunStats(userId: string) {
          join user_platform_accounts upa on upa.id = uau.user_platform_account_id
          join achievement_platform_links apl on apl.id = uau.achievement_platform_link_id
          join canonical_achievements ca on ca.id = apl.canonical_achievement_id
-         where upa.user_id = $1 and uau.unlocked_at > $2
+         where upa.user_id = $1 and uau.unlocked_at > $2 and ${notExcluded("ca.game_id")}
          group by day
          order by points desc
          limit 1`,
@@ -213,7 +229,9 @@ export async function getFunStats(userId: string) {
         `select date(uau.unlocked_at) as day, count(*) as unlocks
          from user_achievement_unlocks uau
          join user_platform_accounts upa on upa.id = uau.user_platform_account_id
-         where upa.user_id = $1 and uau.unlocked_at > $2
+         join achievement_platform_links apl on apl.id = uau.achievement_platform_link_id
+         join canonical_achievements ca on ca.id = apl.canonical_achievement_id
+         where upa.user_id = $1 and uau.unlocked_at > $2 and ${notExcluded("ca.game_id")}
          group by day
          order by unlocks desc
          limit 1`,
@@ -227,7 +245,7 @@ export async function getFunStats(userId: string) {
          join achievement_platform_links apl on apl.id = uau.achievement_platform_link_id
          join canonical_achievements ca on ca.id = apl.canonical_achievement_id
          join games g on g.id = ca.game_id
-         where upa.user_id = $1 and uau.unlocked_at > $2
+         where upa.user_id = $1 and uau.unlocked_at > $2 and ${notExcluded("g.id")}
          order by uau.unlocked_at asc
          limit 1`,
         [userId, UNLOCK_TIMESTAMP_FLOOR]
@@ -246,7 +264,7 @@ export async function getFunStats(userId: string) {
          join user_platform_accounts upa on upa.id = uau.user_platform_account_id
          join achievement_platform_links apl on apl.id = uau.achievement_platform_link_id
          join canonical_achievements ca on ca.id = apl.canonical_achievement_id
-         where upa.user_id = $1 and ca.tier = 'platinum'
+         where upa.user_id = $1 and ca.tier = 'platinum' and ${notExcluded("ca.game_id")}
          order by uau.unlocked_at asc`,
         [userId]
     );
@@ -267,7 +285,7 @@ export async function getFunStats(userId: string) {
          join user_platform_accounts upa on upa.id = uau.user_platform_account_id
          join achievement_platform_links apl on apl.id = uau.achievement_platform_link_id
          join canonical_achievements ca on ca.id = apl.canonical_achievement_id
-         where upa.user_id = $1 and ca.tier = 'gold'`,
+         where upa.user_id = $1 and ca.tier = 'gold' and ${notExcluded("ca.game_id")}`,
         [userId]
     );
     const silvers = await pool.query(
@@ -276,7 +294,7 @@ export async function getFunStats(userId: string) {
          join user_platform_accounts upa on upa.id = uau.user_platform_account_id
          join achievement_platform_links apl on apl.id = uau.achievement_platform_link_id
          join canonical_achievements ca on ca.id = apl.canonical_achievement_id
-         where upa.user_id = $1 and ca.tier = 'silver'`,
+         where upa.user_id = $1 and ca.tier = 'silver' and ${notExcluded("ca.game_id")}`,
         [userId]
     );
     const bronzes = await pool.query(
@@ -285,14 +303,14 @@ export async function getFunStats(userId: string) {
          join user_platform_accounts upa on upa.id = uau.user_platform_account_id
          join achievement_platform_links apl on apl.id = uau.achievement_platform_link_id
          join canonical_achievements ca on ca.id = apl.canonical_achievement_id
-         where upa.user_id = $1 and ca.tier = 'bronze'`,
+         where upa.user_id = $1 and ca.tier = 'bronze' and ${notExcluded("ca.game_id")}`,
         [userId]
     );
 
     // Reuses the same unlocked/total counts the games list already computes
     // (and has already been tested against) rather than re-deriving
     // completion at the canonical-achievement level from scratch.
-    const games = await getGamesForUser(userId);
+    const games = await getGamesForUser(userId, { includeHidden: true });
     const fullyCompletedGames = games.filter(
         (g) => Number(g.total_achievements) > 0 && Number(g.unlocked_achievements) === Number(g.total_achievements)
     ).length;

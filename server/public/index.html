@@ -1308,6 +1308,7 @@ function renderStats(stats) {
 
     grid.innerHTML = cards.length > 0 ? cards.join("") : `<div class="loading-note">Not enough data yet.</div>`;
     bindGameTitleLinks(grid);
+    renderLevelTierCounts(stats);
 }
 
 async function refreshStats() {
@@ -1472,6 +1473,7 @@ async function setGameVisibility(gameId, mode) {
         });
         status.textContent = mode === "excluded" ? "Game excluded from your score." : "Game hidden.";
         await refreshGamesAndScore();
+        await refreshActivity();
     } catch (err) {
         status.textContent = `Couldn't update visibility: ${err.message}`;
     }
@@ -1513,6 +1515,7 @@ async function clearGameVisibility(gameId) {
         await api(`/api/me/games/${gameId}/visibility`, { method: "DELETE" });
         status.textContent = "Game unhidden.";
         await refreshGamesAndScore();
+        await refreshActivity();
     } catch (err) {
         status.textContent = `Couldn't update visibility: ${err.message}`;
     }
@@ -2276,33 +2279,26 @@ async function splitPlatformLink(gameId, link, button) {
     }
 }
 
+// Score, library, and stats move together: hiding, excluding, merging, or
+// renaming a game can change all three.
 async function refreshGamesAndScore() {
-    const [score, games] = await Promise.all([api("/api/me/score"), api("/api/me/games")]);
+    const [score, games, stats] = await Promise.all([api("/api/me/score"), api("/api/me/games"), api("/api/me/stats")]);
     state.games = games;
     renderScore(score);
-    renderLevelTierCounts(games);
     renderGames(games);
+    renderStats(stats);
 }
 
-// Achievements earned per tier, alongside the level ring (see #189) -
-// summed from each game's own tier counts, the same numbers already shown
-// as pips on each game row.
-function renderLevelTierCounts(games) {
-    const totals = games.reduce(
-        (sum, g) => {
-            sum.platinum += Number(g.platinum_unlocked);
-            sum.gold += Number(g.gold_unlocked);
-            sum.silver += Number(g.silver_unlocked);
-            sum.bronze += Number(g.bronze_unlocked);
-            return sum;
-        },
-        { platinum: 0, gold: 0, silver: 0, bronze: 0 }
-    );
+// Achievements earned per tier, alongside the level ring (see #189). Taken
+// from the same totals as Fun stats rather than summed from the library
+// list, which leaves out hidden games that still count toward the score
+// (see #236).
+function renderLevelTierCounts(stats) {
     const pips = [
-        ["platinum", totals.platinum],
-        ["gold", totals.gold],
-        ["silver", totals.silver],
-        ["bronze", totals.bronze],
+        ["platinum", stats.totalPlatinums],
+        ["gold", stats.totalGold],
+        ["silver", stats.totalSilver],
+        ["bronze", stats.totalBronze],
     ];
     document.getElementById("level-tier-counts").innerHTML = pips
         .filter(([, count]) => count > 0)
@@ -2522,7 +2518,6 @@ async function syncAllPlatforms(button, statusEl) {
         try {
             await refreshGamesAndScore();
             await refreshActivity();
-            await refreshStats();
             await refreshPlatforms();
         } catch (err) {
             statusEl.textContent += " (couldn't refresh the page - reload to see the results)";
@@ -2559,7 +2554,6 @@ async function syncPlatform(platformId, button, noteEl) {
         renderScore(summary.score);
         await refreshGamesAndScore();
         await refreshActivity();
-        await refreshStats();
     } catch (err) {
         noteEl.textContent = err.message?.includes("429") || err.message?.toLowerCase().includes("rate limit")
             ? "Rate limited by Xbox's API — wait a bit and try again."
@@ -3207,7 +3201,6 @@ async function init() {
     await refreshPlatforms();
     await refreshGamesAndScore();
     await refreshActivity();
-    await refreshStats();
     await refreshReviewCount();
     await refreshGameReviewCount();
     await refreshSplitReviewCount();
