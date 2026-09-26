@@ -2518,7 +2518,10 @@ function setHiddenDashboardSections(hidden) {
 function applyDashboardSectionVisibility() {
     const hidden = getHiddenDashboardSections();
     DASHBOARD_SECTIONS.forEach(({ key, elementId }) => {
-        document.getElementById(elementId)?.classList.toggle("hidden", hidden.has(key));
+        // Customize only shapes the Overview: the games views in the sidebar
+        // (All Games, In Progress, ...) always show the games list (see #279).
+        const shownAnyway = key === "games" && state.activeNav && state.activeNav !== "overview" && NAV_SECTIONS[state.activeNav] === "section-games";
+        document.getElementById(elementId)?.classList.toggle("hidden", hidden.has(key) && !shownAnyway);
     });
 }
 
@@ -4083,6 +4086,7 @@ function initSidebarNav() {
             }
             hideSettingsView();
             state.completionPreset = PRESET_LABELS[key] ? key : null;
+            applyDashboardSectionVisibility();
             document.getElementById(NAV_SECTIONS[key])?.scrollIntoView({ behavior: "smooth", block: "start" });
             renderGames(state.games);
         });
