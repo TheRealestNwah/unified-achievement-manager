@@ -1057,6 +1057,30 @@
                     </div>
                 </div>
 
+                <div id="desktop-settings-section" class="hidden">
+                    <h3 class="settings-heading">Desktop app</h3>
+                    <div class="platforms">
+                        <div class="platform-row">
+                            <span class="platform-name">Keep running in the tray</span>
+                            <span class="platform-note">Closing the window keeps the app in the system tray, so background syncs keep running. Quit from the tray icon.</span>
+                            <div class="platform-actions">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
+                                    <input type="checkbox" id="desktop-keep-in-tray-toggle" data-desktop-setting="keepInTray" /> On
+                                </label>
+                            </div>
+                        </div>
+                        <div class="platform-row">
+                            <span class="platform-name">Start with Windows</span>
+                            <span class="platform-note">Starts the app when you sign in to Windows (in the tray, if that's on).</span>
+                            <div class="platform-actions">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
+                                    <input type="checkbox" id="desktop-start-with-windows-toggle" data-desktop-setting="startWithWindows" /> On
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <h3 class="settings-heading">Search acronyms</h3>
                 <p class="settings-subnote">Typing an acronym in the games filter also matches its franchise (e.g. "GTA" finds Grand Theft Auto). Add your own on top of the built-in list.</p>
                 <div class="platforms" id="search-acronyms-list"></div>
@@ -3239,6 +3263,34 @@ async function initDiscordPresenceRow() {
     });
 }
 
+// Desktop-app-only toggles (see #249). The Electron main process reads the
+// saved values from the server and applies them within a few seconds.
+async function initDesktopSettingsRows(setup) {
+    if (!setup.desktopApp) return;
+    document.getElementById("desktop-settings-section").classList.remove("hidden");
+    const toggles = document.querySelectorAll("[data-desktop-setting]");
+    try {
+        const settings = await api("/api/settings/desktop");
+        toggles.forEach((t) => (t.checked = Boolean(settings[t.dataset.desktopSetting])));
+    } catch (err) {
+        console.error(err);
+    }
+    toggles.forEach((toggle) => {
+        toggle.addEventListener("change", async () => {
+            try {
+                await api("/api/settings/desktop", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ [toggle.dataset.desktopSetting]: toggle.checked }),
+                });
+            } catch (err) {
+                toggle.checked = !toggle.checked;
+                showMessage(err.message || "Couldn't save that setting.");
+            }
+        });
+    });
+}
+
 // Merges custom acronyms on top of the built-in list (see #194) - a custom
 // entry with the same acronym as a built-in one wins, so a user can
 // override "ac" to mean something else for them.
@@ -3506,6 +3558,7 @@ async function init() {
     initSteamKeyRow(setup);
     initSteamGridDbKeyRow();
     initDiscordPresenceRow();
+    initDesktopSettingsRows(setup);
     initSearchAcronymsRow();
     initAccountDeletion();
     initSidebarNav();
@@ -3514,6 +3567,12 @@ async function init() {
     document.getElementById("sync-all-btn").addEventListener("click", (e) => {
         syncAllPlatforms(e.target, document.getElementById("sync-all-status"));
     });
+    // The desktop tray's "Sync all now" (see #249) runs this in the page, so
+    // it goes through the same session and CSRF token as the button.
+    window.uamSyncAll = () => {
+        const btn = document.getElementById("sync-all-btn");
+        if (!btn.disabled) return syncAllPlatforms(btn, document.getElementById("sync-all-status"));
+    };
     document.getElementById("match-btn").addEventListener("click", async (e) => {
         const btn = e.target;
         const status = document.getElementById("match-status");
