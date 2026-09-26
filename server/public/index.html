@@ -158,6 +158,28 @@
     }
     .nav-item svg { flex-shrink: 0; }
     .nav-item .nav-item-label { flex: 1; }
+    .nav-badge {
+        min-width: 18px;
+        height: 18px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .nav-item.active .nav-badge { background: #fff; color: var(--accent); }
+    .review-tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+    .review-tab {
+        background: none;
+        color: var(--text-dim);
+        border: 1px solid transparent;
+        padding: 6px 12px;
+    }
+    .review-tab[aria-selected="true"] { background: var(--card); color: var(--text); border-color: var(--border); }
     .nav-item.active {
         background: var(--accent);
         color: #fff;
@@ -820,6 +842,11 @@
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="7" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="11.5" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
                 <span class="nav-item-label">All Games</span>
             </button>
+            <button type="button" class="nav-item" data-nav="review">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 4.5h10M3 8h10M3 11.5h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="12.3" cy="11.5" r="1.7" stroke="currentColor" stroke-width="1.2"/></svg>
+                <span class="nav-item-label">Review</span>
+                <span class="nav-badge hidden" id="review-nav-badge"></span>
+            </button>
         </div>
         <div class="sidebar-section hidden" data-signed-in-only>
             <span class="sidebar-label">Smart Views</span>
@@ -912,25 +939,13 @@
                         <h2 id="games-heading">Your games</h2>
                         <div class="games-actions">
                             <div class="button-group">
-                                <button type="button" class="secondary" id="review-btn">Review matches</button>
-                                <button type="button" class="secondary" id="review-games-btn">Review game merges</button>
-                                <button type="button" class="secondary" id="review-splits-btn">Review possible bad merges</button>
+                                <button type="button" class="secondary" id="review-shortcut-btn">Review</button>
                                 <button type="button" class="secondary" id="match-btn">Find matches</button>
                                 <button type="button" class="secondary" id="link-games-btn">Link games</button>
-                                <button type="button" class="secondary" id="hidden-games-btn">Hidden games</button>
                             </div>
-                            <div class="button-group">
-                                <button type="button" class="secondary" id="export-json-btn">Export JSON</button>
-                                <button type="button" class="secondary" id="export-csv-btn">Export CSV</button>
-                            </div>
-                            <span class="platform-note" id="match-status"></span>
+                            <div class="platform-note" id="match-status" role="status"></div>
                         </div>
                     </div>
-
-                    <div id="review-panel" class="hidden"></div>
-                    <div id="review-games-panel" class="hidden"></div>
-                    <div id="review-splits-panel" class="hidden"></div>
-                    <div id="hidden-games-panel" class="hidden"></div>
 
                     <div class="filter-chip" id="preset-filter-chip">
                         <span id="preset-filter-label"></span>
@@ -976,6 +991,18 @@
                     <button type="button" class="secondary" id="game-view-unhide-btn">Unhide</button>
                 </div>
                 <div id="game-view-achievements"></div>
+            </section>
+
+            <section id="review-view" class="hidden">
+                <p class="settings-subnote">Matches the app wasn't sure about. Confirming or rejecting one here is remembered, so it won't be asked again.</p>
+                <div class="review-tabs" role="tablist" aria-label="Review queues">
+                    <button type="button" class="review-tab" role="tab" data-review-tab="achievements" aria-controls="review-panel" id="review-tab-achievements">Achievement matches</button>
+                    <button type="button" class="review-tab" role="tab" data-review-tab="games" aria-controls="review-games-panel" id="review-tab-games">Game merges</button>
+                    <button type="button" class="review-tab" role="tab" data-review-tab="splits" aria-controls="review-splits-panel" id="review-tab-splits">Possible bad merges</button>
+                </div>
+                <div id="review-panel" class="review-list hidden" role="tabpanel" aria-labelledby="review-tab-achievements"></div>
+                <div id="review-games-panel" class="review-list hidden" role="tabpanel" aria-labelledby="review-tab-games"></div>
+                <div id="review-splits-panel" class="review-list hidden" role="tabpanel" aria-labelledby="review-tab-splits"></div>
             </section>
 
             <section id="settings-view" class="hidden">
@@ -1032,6 +1059,22 @@
                     <input type="text" id="search-acronym-expansion-input" placeholder="Expands to (e.g. baldur's gate)" autocomplete="off" spellcheck="false" />
                     <button type="submit">Add</button>
                 </form>
+
+                <h3 class="settings-heading">Hidden games</h3>
+                <p class="settings-subnote">Games you hid or excluded from the right-click menu. Hidden games still count toward your score; excluded ones don't.</p>
+                <div id="hidden-games-panel" class="review-list"></div>
+
+                <h3 class="settings-heading">Export</h3>
+                <div class="platforms">
+                    <div class="platform-row">
+                        <span class="platform-name">Unlock history</span>
+                        <span class="platform-note">Every unlock across every platform, as a download.</span>
+                        <div class="platform-actions">
+                            <button type="button" class="secondary slot-1" id="export-json-btn">JSON</button>
+                            <button type="button" class="secondary slot-2" id="export-csv-btn">CSV</button>
+                        </div>
+                    </div>
+                </div>
 
                 <h3 class="settings-heading">Account</h3>
                 <div class="platforms">
@@ -2154,6 +2197,7 @@ function showDashboardCustomizeMenu(anchorEl) {
 function initDashboardCustomization() {
     applyDashboardSectionVisibility();
     const btn = document.getElementById("customize-dashboard-btn");
+    state.dashboardCustomizable = true;
     btn.classList.remove("hidden");
     btn.addEventListener("click", (e) => {
         showDashboardCustomizeMenu(e.currentTarget);
@@ -2215,8 +2259,7 @@ function renderGameViewHeader(game) {
 }
 
 function hideGameView() {
-    document.getElementById("game-view").classList.add("hidden");
-    document.getElementById("dashboard-view").classList.remove("hidden");
+    showOnlyView("dashboard-view");
 }
 
 async function toggleAchievements(gameEl, gameId) {
@@ -2465,10 +2508,24 @@ function renderLevelTierCounts(stats) {
         .join("");
 }
 
+// Pending counts for each review queue (see #244): shown on each tab of the
+// Review page, and summed into the sidebar badge and the toolbar shortcut.
+const REVIEW_TAB_LABELS = { achievements: "Achievement matches", games: "Game merges", splits: "Possible bad merges" };
+
+function setReviewCount(tab, count) {
+    state.reviewCounts = { ...(state.reviewCounts || {}), [tab]: count };
+    document.getElementById(`review-tab-${tab}`).textContent = count > 0 ? `${REVIEW_TAB_LABELS[tab]} (${count})` : REVIEW_TAB_LABELS[tab];
+    const total = Object.values(state.reviewCounts).reduce((sum, n) => sum + n, 0);
+    const badge = document.getElementById("review-nav-badge");
+    badge.textContent = String(total);
+    badge.classList.toggle("hidden", total === 0);
+    badge.setAttribute("aria-label", `${total} waiting`);
+    document.getElementById("review-shortcut-btn").textContent = total > 0 ? `Review (${total})` : "Review";
+}
+
 async function refreshReviewCount() {
     const candidates = await api("/api/matching/candidates");
-    const btn = document.getElementById("review-btn");
-    btn.textContent = candidates.length > 0 ? `Review matches (${candidates.length})` : "Review matches";
+    setReviewCount("achievements", candidates.length);
     return candidates;
 }
 
@@ -2557,8 +2614,7 @@ const GAME_CANDIDATE_REASON_LABELS = {
 
 async function refreshGameReviewCount() {
     const candidates = await api("/api/matching/game-candidates");
-    const btn = document.getElementById("review-games-btn");
-    btn.textContent = candidates.length > 0 ? `Review game merges (${candidates.length})` : "Review game merges";
+    setReviewCount("games", candidates.length);
     return candidates;
 }
 
@@ -2607,8 +2663,7 @@ async function resolveGameCandidate(id, action) {
 
 async function refreshSplitReviewCount() {
     const candidates = await api("/api/matching/game-split-candidates");
-    const btn = document.getElementById("review-splits-btn");
-    btn.textContent = candidates.length > 0 ? `Review possible bad merges (${candidates.length})` : "Review possible bad merges";
+    setReviewCount("splits", candidates.length);
     return candidates;
 }
 
@@ -3244,6 +3299,7 @@ const NAV_TITLES = {
     overview: "Overview",
     platforms: "Settings",
     games: "All Games",
+    review: "Review",
     "in-progress": "In Progress",
     completed: "Completed",
 };
@@ -3259,16 +3315,78 @@ function setActiveNav(key) {
 // than a dashboard section, since it's account/app-level config, not part
 // of the games library. Shares the dashboard-view/game-view show-one-at-a-
 // time pattern from #186.
+const MAIN_VIEWS = ["dashboard-view", "settings-view", "game-view", "review-view"];
+
+function showOnlyView(id) {
+    MAIN_VIEWS.forEach((view) => document.getElementById(view).classList.toggle("hidden", view !== id));
+    // Customizing only means anything on the dashboard itself.
+    document.getElementById("customize-dashboard-btn").classList.toggle("hidden", id !== "dashboard-view" || !state.dashboardCustomizable);
+}
+
 function showSettingsView() {
-    document.getElementById("dashboard-view").classList.add("hidden");
-    document.getElementById("game-view").classList.add("hidden");
-    document.getElementById("settings-view").classList.remove("hidden");
+    showOnlyView("settings-view");
+    const panel = document.getElementById("hidden-games-panel");
+    panel.innerHTML = `<div class="loading-note">Loading...</div>`;
+    loadPanel(panel, () => api("/api/me/games/hidden"), renderHiddenGamesPanel);
 }
 
 function hideSettingsView() {
-    document.getElementById("settings-view").classList.add("hidden");
-    document.getElementById("game-view").classList.add("hidden");
-    document.getElementById("dashboard-view").classList.remove("hidden");
+    showOnlyView("dashboard-view");
+}
+
+// The Review page (see #244) gathers the three review queues behind tabs,
+// replacing three separate toolbar toggles. It opens on the first queue with
+// anything waiting, or the one asked for.
+const REVIEW_TABS = {
+    achievements: { panelId: "review-panel", url: "/api/matching/candidates", render: (rows) => renderReviewPanel(rows) },
+    games: { panelId: "review-games-panel", url: "/api/matching/game-candidates", render: (rows) => renderGameReviewPanel(rows) },
+    splits: { panelId: "review-splits-panel", url: "/api/matching/game-split-candidates", render: (rows) => renderSplitReviewPanel(rows) },
+};
+
+function selectReviewTab(tab) {
+    state.reviewTab = tab;
+    for (const [key, { panelId }] of Object.entries(REVIEW_TABS)) {
+        document.getElementById(`review-tab-${key}`).setAttribute("aria-selected", String(key === tab));
+        document.getElementById(panelId).classList.toggle("hidden", key !== tab);
+    }
+    const { panelId, url, render } = REVIEW_TABS[tab];
+    const panel = document.getElementById(panelId);
+    panel.innerHTML = `<div class="loading-note">Loading...</div>`;
+    return loadPanel(panel, () => api(url), render);
+}
+
+// A few short facts instead of one long sentence of counts (see #244), with
+// a way straight into the Review page when something was queued.
+function renderMatchSummary(statusEl, summary) {
+    const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    const enriched = summary.steamCatalogGamesEnriched + summary.xboxCatalogGamesEnriched + summary.retroCatalogGamesEnriched;
+    const queued = summary.achievementCandidatesRecorded + summary.gameCandidatesRecorded + summary.gameSplitCandidatesRecorded;
+    const parts = [
+        `${plural(summary.gameGroupsMerged, "game")} merged`,
+        `${plural(summary.achievementsMerged, "achievement")} matched`,
+    ];
+    if (enriched > 0) parts.push(`${plural(enriched, "game")} given real tier data`);
+    statusEl.textContent = `${parts.join(" · ")}. `;
+    if (queued > 0) {
+        const link = document.createElement("a");
+        link.href = "#";
+        link.textContent = `${queued} waiting for review`;
+        link.addEventListener("click", (e) => {
+            e.preventDefault();
+            openReviewPage();
+        });
+        statusEl.appendChild(link);
+    } else {
+        statusEl.append("Nothing new to review.");
+    }
+}
+
+function openReviewPage(tab) {
+    setActiveNav("review");
+    showOnlyView("review-view");
+    const counts = state.reviewCounts || {};
+    const firstWaiting = Object.keys(REVIEW_TABS).find((key) => counts[key] > 0);
+    return selectReviewTab(tab || firstWaiting || state.reviewTab || "achievements");
 }
 
 function initSidebarNav() {
@@ -3278,6 +3396,10 @@ function initSidebarNav() {
             setActiveNav(key);
             if (key === "platforms") {
                 showSettingsView();
+                return;
+            }
+            if (key === "review") {
+                openReviewPage();
                 return;
             }
             hideSettingsView();
@@ -3344,61 +3466,21 @@ async function init() {
         status.textContent = "Matching games and achievements across platforms...";
         try {
             const summary = await api("/api/matching/run", { method: "POST" });
-            status.textContent = `Merged ${summary.gameGroupsMerged} game(s), ${summary.achievementsMerged} achievement(s). ${summary.steamCatalogGamesEnriched} Steam, ${summary.xboxCatalogGamesEnriched} Xbox, ${summary.retroCatalogGamesEnriched} RetroAchievements game(s) enriched with real tier data. ${summary.achievementCandidatesRecorded} possible achievement match(es), ${summary.gameCandidatesRecorded} possible game merge(s), and ${summary.gameSplitCandidatesRecorded} possible bad merge(s) queued for review.`;
             await refreshGamesAndScore();
             await refreshReviewCount();
             await refreshGameReviewCount();
             await refreshSplitReviewCount();
+            renderMatchSummary(status, summary);
         } catch (err) {
             status.textContent = `Matching failed: ${err.message}`;
         } finally {
             btn.disabled = false;
         }
     });
-    document.getElementById("review-btn").addEventListener("click", async () => {
-        const panel = document.getElementById("review-panel");
-        if (!panel.classList.contains("hidden")) {
-            panel.classList.add("hidden");
-            return;
-        }
-        panel.classList.remove("hidden");
-        panel.className = "review-list";
-        panel.innerHTML = `<div class="loading-note">Loading...</div>`;
-        await loadPanel(panel, () => api("/api/matching/candidates"), renderReviewPanel);
+    document.querySelectorAll("[data-review-tab]").forEach((tab) => {
+        tab.addEventListener("click", () => selectReviewTab(tab.dataset.reviewTab));
     });
-    document.getElementById("review-games-btn").addEventListener("click", async () => {
-        const panel = document.getElementById("review-games-panel");
-        if (!panel.classList.contains("hidden")) {
-            panel.classList.add("hidden");
-            return;
-        }
-        panel.classList.remove("hidden");
-        panel.className = "review-list";
-        panel.innerHTML = `<div class="loading-note">Loading...</div>`;
-        await loadPanel(panel, () => api("/api/matching/game-candidates"), renderGameReviewPanel);
-    });
-    document.getElementById("review-splits-btn").addEventListener("click", async () => {
-        const panel = document.getElementById("review-splits-panel");
-        if (!panel.classList.contains("hidden")) {
-            panel.classList.add("hidden");
-            return;
-        }
-        panel.classList.remove("hidden");
-        panel.className = "review-list";
-        panel.innerHTML = `<div class="loading-note">Loading...</div>`;
-        await loadPanel(panel, () => api("/api/matching/game-split-candidates"), renderSplitReviewPanel);
-    });
-    document.getElementById("hidden-games-btn").addEventListener("click", async () => {
-        const panel = document.getElementById("hidden-games-panel");
-        if (!panel.classList.contains("hidden")) {
-            panel.classList.add("hidden");
-            return;
-        }
-        panel.classList.remove("hidden");
-        panel.className = "review-list";
-        panel.innerHTML = `<div class="loading-note">Loading...</div>`;
-        await loadPanel(panel, () => api("/api/me/games/hidden"), renderHiddenGamesPanel);
-    });
+    document.getElementById("review-shortcut-btn").addEventListener("click", () => openReviewPage());
     document.getElementById("games-filter").addEventListener("input", () => renderGames(state.games));
     document.getElementById("games-sort").addEventListener("change", () => renderGames(state.games));
     document.getElementById("export-json-btn").addEventListener("click", () => {

@@ -22,7 +22,7 @@ The program itself is installed separately (by default in `%LOCALAPPDATA%\Progra
 
 To restore, or to move to another PC: install Unified Achievement Manager, don't launch it (or quit it), replace `%APPDATA%\Unified Achievement Manager` with your copy, and start the app. Always copy the folder as a whole. `secrets.json` and `postgres\` only work together, and a copy taken while the app is running may not be consistent.
 
-The **Export** button gives you a portable JSON or CSV of your unlock history too, but it isn't something the app can import back.
+**Settings → Export** gives you a portable JSON or CSV of your unlock history too, but it isn't something the app can import back.
 
 ## Removing everything
 
