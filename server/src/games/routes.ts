@@ -105,7 +105,9 @@ gamesRouter.get("/games", requireAuth, async (req, res, next) => {
 
 gamesRouter.get("/activity", requireAuth, async (req, res, next) => {
     try {
-        res.json(await getRecentActivity(req.user!.id));
+        const limit = Math.min(Math.max(Number.parseInt(String(req.query.limit ?? "20"), 10) || 20, 1), 100);
+        const offset = Math.max(Number.parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
+        res.json(await getRecentActivity(req.user!.id, limit, offset));
     } catch (err) {
         next(err);
     }

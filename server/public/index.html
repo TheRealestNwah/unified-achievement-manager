@@ -682,6 +682,7 @@
         border-bottom: 1px solid var(--border-2);
     }
     .activity-item:last-child { border-bottom: none; }
+    .activity-more-btn { display: block; margin: -12px auto 24px; }
     .activity-body { flex: 1; min-width: 0; }
     .activity-name { font-weight: 600; }
     .activity-meta { font-size: 12px; color: var(--text-dim); }
@@ -936,6 +937,7 @@
                     <div class="activity-panel" id="activity-panel">
                         <div class="loading-note">Loading...</div>
                     </div>
+                    <button type="button" class="secondary hidden activity-more-btn" id="activity-more-btn">Show more</button>
                 </div>
 
                 <div id="section-your-games">
@@ -1282,13 +1284,17 @@ function relativeTime(isoString) {
     return "just now";
 }
 
-function renderActivity(items) {
+// Recent activity loads a page at a time; "Show more" appends the next page
+// (see #253).
+const ACTIVITY_PAGE_SIZE = 20;
+
+function renderActivity(items, { append = false } = {}) {
     const panel = document.getElementById("activity-panel");
-    if (items.length === 0) {
+    if (!append && items.length === 0) {
         panel.innerHTML = `<div class="loading-note">Nothing unlocked yet - sync a platform to get started.</div>`;
         return;
     }
-    panel.innerHTML = items
+    const html = items
         .map(
             (a) => `
         <div class="activity-item">
@@ -1304,16 +1310,45 @@ function renderActivity(items) {
                 }</div>
                 <div class="activity-meta">${gameTitleLink(a.game_id, a.game_title)} <span class="platform-badge">${a.platform_id}</span></div>
             </div>
-            <div class="activity-time">${relativeTime(a.unlocked_at)}</div>
+            <div class="activity-time" title="${escapeHtml(new Date(a.unlocked_at).toLocaleString())}">${relativeTime(a.unlocked_at)}</div>
         </div>
     `
         )
         .join("");
-    bindGameTitleLinks(panel);
+    if (append) {
+        const holder = document.createElement("div");
+        holder.innerHTML = html;
+        bindGameTitleLinks(holder);
+        panel.append(...holder.children);
+    } else {
+        panel.innerHTML = html;
+        bindGameTitleLinks(panel);
+    }
+}
+
+function updateActivityMoreButton(lastPageSize) {
+    document.getElementById("activity-more-btn").classList.toggle("hidden", lastPageSize < ACTIVITY_PAGE_SIZE);
 }
 
 async function refreshActivity() {
-    renderActivity(await api("/api/me/activity"));
+    const items = await api(`/api/me/activity?limit=${ACTIVITY_PAGE_SIZE}`);
+    state.activityShown = items.length;
+    renderActivity(items);
+    updateActivityMoreButton(items.length);
+}
+
+async function loadMoreActivity(button) {
+    button.disabled = true;
+    try {
+        const items = await api(`/api/me/activity?limit=${ACTIVITY_PAGE_SIZE}&offset=${state.activityShown || 0}`);
+        state.activityShown = (state.activityShown || 0) + items.length;
+        renderActivity(items, { append: true });
+        updateActivityMoreButton(items.length);
+    } catch (err) {
+        showMessage(`Couldn't load more activity: ${err.message}`);
+    } finally {
+        button.disabled = false;
+    }
 }
 
 // A game title that opens that game's own achievements page (see #186).
@@ -3536,6 +3571,7 @@ async function init() {
         tab.addEventListener("click", () => selectReviewTab(tab.dataset.reviewTab));
     });
     document.getElementById("review-shortcut-btn").addEventListener("click", () => openReviewPage());
+    document.getElementById("activity-more-btn").addEventListener("click", (e) => loadMoreActivity(e.currentTarget));
     document.getElementById("games-filter").addEventListener("input", () => renderGames(state.games));
     document.getElementById("games-sort").addEventListener("change", () => renderGames(state.games));
     document.getElementById("export-json-btn").addEventListener("click", () => {
