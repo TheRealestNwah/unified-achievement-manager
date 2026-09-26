@@ -10,6 +10,7 @@ All of Unified Achievement Manager's data is in one folder: `%APPDATA%\Unified A
 | `secrets.json` | The key that encrypts your platform credentials, plus the session secret. Without it, stored credentials can't be decrypted |
 | `database.json` | The password for the private database |
 | `app.json` | The local port the app last ran on, reused so your display preferences (theme, hidden sections) stick between launches |
+| `window-state.json` | The window's last size, position, and maximized state |
 | `uploads\` | Cover art and icons you uploaded |
 | `logs\main.log`, `postgres.log` | App and database logs |
 
