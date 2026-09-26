@@ -10,6 +10,7 @@ All of Unified Achievement Manager's data is in one folder: `%APPDATA%\Unified A
 | `secrets.json` | The key that encrypts your platform credentials, plus the session secret. Without it, stored credentials can't be decrypted |
 | `database.json` | The password for the private database |
 | `app.json` | The local port the app last ran on, reused so your display preferences (theme, hidden sections) stick between launches |
+| `window-state.json` | The window's last size, position, and maximized state |
 | `uploads\` | Cover art and icons you uploaded |
 | `logs\main.log`, `postgres.log` | App and database logs |
 
@@ -22,7 +23,7 @@ The program itself is installed separately (by default in `%LOCALAPPDATA%\Progra
 
 To restore, or to move to another PC: install Unified Achievement Manager, don't launch it (or quit it), replace `%APPDATA%\Unified Achievement Manager` with your copy, and start the app. Always copy the folder as a whole. `secrets.json` and `postgres\` only work together, and a copy taken while the app is running may not be consistent.
 
-The **Export** button gives you a portable JSON or CSV of your unlock history too, but it isn't something the app can import back.
+**Settings → Export** gives you a portable JSON or CSV of your unlock history too, but it isn't something the app can import back.
 
 ## Removing everything
 
