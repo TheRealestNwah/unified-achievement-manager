@@ -1951,8 +1951,11 @@ const PRESET_LABELS = {
 };
 
 function presetMatches(game) {
-    if (state.completionPreset === "in-progress") return game.total_achievements > 0 && game.unlocked_achievements < game.total_achievements;
-    if (state.completionPreset === "completed") return game.total_achievements > 0 && game.unlocked_achievements === game.total_achievements;
+    // Compared as numbers - as strings "9" < "10" is false (see #270).
+    const total = Number(game.total_achievements);
+    const unlocked = Number(game.unlocked_achievements);
+    if (state.completionPreset === "in-progress") return total > 0 && unlocked < total;
+    if (state.completionPreset === "completed") return total > 0 && unlocked === total;
     return true;
 }
 

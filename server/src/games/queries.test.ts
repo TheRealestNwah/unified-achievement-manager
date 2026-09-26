@@ -56,8 +56,8 @@ describe("getGamesForUser", () => {
         const [game] = await getGamesForUser("user-1");
 
         expect(game.platinum_synthetic).toBe(false);
-        expect(game.platinum_unlocked).toBe("1"); // untouched - real platinum, no bonus applied
-        expect(game.points_earned).toBe("450"); // untouched
+        expect(game.platinum_unlocked).toBe(1); // untouched - real platinum, no bonus applied
+        expect(game.points_earned).toBe(450); // untouched
     });
 
     it("does not award a platinum for a game that isn't 100% complete", async () => {
@@ -67,7 +67,18 @@ describe("getGamesForUser", () => {
         const [game] = await getGamesForUser("user-1");
 
         expect(game.platinum_synthetic).toBe(false);
-        expect(game.platinum_unlocked).toBe("0");
+        expect(game.platinum_unlocked).toBe(0);
+    });
+
+    it("returns achievement counts as numbers, not node-postgres strings (#270)", async () => {
+        const { getGamesForUser } = await import("./queries");
+        queueQueryResults([gameRow({ unlocked_achievements: "9", total_achievements: "10" })]);
+
+        const [game] = await getGamesForUser("user-1");
+
+        expect(game.unlocked_achievements).toBe(9);
+        expect(game.total_achievements).toBe(10);
+        expect(game.unlocked_achievements < game.total_achievements).toBe(true);
     });
 });
 

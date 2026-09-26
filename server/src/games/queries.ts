@@ -90,10 +90,23 @@ export async function getGamesForUser(userId: string, { includeHidden = false, g
          order by unlocked_achievements desc, g.title`,
         gameId ? [userId, gameId] : [userId]
     );
-    return result.rows.map((row) => {
-        const totalAchievements = Number(row.total_achievements);
-        const unlockedAchievements = Number(row.unlocked_achievements);
-        const realPlatinumUnlocked = Number(row.platinum_unlocked);
+    return result.rows.map((rawRow) => {
+        // node-postgres returns count()/sum() as strings; comparing those in
+        // the dashboard is lexicographic ("9" < "10" is false), which dropped
+        // games from In Progress (see #270). Hand back real numbers.
+        const row = {
+            ...rawRow,
+            total_achievements: Number(rawRow.total_achievements),
+            unlocked_achievements: Number(rawRow.unlocked_achievements),
+            points_earned: Number(rawRow.points_earned),
+            platinum_unlocked: Number(rawRow.platinum_unlocked),
+            gold_unlocked: Number(rawRow.gold_unlocked),
+            silver_unlocked: Number(rawRow.silver_unlocked),
+            bronze_unlocked: Number(rawRow.bronze_unlocked),
+        };
+        const totalAchievements = row.total_achievements;
+        const unlockedAchievements = row.unlocked_achievements;
+        const realPlatinumUnlocked = row.platinum_unlocked;
         const isCompletionPlatinum = qualifiesForCompletionPlatinum({
             totalAchievements,
             unlockedAchievements,
@@ -110,7 +123,7 @@ export async function getGamesForUser(userId: string, { includeHidden = false, g
         return {
             ...row,
             platinum_unlocked: realPlatinumUnlocked + 1,
-            points_earned: Number(row.points_earned) + TIER_POINTS.platinum,
+            points_earned: row.points_earned + TIER_POINTS.platinum,
             platinum_synthetic: true,
         };
     });
