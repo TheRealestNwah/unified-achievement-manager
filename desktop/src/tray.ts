@@ -8,6 +8,8 @@ import { app, BrowserWindow, Menu, Tray } from "electron";
 interface DesktopSettings {
     keepInTray: boolean;
     startWithWindows: boolean;
+    // Read by notifications.ts (see #250); polled here with the rest.
+    unlockNotifications: boolean;
 }
 
 // Windows starts the app with this when "Start with Windows" is on, so it
@@ -16,7 +18,11 @@ export const HIDDEN_LAUNCH_ARG = "--hidden";
 
 const POLL_INTERVAL_MS = 5_000;
 
-let settings: DesktopSettings = { keepInTray: false, startWithWindows: false };
+let settings: DesktopSettings = { keepInTray: false, startWithWindows: false, unlockNotifications: true };
+
+export function unlockNotificationsEnabled(): boolean {
+    return settings.unlockNotifications !== false;
+}
 let tray: Tray | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let quitting = false;

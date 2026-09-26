@@ -31,7 +31,7 @@ Links like these open in your normal web browser. Only Steam sign-in happens ins
 
 ## Using it
 
-- **Sync:** pulls each platform's library and unlocks and recomputes your score. While the app is open it also re-syncs every linked platform automatically every 6 hours. Turn on **Settings → Desktop app → Keep running in the tray** to keep that going after you close the window, and **Start with Windows** to have it start in the tray when you sign in.
+- **Sync:** pulls each platform's library and unlocks and recomputes your score. While the app is open it also re-syncs every linked platform automatically every 6 hours. Turn on **Settings → Desktop app → Keep running in the tray** to keep that going after you close the window, and **Start with Windows** to have it start in the tray when you sign in. When a sync finds new achievements while the app isn't in front, a Windows notification says so (turn it off under **Settings → Desktop app → Unlock notifications**).
 - **Find matches:** links the same real-world game and achievement across platforms so they share one tier, with PSN's own tier always winning. Your score isn't collapsed: unlocking the same achievement on two platforms still counts both.
 - **Review:** high-confidence matches merge automatically. Anything uncertain (achievement matches, game merges, and possible bad merges) waits on the **Review** page in the sidebar, with a count of what's waiting, for you to confirm or reject.
 - **Link games:** automatic matching only merges exact titles, so it misses cases like "Skyrim" on PSN vs "The Elder Scrolls V: Skyrim" on Steam. Click **Link games**, click the game whose title you want to keep, then click the duplicate.
