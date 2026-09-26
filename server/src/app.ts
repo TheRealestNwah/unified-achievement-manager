@@ -1,6 +1,7 @@
 import os from "os";
 import path from "path";
-import { findFreePort, startEmbeddedDatabase } from "./runtime/embeddedDatabase";
+import { startEmbeddedDatabase } from "./runtime/embeddedDatabase";
+import { resolveAppPort } from "./runtime/appPort";
 
 // Entry point for the self-contained app: no .env, no external PostgreSQL.
 // Everything lives in one per-user data folder.
@@ -22,7 +23,7 @@ export async function startApp({ dataDir = defaultDataDir(), port }: { dataDir?:
     process.env.UAM_APP = "1";
     process.env.UAM_DATA_DIR = resolvedDataDir;
     process.env.HOST = "127.0.0.1";
-    process.env.PORT = String(port ?? (await findFreePort()));
+    process.env.PORT = String(port ?? (await resolveAppPort(resolvedDataDir)));
     // Single-user defaults: nobody else is going to press Sync, and one person
     // clicking around can't trip limits meant for a shared public server.
     process.env.SCHEDULER_ENABLED ??= "true";

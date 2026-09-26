@@ -71,7 +71,7 @@ Integration tests need `INTEGRATION_TESTS=true` and a `DATABASE_URL`. The embedd
 
 - **Data folder:** `secrets.json` holds the session secret and the credential-encryption key, generated once on first run and never regenerated. `database.json` holds the embedded database password. `postgres/` is the PostgreSQL cluster, `uploads/` holds cover and icon overrides, and `logs/main.log` is the app log.
 - **Database:** PostgreSQL 17 from the `@embedded-postgres/*` binary packages, driven through `pg_ctl` (`server/src/runtime/embeddedDatabase.ts`). It listens on `127.0.0.1` at a free port and is fast-stopped on quit. An instance orphaned by a crash is stopped on the next launch, and by the installer and uninstaller.
-- **Server:** binds `127.0.0.1` on a free port. Rate limits are loosened and the scheduler is on by default. `.env` files are ignored.
+- **Server:** binds `127.0.0.1` on the port saved in `app.json`, or a new free port (then saved) when that one is taken. Keeping the port stable keeps the dashboard's origin stable, so its `localStorage` preferences survive restarts. Rate limits are loosened and the scheduler is on by default. `.env` files are ignored.
 - **Window:** Steam OpenID sign-in stays in the window so the session cookie lands in the app. Every other link opens in the system browser.
 
 ## HTTP API
