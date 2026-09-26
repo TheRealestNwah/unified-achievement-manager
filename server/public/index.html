@@ -364,6 +364,21 @@
     .score-info { flex: 1; min-width: 0; }
     .score-info .points { font-family: var(--font-mono); font-size: 14px; color: var(--text-dim); }
     #level-tier-counts { margin-top: 8px; }
+    .sync-freshness { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--text-dim); }
+    .sync-freshness button { padding: 4px 12px; font-size: 12px; }
+    .toast {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 60;
+        background: var(--text);
+        color: var(--bg);
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    }
 
     .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
     .toolbar h2 { font-size: 17px; color: var(--text); font-weight: 700; margin: 0; letter-spacing: -0.01em; }
@@ -943,6 +958,11 @@
                     <div class="score-info">
                         <div class="points" id="points-text">-</div>
                         <div class="tier-pips" id="level-tier-counts"></div>
+                        <div class="sync-freshness">
+                            <span id="sync-freshness-text"></span>
+                            <button type="button" class="secondary" id="dashboard-sync-all-btn">Sync all</button>
+                            <span id="dashboard-sync-status" role="status"></span>
+                        </div>
                     </div>
                 </div>
 
@@ -1144,6 +1164,8 @@
     </div>
 </div>
 
+<div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+
 <dialog id="text-prompt">
     <form id="text-prompt-form">
         <p id="text-prompt-message"></p>
@@ -1313,6 +1335,74 @@ function renderScore(score) {
         String(LEVEL_RING_CIRCUMFERENCE * (1 - pct / 100));
 }
 
+// Anything rendered with data-relative-time="<iso>" is re-rendered every
+// minute, so "just now" doesn't stay "just now" for hours (see #248).
+function refreshRelativeTimes() {
+    document.querySelectorAll("[data-relative-time]").forEach((el) => {
+        el.textContent = relativeTime(el.dataset.relativeTime);
+    });
+}
+
+function renderSyncFreshness(lastSyncedAt) {
+    const text = document.getElementById("sync-freshness-text");
+    text.replaceChildren();
+    if (!lastSyncedAt) {
+        text.textContent = "Not synced yet.";
+        return;
+    }
+    const when = document.createElement("span");
+    when.dataset.relativeTime = lastSyncedAt;
+    when.textContent = relativeTime(lastSyncedAt);
+    text.append("Last synced ", when);
+    text.title = new Date(lastSyncedAt).toLocaleString();
+}
+
+// Background syncs (the scheduler, or the desktop tray's Sync all now) happen
+// without the dashboard knowing. Polling a cheap endpoint and refreshing when
+// the latest sync time moves keeps the page current without a reload. The
+// user's own syncs refresh the page themselves, so they're skipped here.
+const SYNC_POLL_INTERVAL_MS = 60_000;
+
+async function pollSyncStatus({ silent = false } = {}) {
+    let status;
+    try {
+        status = await api("/api/me/sync-status");
+    } catch {
+        return;
+    }
+    renderSyncFreshness(status.lastSyncedAt);
+    const changed = state.knownSyncAt !== undefined && status.lastSyncedAt !== state.knownSyncAt;
+    state.knownSyncAt = status.lastSyncedAt;
+    if (!changed || silent || state.userSyncs > 0) return;
+    try {
+        await refreshGamesAndScore();
+        await refreshActivity();
+        await refreshPlatforms();
+        showToast("Updated with the latest background sync.");
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// Tracks the user's own syncs so the poll above doesn't double-refresh.
+async function trackUserSync(run) {
+    state.userSyncs = (state.userSyncs || 0) + 1;
+    try {
+        return await run();
+    } finally {
+        state.userSyncs -= 1;
+        await pollSyncStatus({ silent: true });
+    }
+}
+
+function showToast(message) {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.classList.remove("hidden");
+    clearTimeout(state.toastTimer);
+    state.toastTimer = setTimeout(() => toast.classList.add("hidden"), 4000);
+}
+
 function relativeTime(isoString) {
     const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
     const units = [
@@ -1355,7 +1445,7 @@ function renderActivity(items, { append = false } = {}) {
                 }</div>
                 <div class="activity-meta">${gameTitleLink(a.game_id, a.game_title)} <span class="platform-badge">${a.platform_id}</span></div>
             </div>
-            <div class="activity-time" title="${escapeHtml(new Date(a.unlocked_at).toLocaleString())}">${relativeTime(a.unlocked_at)}</div>
+            <div class="activity-time" title="${escapeHtml(new Date(a.unlocked_at).toLocaleString())}" data-relative-time="${escapeHtml(a.unlocked_at)}">${relativeTime(a.unlocked_at)}</div>
         </div>
     `
         )
@@ -3089,11 +3179,17 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
     const note = document.createElement("span");
     note.className = "platform-note";
     note.id = `${PLATFORM_NOTE_PREFIXES[platformId]}-note`;
-    const synced = account?.last_synced_at
-        ? `synced ${relativeTime(account.last_synced_at)}`
-        : "not synced yet";
-    note.textContent = account?.display_name ? `${account.display_name} · ${synced}` : synced[0].toUpperCase() + synced.slice(1);
-    if (account?.last_synced_at) note.title = `Last synced ${new Date(account.last_synced_at).toLocaleString()}`;
+    const prefix = account?.display_name ? `${account.display_name} · ` : "";
+    if (account?.last_synced_at) {
+        // The relative part keeps itself current (see #248).
+        const when = document.createElement("span");
+        when.dataset.relativeTime = account.last_synced_at;
+        when.textContent = relativeTime(account.last_synced_at);
+        note.append(`${prefix}${prefix ? "synced" : "Synced"} `, when);
+        note.title = `Last synced ${new Date(account.last_synced_at).toLocaleString()}`;
+    } else {
+        note.textContent = `${prefix}${prefix ? "not" : "Not"} synced yet`;
+    }
 
     const actions = document.createElement("div");
     actions.className = "platform-actions";
@@ -3102,7 +3198,10 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
     syncBtn.className = "secondary slot-1";
     syncBtn.id = `${PLATFORM_NOTE_PREFIXES[platformId]}-sync-btn`;
     syncBtn.textContent = "Sync";
-    syncBtn.addEventListener("click", (e) => syncPlatform(PLATFORM_SYNC_SLUGS[platformId], label, e.currentTarget, note));
+    syncBtn.addEventListener("click", (e) => {
+        const button = e.currentTarget;
+        trackUserSync(() => syncPlatform(PLATFORM_SYNC_SLUGS[platformId], label, button, note));
+    });
     actions.appendChild(syncBtn);
     if (canDisconnect) {
         const disconnectBtn = document.createElement("button");
@@ -3727,14 +3826,25 @@ async function init() {
     document.getElementById("game-view-back-btn").addEventListener("click", () => hideGameView());
     initDashboardCustomization();
     document.getElementById("sync-all-btn").addEventListener("click", (e) => {
-        syncAllPlatforms(e.target, document.getElementById("sync-all-status"));
+        trackUserSync(() => syncAllPlatforms(e.target, document.getElementById("sync-all-status")));
     });
     // The desktop tray's "Sync all now" (see #249) runs this in the page, so
     // it goes through the same session and CSRF token as the button.
     window.uamSyncAll = () => {
         const btn = document.getElementById("sync-all-btn");
-        if (!btn.disabled) return syncAllPlatforms(btn, document.getElementById("sync-all-status"));
+        if (!btn.disabled) return trackUserSync(() => syncAllPlatforms(btn, document.getElementById("sync-all-status")));
     };
+    // The same Sync all, next to the "Last synced" line on the dashboard.
+    document.getElementById("dashboard-sync-all-btn").addEventListener("click", (e) => {
+        const button = e.currentTarget;
+        trackUserSync(() => syncAllPlatforms(button, document.getElementById("dashboard-sync-status")));
+    });
+    setInterval(refreshRelativeTimes, 60_000);
+    setInterval(() => pollSyncStatus(), SYNC_POLL_INTERVAL_MS);
+    // Coming back to the window is a good moment to catch up.
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") pollSyncStatus();
+    });
     document.getElementById("match-btn").addEventListener("click", async (e) => {
         const btn = e.target;
         const status = document.getElementById("match-status");
@@ -3784,6 +3894,7 @@ async function init() {
     await refreshReviewCount();
     await refreshGameReviewCount();
     await refreshSplitReviewCount();
+    await pollSyncStatus({ silent: true });
 }
 
 init();

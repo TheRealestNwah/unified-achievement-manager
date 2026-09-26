@@ -103,6 +103,21 @@ gamesRouter.get("/games", requireAuth, async (req, res, next) => {
     }
 });
 
+// A cheap "has anything synced since I last looked" check the dashboard polls,
+// so background syncs by the scheduler show up without a reload (see #248).
+gamesRouter.get("/sync-status", requireAuth, async (req, res, next) => {
+    try {
+        res.setHeader("Cache-Control", "no-store");
+        const result = await pool.query(
+            "select max(last_synced_at) as last_synced_at from user_platform_accounts where user_id = $1",
+            [req.user!.id]
+        );
+        res.json({ lastSyncedAt: result.rows[0]?.last_synced_at ?? null });
+    } catch (err) {
+        next(err);
+    }
+});
+
 gamesRouter.get("/activity", requireAuth, async (req, res, next) => {
     try {
         const limit = Math.min(Math.max(Number.parseInt(String(req.query.limit ?? "20"), 10) || 20, 1), 100);
