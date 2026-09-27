@@ -16,7 +16,7 @@ Windows 10/11, 64-bit. The installer is about 135 MB because it bundles its own 
 
 ## First run
 
-1. **Steam Web API key.** On first launch the app asks for your own free key. Open [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey), enter `localhost` as the domain name, and paste the key it gives you. The app checks the key with Steam and stores it encrypted on your computer. You can change it later from **Platforms → Steam Web API key**.
+1. **Steam Web API key.** On first launch the app asks for your own free key. Open [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey), enter `localhost` as the domain name, and paste the key it gives you. The app checks the key with Steam and stores it encrypted on your computer. You can change it later from **Settings → API keys → Steam Web API**.
 2. **Sign in with Steam.** Steam's own sign-in page opens inside the app. Your Steam account becomes your identity in the app.
 3. Click **Sync** to pull your Steam library, then connect other platforms.
 
@@ -35,7 +35,12 @@ Links like these open in your normal web browser. Only Steam sign-in happens ins
 - **Find matches:** links the same real-world game and achievement across platforms so they share one tier, with PSN's own tier always winning. Your score isn't collapsed: unlocking the same achievement on two platforms still counts both.
 - **Review:** high-confidence matches merge automatically. Anything uncertain (achievement matches, game merges, and possible bad merges) waits on the **Review** page in the sidebar, with a count of what's waiting, for you to confirm or reject.
 - **Link games:** automatic matching only merges exact titles, so it misses cases like "Skyrim" on PSN vs "The Elder Scrolls V: Skyrim" on Steam. Click **Link games**, click the game whose title you want to keep, then click the duplicate.
-- **Cover art and icons:** click a game's cover or an achievement's icon to paste an image URL or upload your own (PNG, JPEG, WebP, or GIF, up to 5 MB).
+- **Cover art and icons:** click a game's cover or an achievement's icon to paste an image URL or upload your own (PNG, JPEG, WebP, or GIF, up to 5 MB). Add a free SteamGridDB key under **Settings → API keys** to pick covers from SteamGridDB instead.
+- **Rename, hide, or exclude a game:** right-click a game to change its display name, hide it from your library (it still counts toward your score), or exclude it (removed from your score too). Bring hidden and excluded games back from **Settings → Hidden games**.
+- **Search acronyms:** typing an acronym in the games filter also finds its franchise ("GTA" finds Grand Theft Auto). Add your own under **Settings → Search acronyms**.
+- **Discord:** while Discord is running, your level and XP show on your Discord profile. It's on by default; turn it off under **Settings → Discord**.
+- **Updates:** the app checks for new versions in the background and asks before restarting to install one. **Help → Check for Updates** checks right away, and **Settings → Desktop app → Automatic updates** turns the background checks off.
+- **Compact sidebar:** the button next to the app name collapses the sidebar to icons only. It collapses on its own when the window is narrow.
 - **Export:** download your full unlock history as JSON or CSV from **Settings → Export**.
 - **Disconnect:** Xbox, PSN, RetroAchievements, and GOG can each be unlinked, which removes that platform's synced games and achievements. Steam can't be disconnected because it's how you sign in.
 - **Delete account:** permanently removes your account and everything linked to it after you type `DELETE` to confirm.
