@@ -4858,7 +4858,6 @@ function initSidebarToggle() {
 }
 
 function initSidebarNav() {
-    initSidebarToggle();
     // Tooltips for the compact icon-only rail (see #280).
     document.querySelectorAll(".nav-item").forEach((btn) => {
         btn.title = btn.querySelector(".nav-item-label")?.textContent.trim() ?? "";
@@ -5105,6 +5104,9 @@ async function init() {
     void syncNewAccounts(state.accounts || []);
 }
 
+// Before init()'s network calls, so the saved rail state applies on first
+// paint and the toggle works on the setup/sign-in screens too (see #376).
+initSidebarToggle();
 init();
 </script>
 </body>
