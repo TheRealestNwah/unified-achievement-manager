@@ -974,7 +974,7 @@
        "compact window" pattern as a resized native app) instead of eating
        into the content area or forcing horizontal scroll. */
     @media (max-width: 900px) {
-        .sidebar { width: 60px; align-items: center; }
+        .sidebar { width: 60px; align-items: center; overflow-x: hidden; }
         .sidebar-brand span, .sidebar-label { display: none; }
         /* Visually hidden, not display:none, so each icon button keeps its
            accessible name in the compact rail (see #280). */
@@ -987,13 +987,15 @@
             white-space: nowrap;
         }
         .nav-item { position: relative; }
-        .nav-item .nav-badge { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; font-size: 10px; padding: 0 4px; }
+        /* On the icon's lower-right corner, inside its own button, so it
+           can't be mistaken for the item above's (see #348). */
+        .nav-item .nav-badge { position: absolute; bottom: -5px; right: -6px; min-width: 16px; height: 15px; font-size: 9.5px; padding: 0 4px; }
         .sidebar-brand { justify-content: center; padding: 18px 0 16px; }
         .sidebar-section { padding: 0 8px; width: 100%; }
         .nav-item { justify-content: center; padding: 0; width: 40px; height: 34px; margin: 0 auto 4px; }
         .sidebar-footer { flex-direction: column; padding: 12px 6px; }
         .sidebar-footer a, .sidebar-footer span { display: none; }
-        .sidebar-footer button { font-size: 11px; padding: 8px 4px; width: 48px; }
+        .sidebar-footer button { font-size: 11px; padding: 8px 2px; width: 52px; white-space: nowrap; }
         main { padding: 20px; }
         .toolbar { flex-direction: column; align-items: flex-start; }
     }
@@ -3500,7 +3502,8 @@ function setReviewCount(tab, count) {
     document.getElementById(`review-tab-${tab}`).textContent = count > 0 ? `${REVIEW_TAB_LABELS[tab]} (${count})` : REVIEW_TAB_LABELS[tab];
     const total = Object.values(state.reviewCounts).reduce((sum, n) => sum + n, 0);
     const badge = document.getElementById("review-nav-badge");
-    badge.textContent = String(total);
+    // Capped so the badge stays small; the exact count is in its label.
+    badge.textContent = total > 999 ? "999+" : String(total);
     badge.classList.toggle("hidden", total === 0);
     badge.setAttribute("aria-label", `${total} waiting`);
     document.getElementById("review-shortcut-btn").textContent = total > 0 ? `Review (${total})` : "Review";
@@ -4910,7 +4913,7 @@ async function init() {
     document.querySelectorAll("[data-signed-in-only]").forEach((el) => el.classList.remove("hidden"));
     document.getElementById("header-actions").innerHTML = `
         <span style="color: var(--text-dim);">${escapeHtml(user.username)}</span>
-        <button type="button" class="secondary" id="logout-btn" style="margin-left: auto;">Log out</button>
+        <button type="button" class="secondary" id="logout-btn" style="margin-left: auto;" title="Signed in as ${escapeHtml(user.username)}">Log out</button>
     `;
     document.getElementById("logout-btn").addEventListener("click", async () => {
         await api("/auth/logout", { method: "POST" });
