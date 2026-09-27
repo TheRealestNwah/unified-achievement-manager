@@ -389,6 +389,7 @@
     @media (prefers-color-scheme: dark) {
         :root:not([data-theme="light"]) .sync-problems a, :root:not([data-theme="light"]) .platform-sync-error { color: #FCA5A5; }
     }
+    .settings-select { background: var(--input-bg); border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px; color: var(--text); font-size: 13px; }
     .sync-freshness { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--text-dim); }
     .sync-freshness button { padding: 4px 12px; font-size: 12px; }
     .toast {
@@ -1155,6 +1156,16 @@
                 </div>
                 <div class="platforms" id="platforms-list"></div>
 
+                <div class="platforms hidden" id="sync-interval-section">
+                    <div class="platform-row">
+                        <span class="platform-name">Background sync</span>
+                        <span class="platform-note" id="sync-interval-note">How often every linked platform re-syncs on its own.</span>
+                        <div class="platform-actions">
+                            <select class="slot-2 settings-select" id="sync-interval-select" aria-label="Background sync interval"></select>
+                        </div>
+                    </div>
+                </div>
+
                 <h3 class="settings-heading">API keys</h3>
                 <p class="settings-subnote">Stored encrypted on this computer.</p>
                 <div class="platforms">
@@ -1506,20 +1517,77 @@ function refreshRelativeTimes() {
     document.querySelectorAll("[data-relative-time]").forEach((el) => {
         el.textContent = relativeTime(el.dataset.relativeTime);
     });
+    document.querySelectorAll("[data-until-time]").forEach((el) => {
+        el.textContent = untilTime(el.dataset.untilTime);
+    });
 }
 
-function renderSyncFreshness(lastSyncedAt) {
+function renderSyncFreshness(lastSyncedAt, nextSyncAt = null) {
     const text = document.getElementById("sync-freshness-text");
     text.replaceChildren();
     if (!lastSyncedAt) {
         text.textContent = "Not synced yet.";
+    } else {
+        const when = document.createElement("span");
+        when.dataset.relativeTime = lastSyncedAt;
+        when.textContent = relativeTime(lastSyncedAt);
+        text.append("Last synced ", when);
+        text.title = new Date(lastSyncedAt).toLocaleString();
+    }
+    // When the next automatic sync is due (see #289).
+    if (nextSyncAt) {
+        const next = document.createElement("span");
+        next.dataset.untilTime = nextSyncAt;
+        next.textContent = untilTime(nextSyncAt);
+        text.append(" · next ", next);
+    }
+}
+
+// "in 2 hours" for a future time - the counterpart to relativeTime().
+function untilTime(isoString) {
+    const seconds = Math.floor((new Date(isoString).getTime() - Date.now()) / 1000);
+    for (const [name, secondsPerUnit] of [
+        ["day", 86400],
+        ["hour", 3600],
+        ["minute", 60],
+    ]) {
+        const value = Math.floor(seconds / secondsPerUnit);
+        if (value >= 1) return `in ${value} ${name}${value > 1 ? "s" : ""}`;
+    }
+    return "any moment";
+}
+
+const SYNC_INTERVAL_LABELS = { 60: "Every hour", 180: "Every 3 hours", 360: "Every 6 hours", 720: "Every 12 hours", 1440: "Once a day" };
+
+async function initSyncIntervalRow() {
+    let setting;
+    try {
+        setting = await api("/api/settings/sync-interval");
+    } catch {
         return;
     }
-    const when = document.createElement("span");
-    when.dataset.relativeTime = lastSyncedAt;
-    when.textContent = relativeTime(lastSyncedAt);
-    text.append("Last synced ", when);
-    text.title = new Date(lastSyncedAt).toLocaleString();
+    if (!setting.available) return;
+    document.getElementById("sync-interval-section").classList.remove("hidden");
+    const select = document.getElementById("sync-interval-select");
+    select.replaceChildren(
+        ...setting.choices.map((minutes) => new Option(minutes === null ? "Off" : SYNC_INTERVAL_LABELS[minutes] ?? `Every ${minutes} minutes`, minutes === null ? "off" : String(minutes)))
+    );
+    select.value = setting.minutes === null ? "off" : String(setting.minutes);
+    let saved = select.value;
+    select.addEventListener("change", async () => {
+        try {
+            await api("/api/settings/sync-interval", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ minutes: select.value === "off" ? null : Number(select.value) }),
+            });
+            saved = select.value;
+            await pollSyncStatus({ silent: true });
+        } catch (err) {
+            select.value = saved;
+            showMessage(err.message || "Couldn't save that setting.");
+        }
+    });
 }
 
 // Background syncs (the scheduler, or the desktop tray's Sync all now) happen
@@ -1535,7 +1603,7 @@ async function pollSyncStatus({ silent = false } = {}) {
     } catch {
         return;
     }
-    renderSyncFreshness(status.lastSyncedAt);
+    renderSyncFreshness(status.lastSyncedAt, status.nextSyncAt);
     const changed = state.knownSyncAt !== undefined && status.lastSyncedAt !== state.knownSyncAt;
     // A failed background sync doesn't move lastSyncedAt, but its error
     // should still show up without a reload (see #282).
@@ -4334,6 +4402,7 @@ async function init() {
     initSteamKeyRow(setup);
     initSteamGridDbKeyRow();
     initDiscordPresenceRow();
+    initSyncIntervalRow();
     initDesktopSettingsRows(setup);
     initSearchAcronymsRow();
     initAccountDeletion();
