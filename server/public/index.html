@@ -684,6 +684,7 @@
     input[type="checkbox"]:checked::before { transform: translateX(17px); }
     .game-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; }
     .game-title { flex: 1; min-width: 0; font-weight: 600; }
+    .games-more { display: flex; justify-content: center; padding: 8px 0 16px; }
     .game-badges { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; }
     .platform-badge { white-space: nowrap; }
     /* Narrow windows: badges and pips drop under the title instead of
@@ -2616,71 +2617,117 @@ function renderGames(games, { refetchExpanded = false } = {}) {
         return;
     }
 
-    for (const game of visible) {
-        const el = document.createElement("div");
-        el.className = "game";
-        el.innerHTML = `
-            <div class="game-row" data-game-id="${game.id}">
-                ${ImageControls.gameCoverMarkup(game.cover_image_url)}
-                <div class="game-main">
-                    <div class="game-title">${escapeHtml(game.title)}</div>
-                    <div class="game-badges">${platformBadges(game)}<div class="tier-pips">${tierDots(game)}</div></div>
-                </div>
-                <div class="game-progress-text">${game.unlocked_achievements}/${game.total_achievements}</div>
-                <button type="button" class="game-actions-btn" aria-haspopup="menu" aria-label="Actions for ${escapeHtml(game.title)}" title="Game actions">&hellip;</button>
-            </div>
-        `;
-        const row = el.querySelector(".game-row");
-        const titleEl = el.querySelector(".game-title");
-        makeKeyboardButton(titleEl);
-        titleEl.setAttribute("aria-expanded", "false");
-        const actionsBtn = el.querySelector(".game-actions-btn");
-        actionsBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const rect = actionsBtn.getBoundingClientRect();
-            showGameContextMenu(rect.left, rect.bottom + 4, game, actionsBtn);
-        });
-        // The keyboard's own context-menu keys open the same menu as a right-click.
-        row.addEventListener("keydown", (e) => {
-            if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
-                e.preventDefault();
-                const rect = (document.activeElement ?? row).getBoundingClientRect();
-                showGameContextMenu(rect.left, rect.bottom + 4, game, document.activeElement);
-            }
-        });
-        if (state.linkMode) {
-            if (state.linkSelection === game.id) row.classList.add("link-selected");
-            row.addEventListener("click", () => handleLinkClick(game));
-        } else {
-            row.addEventListener("click", () => toggleAchievements(el, game.id));
-        }
-        const coverWrap = el.querySelector(".game-cover-wrap");
-        const coverImage = coverWrap.querySelector(".game-cover");
-        if (coverImage) {
-            const showPlaceholder = () => ImageControls.markCoverImageFailed(coverImage);
-            coverImage.addEventListener("error", showPlaceholder);
-            if (coverImage.complete && coverImage.naturalWidth === 0) showPlaceholder();
-        }
-        coverWrap.addEventListener("click", (e) => {
-            e.stopPropagation();
-            showImageActionMenu(e.currentTarget, {
-                onUpload: () => uploadCoverArt(game.id),
-                onPaste: () => setCoverArt(game.id),
-                onSteamGridDb: () => openSteamGridDbPicker(game),
-            });
-        });
-        row.addEventListener("contextmenu", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            showGameContextMenu(e.clientX, e.clientY, game);
-        });
-        list.appendChild(el);
-        if (!state.linkMode && expandedGameIds.has(game.id)) {
-            openAchievementsPanel(el, game.id, { refetch: refetchExpanded }).catch((err) => console.error(err));
-        }
-    }
+    // Large libraries render a chunk at a time, adding more as you scroll
+    // (see #292). A re-render of the same view keeps at least as many rows as
+    // before, so a refresh doesn't yank a scrolled-down reader back up.
+    const viewKey = [filterText, sortMode, platformFilter, state.completionPreset, state.linkMode].join("|");
+    if (state.gamesViewKey !== viewKey) state.renderedGameCount = 0;
+    state.gamesViewKey = viewKey;
+    const token = (state.gamesRenderToken = (state.gamesRenderToken || 0) + 1);
+    let rendered = 0;
+    const renderMore = (count) => {
+        if (token !== state.gamesRenderToken) return;
+        list.querySelector(".games-more")?.remove();
+        const end = Math.min(visible.length, rendered + count);
+        for (; rendered < end; rendered++) renderGameRow(visible[rendered], list, refetchExpanded);
+        state.renderedGameCount = rendered;
+        if (rendered < visible.length) list.appendChild(moreGamesSentinel(rendered, visible.length, () => renderMore(GAMES_CHUNK_SIZE)));
+    };
+    renderMore(Math.max(GAMES_CHUNK_SIZE, state.renderedGameCount || 0));
     // Rebuilding the list briefly shrinks the page; keep the reader's place.
     pane.scrollTop = scrollTop;
+}
+
+const GAMES_CHUNK_SIZE = 100;
+
+// The "more rows" marker at the end of a partly rendered list: scrolling near
+// it loads the next chunk, and its button does the same from the keyboard.
+function moreGamesSentinel(shown, total, loadMore) {
+    const more = document.createElement("div");
+    more.className = "games-more";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary";
+    button.textContent = `Show more (${shown.toLocaleString()} of ${total.toLocaleString()})`;
+    button.addEventListener("click", loadMore);
+    more.appendChild(button);
+    const observer = new IntersectionObserver(
+        (entries) => {
+            if (entries.some((e) => e.isIntersecting)) {
+                observer.disconnect();
+                loadMore();
+            }
+        },
+        { root: document.querySelector(".content-pane"), rootMargin: "800px 0px" }
+    );
+    // Observe once it's in the page; a removed marker stops observing.
+    requestAnimationFrame(() => (more.isConnected ? observer.observe(more) : observer.disconnect()));
+    return more;
+}
+
+// One library row, with its click, keyboard, cover, and context-menu wiring.
+function renderGameRow(game, list, refetchExpanded) {
+    const el = document.createElement("div");
+    el.className = "game";
+    el.innerHTML = `
+        <div class="game-row" data-game-id="${game.id}">
+            ${ImageControls.gameCoverMarkup(game.cover_image_url)}
+            <div class="game-main">
+                <div class="game-title">${escapeHtml(game.title)}</div>
+                <div class="game-badges">${platformBadges(game)}<div class="tier-pips">${tierDots(game)}</div></div>
+            </div>
+            <div class="game-progress-text">${game.unlocked_achievements}/${game.total_achievements}</div>
+            <button type="button" class="game-actions-btn" aria-haspopup="menu" aria-label="Actions for ${escapeHtml(game.title)}" title="Game actions">&hellip;</button>
+        </div>
+    `;
+    const row = el.querySelector(".game-row");
+    const titleEl = el.querySelector(".game-title");
+    makeKeyboardButton(titleEl);
+    titleEl.setAttribute("aria-expanded", "false");
+    const actionsBtn = el.querySelector(".game-actions-btn");
+    actionsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const rect = actionsBtn.getBoundingClientRect();
+        showGameContextMenu(rect.left, rect.bottom + 4, game, actionsBtn);
+    });
+    // The keyboard's own context-menu keys open the same menu as a right-click.
+    row.addEventListener("keydown", (e) => {
+        if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+            e.preventDefault();
+            const rect = (document.activeElement ?? row).getBoundingClientRect();
+            showGameContextMenu(rect.left, rect.bottom + 4, game, document.activeElement);
+        }
+    });
+    if (state.linkMode) {
+        if (state.linkSelection === game.id) row.classList.add("link-selected");
+        row.addEventListener("click", () => handleLinkClick(game));
+    } else {
+        row.addEventListener("click", () => toggleAchievements(el, game.id));
+    }
+    const coverWrap = el.querySelector(".game-cover-wrap");
+    const coverImage = coverWrap.querySelector(".game-cover");
+    if (coverImage) {
+        const showPlaceholder = () => ImageControls.markCoverImageFailed(coverImage);
+        coverImage.addEventListener("error", showPlaceholder);
+        if (coverImage.complete && coverImage.naturalWidth === 0) showPlaceholder();
+    }
+    coverWrap.addEventListener("click", (e) => {
+        e.stopPropagation();
+        showImageActionMenu(e.currentTarget, {
+            onUpload: () => uploadCoverArt(game.id),
+            onPaste: () => setCoverArt(game.id),
+            onSteamGridDb: () => openSteamGridDbPicker(game),
+        });
+    });
+    row.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showGameContextMenu(e.clientX, e.clientY, game);
+    });
+    list.appendChild(el);
+    if (!state.linkMode && expandedGameIds.has(game.id)) {
+        openAchievementsPanel(el, game.id, { refetch: refetchExpanded }).catch((err) => console.error(err));
+    }
 }
 
 // Enters link-selection mode, optionally pre-selecting `game` as the one to
@@ -4783,7 +4830,12 @@ async function init() {
     });
     document.getElementById("review-shortcut-btn").addEventListener("click", () => openReviewPage());
     document.getElementById("activity-more-btn").addEventListener("click", (e) => loadMoreActivity(e.currentTarget));
-    document.getElementById("games-filter").addEventListener("input", () => renderGames(state.games));
+    // Debounced, so a fast typist doesn't rebuild the list on every key (#292).
+    let filterTimer;
+    document.getElementById("games-filter").addEventListener("input", () => {
+        clearTimeout(filterTimer);
+        filterTimer = setTimeout(() => renderGames(state.games), 120);
+    });
     const listPrefs = getGamesListPrefs();
     if (listPrefs.sort && gameSorters[listPrefs.sort]) document.getElementById("games-sort").value = listPrefs.sort;
     document.getElementById("games-sort").addEventListener("change", () => {
