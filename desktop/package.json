@@ -80,9 +80,17 @@
       "deleteAppDataOnUninstall": false,
       "include": "build/installer.nsh",
       "shortcutName": "Unified Achievement Manager"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "TheRealestNwah",
+        "repo": "unified-achievement-manager"
+      }
+    ]
   },
   "dependencies": {
-    "@xhayper/discord-rpc": "^1.5.1"
+    "@xhayper/discord-rpc": "^1.5.1",
+    "electron-updater": "6.8.9"
   }
 }

@@ -7,18 +7,21 @@ export interface DesktopSettings {
     keepInTray: boolean;
     startWithWindows: boolean;
     unlockNotifications: boolean;
+    automaticUpdates: boolean;
 }
 
 const KEYS: Record<keyof DesktopSettings, string> = {
     keepInTray: "desktop_keep_in_tray",
     startWithWindows: "desktop_start_with_windows",
     unlockNotifications: "desktop_unlock_notifications",
+    automaticUpdates: "desktop_automatic_updates",
 };
 
 // Tray and startup are off by default: closing the window quits, and nothing
 // is added to Windows startup, until the user opts in. Unlock notifications
 // (see #250) are on, and only fire while the window isn't in front.
-const DEFAULTS: DesktopSettings = { keepInTray: false, startWithWindows: false, unlockNotifications: true };
+// Automatic updates (see #314) are on too.
+const DEFAULTS: DesktopSettings = { keepInTray: false, startWithWindows: false, unlockNotifications: true, automaticUpdates: true };
 
 export async function getDesktopSettings(): Promise<DesktopSettings> {
     const result = await pool.query("select key, value from app_settings where key = any($1)", [Object.values(KEYS)]);

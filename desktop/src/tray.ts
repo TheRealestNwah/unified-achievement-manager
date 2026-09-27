@@ -10,6 +10,8 @@ interface DesktopSettings {
     startWithWindows: boolean;
     // Read by notifications.ts (see #250); polled here with the rest.
     unlockNotifications: boolean;
+    // Read by updater.ts (see #314).
+    automaticUpdates: boolean;
 }
 
 // Windows starts the app with this when "Start with Windows" is on, so it
@@ -18,10 +20,14 @@ export const HIDDEN_LAUNCH_ARG = "--hidden";
 
 const POLL_INTERVAL_MS = 5_000;
 
-let settings: DesktopSettings = { keepInTray: false, startWithWindows: false, unlockNotifications: true };
+let settings: DesktopSettings = { keepInTray: false, startWithWindows: false, unlockNotifications: true, automaticUpdates: true };
 
 export function unlockNotificationsEnabled(): boolean {
     return settings.unlockNotifications !== false;
+}
+
+export function automaticUpdatesEnabled(): boolean {
+    return settings.automaticUpdates !== false;
 }
 let tray: Tray | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
