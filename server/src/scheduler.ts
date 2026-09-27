@@ -2,6 +2,7 @@ import { pool } from "./db";
 import { runAccountSync, PlatformAccountRow } from "./sync/runAccountSync";
 import { recomputeUserScore } from "./scoring";
 import { runMatching } from "./matching";
+import { getSyncIntervalMinutes } from "./settings/syncInterval";
 
 // Off by default (see config.ts / .env.example) - every account still syncs
 // fine on demand from the dashboard, and this just automates that instead of
@@ -9,15 +10,77 @@ import { runMatching } from "./matching";
 // Xbox key) logs and moves on rather than aborting the whole run, since a
 // scheduled job with no one watching it shouldn't silently stop covering
 // every other account over one bad one.
-export function startScheduler(intervalMinutes: number): () => void {
-    const intervalMs = intervalMinutes * 60 * 1000;
-    console.log(`Background sync scheduler enabled - running every ${intervalMinutes} minute(s).`);
+//
+// The interval is the user's Settings -> Background sync choice when there is
+// one (see #289), falling back to SCHEDULER_INTERVAL_MINUTES, and can be
+// changed without a restart via applySchedulerInterval().
+let started = false;
+let defaultIntervalMinutes = 360;
+let intervalMinutes: number | null = null;
+let nextRunAt: Date | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
+let running = false;
 
-    runScheduledSync().catch((err) => console.error("Scheduled sync failed:", err));
-    const timer = setInterval(() => {
-        runScheduledSync().catch((err) => console.error("Scheduled sync failed:", err));
-    }, intervalMs);
-    return () => clearInterval(timer);
+export function startScheduler(fallbackIntervalMinutes: number): () => void {
+    started = true;
+    defaultIntervalMinutes = fallbackIntervalMinutes;
+    void applySchedulerInterval({ runNow: true });
+    return () => {
+        started = false;
+        clearTimer();
+    };
+}
+
+// Re-reads the interval and reschedules. A change takes effect from now
+// rather than triggering an immediate sync; startup does sync straight away.
+export async function applySchedulerInterval({ runNow = false } = {}): Promise<void> {
+    if (!started) return;
+    let minutes: number | null;
+    try {
+        minutes = await getSyncIntervalMinutes(defaultIntervalMinutes);
+    } catch (err) {
+        console.error("Couldn't read the background sync interval; using the default:", err);
+        minutes = defaultIntervalMinutes;
+    }
+    clearTimer();
+    intervalMinutes = minutes;
+    if (minutes === null) {
+        console.log("Background sync is off - platforms only sync when asked.");
+        return;
+    }
+    console.log(`Background sync scheduler enabled - running every ${minutes} minute(s).`);
+    if (runNow) runScheduledSyncOnce();
+    scheduleNext(minutes);
+}
+
+export function getSchedulerStatus(): { enabled: boolean; intervalMinutes: number | null; nextRunAt: Date | null } {
+    return { enabled: started, intervalMinutes, nextRunAt };
+}
+
+function scheduleNext(minutes: number): void {
+    const ms = minutes * 60 * 1000;
+    nextRunAt = new Date(Date.now() + ms);
+    timer = setTimeout(() => {
+        runScheduledSyncOnce();
+        scheduleNext(minutes);
+    }, ms);
+}
+
+function clearTimer(): void {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    nextRunAt = null;
+}
+
+// A slow run (a big first sync) mustn't overlap the next one.
+function runScheduledSyncOnce(): void {
+    if (running) return;
+    running = true;
+    runScheduledSync()
+        .catch((err) => console.error("Scheduled sync failed:", err))
+        .finally(() => {
+            running = false;
+        });
 }
 
 async function runScheduledSync(): Promise<void> {

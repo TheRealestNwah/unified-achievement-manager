@@ -8,6 +8,8 @@ import { getDiscordPresenceEnabled, setDiscordPresenceEnabled } from "./discordP
 import { findDuplicateAcronym, getSearchAcronyms, saveSearchAcronyms, type SearchAcronym } from "./searchAcronyms";
 import { getDesktopSettings, isDesktopApp, updateDesktopSettings } from "./desktopSettings";
 import { getNewUnlocksSince } from "./newUnlocks";
+import { isValidSyncInterval, setSyncIntervalMinutes, SYNC_INTERVAL_CHOICES } from "./syncInterval";
+import { applySchedulerInterval, getSchedulerStatus } from "../scheduler";
 
 export const setupRouter = Router();
 export const settingsRouter = Router();
@@ -24,6 +26,34 @@ settingsRouter.put("/discord-rich-presence", requireAuth, async (req, res, next)
     try {
         await setDiscordPresenceEnabled(Boolean(req.body?.enabled));
         res.status(204).end();
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Background sync interval (see #289). `available` is false when the
+// scheduler is off altogether (classic server mode without
+// SCHEDULER_ENABLED), so the dashboard can leave the setting out.
+settingsRouter.get("/sync-interval", requireAuth, async (_req, res, next) => {
+    try {
+        const status = getSchedulerStatus();
+        res.json({ available: status.enabled, minutes: status.intervalMinutes, choices: SYNC_INTERVAL_CHOICES });
+    } catch (err) {
+        next(err);
+    }
+});
+
+settingsRouter.put("/sync-interval", requireAuth, async (req, res, next) => {
+    try {
+        const minutes = req.body?.minutes ?? null;
+        if (!isValidSyncInterval(minutes)) {
+            res.status(400).json({ error: `minutes must be one of ${SYNC_INTERVAL_CHOICES.map((c) => c ?? "null").join(", ")}` });
+            return;
+        }
+        await setSyncIntervalMinutes(minutes);
+        await applySchedulerInterval();
+        const status = getSchedulerStatus();
+        res.json({ minutes: status.intervalMinutes, nextRunAt: status.nextRunAt });
     } catch (err) {
         next(err);
     }
