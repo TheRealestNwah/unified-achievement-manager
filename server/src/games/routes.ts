@@ -4,6 +4,7 @@ import { requireAuth } from "../middleware/requireAuth";
 import { exportFileName, toCsv } from "./exportFile";
 import { getSchedulerStatus } from "../scheduler";
 import { syncingAccountIds } from "../sync/runAccountSync";
+import { explainSyncError } from "../sync/syncErrorMessage";
 import { getGamesForUser, getAchievementsForGame, getRecentActivity, getFunStats, getFullExportData } from "./queries";
 import { recomputeUserScore } from "../scoring";
 import {
@@ -67,7 +68,19 @@ gamesRouter.get("/accounts", requireAuth, async (req, res, next) => {
         // `syncing`: a sync of this account is running right now, manual or
         // scheduled (see #322), so an old error can be shown as superseded.
         const syncing = syncingAccountIds();
-        res.json(result.rows.map(({ id, ...row }) => ({ ...row, syncing: syncing.has(id) })));
+        res.json(
+            result.rows.map(({ id, ...row }) => {
+                // Plain-language error, with the raw one kept as detail (see #389).
+                const explained = row.last_sync_error ? explainSyncError(row.platform_id, row.last_sync_error) : null;
+                return {
+                    ...row,
+                    last_sync_error: explained?.message ?? null,
+                    last_sync_error_detail: explained?.detail ?? null,
+                    last_sync_error_actionable: explained?.actionable ?? false,
+                    syncing: syncing.has(id),
+                };
+            })
+        );
     } catch (err) {
         next(err);
     }

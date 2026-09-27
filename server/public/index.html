@@ -458,6 +458,7 @@
     @media (prefers-color-scheme: dark) {
         :root:not([data-theme="light"]) .sync-problems a, :root:not([data-theme="light"]) .platform-sync-error { color: #FCA5A5; }
     }
+    .platform-sync-error .sync-error-detail { color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; }
     /* A failure a new sync is already retrying (see #322) - context, not an alarm. */
     :root .platform-row .platform-sync-error.superseded { color: var(--text-dim); }
     .empty-library { text-align: center; padding: 40px 24px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
@@ -4184,6 +4185,14 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
         when.dataset.relativeTime = account.last_sync_error_at;
         when.textContent = relativeTime(account.last_sync_error_at);
         error.append("Last sync failed ", when, `: ${account.last_sync_error}`);
+        // The raw error behind the plain-language one (see #389), for
+        // reporting a problem.
+        if (account.last_sync_error_detail) {
+            const detail = document.createElement("span");
+            detail.className = "sync-error-detail";
+            detail.textContent = ` (${account.last_sync_error_detail})`;
+            error.appendChild(detail);
+        }
         row.appendChild(error);
         if (account.syncing) markSyncErrorSuperseded(row);
     }
@@ -4440,9 +4449,13 @@ function renderSyncProblems(accounts) {
         failing.length === 1
             ? `${names[0]} couldn't sync: ${failing[0].last_sync_error}`
             : `${names.join(", ")} couldn't sync.`;
+    if (failing.length === 1 && failing[0].last_sync_error_detail) text.title = failing[0].last_sync_error_detail;
+    // Settings has the full errors either way, but only say "fix" when
+    // there's something there that could fix one (see #389) - a rate limit
+    // or an outage clears up on its own.
     const link = document.createElement("a");
     link.href = "#";
-    link.textContent = "Fix in Settings";
+    link.textContent = failing.some((a) => a.last_sync_error_actionable) ? "Fix in Settings" : "Details";
     link.addEventListener("click", (e) => {
         e.preventDefault();
         document.querySelector('[data-nav="platforms"]').click();
