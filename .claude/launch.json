@@ -5,7 +5,8 @@
       "name": "uam-server",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "server", "run", "dev"],
-      "port": 3000
+      "port": 3000,
+      "url": "http://127.0.0.1:3000"
     }
   ]
 }

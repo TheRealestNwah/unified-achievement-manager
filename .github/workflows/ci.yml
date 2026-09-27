@@ -24,10 +24,6 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/uam_test
-      BASE_URL: http://localhost:3000
-      STEAM_API_KEY: ci-test-key
-      SESSION_SECRET: ci-test-session-secret
-      CREDENTIAL_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       INTEGRATION_TESTS: "true"
       EMBEDDED_PG_TESTS: "true"
     defaults:

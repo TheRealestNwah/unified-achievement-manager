@@ -28,7 +28,6 @@ import { Server } from "node:http";
 export const app = express();
 
 app.disable("x-powered-by");
-if (config.trustProxy) app.set("trust proxy", 1);
 app.use(nonceMiddleware);
 app.use(
     helmet({
@@ -94,7 +93,6 @@ app.use(
         cookie: {
             maxAge: 1000 * 60 * 60 * 24 * 7,
             httpOnly: true,
-            secure: config.baseUrl.startsWith("https://"),
             sameSite: "lax",
         },
     })
@@ -153,18 +151,18 @@ export interface RunningServer {
     stop(): Promise<void>;
 }
 
-export async function startServer({ handleSignals = true } = {}): Promise<RunningServer> {
+// Started by app.ts, which owns the database and process signals around it.
+export async function startServer(): Promise<RunningServer> {
     await loadSteamApiKey();
     const server = await new Promise<Server>((resolve, reject) => {
-        const onListening = () => {
+        const listening = app.listen(config.port, config.host, () => {
             console.log(`Unified Achievement Manager server listening on ${config.baseUrl}`);
             resolve(listening);
-        };
-        const listening = config.host ? app.listen(config.port, config.host, onListening) : app.listen(config.port, onListening);
+        });
         listening.once("error", reject);
     });
 
-    const stopScheduler = config.schedulerEnabled ? startScheduler(config.schedulerIntervalMinutes) : () => undefined;
+    const stopScheduler = startScheduler(config.schedulerIntervalMinutes);
 
     let shutdownPromise: Promise<void> | undefined;
     const stop = () => {
@@ -176,22 +174,5 @@ export async function startServer({ handleSignals = true } = {}): Promise<Runnin
         return shutdownPromise;
     };
 
-    if (handleSignals) {
-        const onSignal = () =>
-            void stop().catch((err) => {
-                console.error("Graceful shutdown failed:", err);
-                process.exitCode = 1;
-            });
-        process.once("SIGTERM", onSignal);
-        process.once("SIGINT", onSignal);
-    }
-
     return { server, stop };
-}
-
-if (require.main === module) {
-    startServer().catch((err) => {
-        console.error(err);
-        process.exit(1);
-    });
 }

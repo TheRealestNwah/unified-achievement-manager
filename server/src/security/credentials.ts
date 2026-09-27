@@ -11,10 +11,10 @@ export function parseCredentialEncryptionKey(value: string): Buffer {
         if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value) || value.length % 4 !== 0) throw new Error();
         key = Buffer.from(value, "base64");
     } catch {
-        throw new Error("CREDENTIAL_ENCRYPTION_KEY must be a base64-encoded 32-byte key");
+        throw new Error("The credential encryption key in secrets.json must be a base64-encoded 32-byte key");
     }
     if (key.length !== KEY_BYTES) {
-        throw new Error("CREDENTIAL_ENCRYPTION_KEY must be a base64-encoded 32-byte key");
+        throw new Error("The credential encryption key in secrets.json must be a base64-encoded 32-byte key");
     }
     return key;
 }

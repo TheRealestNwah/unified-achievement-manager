@@ -9,11 +9,8 @@ const PROBE_STEAM_ID = "76561197960435530";
 
 let currentKey: string | undefined;
 
-export type SteamApiKeySource = "env" | "settings" | null;
-
-export function steamApiKeySource(): SteamApiKeySource {
-    if (config.steamApiKey) return "env";
-    return currentKey ? "settings" : null;
+export function hasSteamApiKey(): boolean {
+    return currentKey !== undefined;
 }
 
 export function getSteamApiKey(): string {
@@ -27,7 +24,6 @@ function useKey(apiKey: string): void {
 }
 
 export async function loadSteamApiKey(): Promise<void> {
-    if (config.steamApiKey) return useKey(config.steamApiKey);
     const result = await pool.query("select value from app_settings where key = $1", [SETTING_KEY]);
     if (result.rows[0]) useKey(decryptCredential(result.rows[0].value as string, config.credentialEncryptionKey));
 }

@@ -9,7 +9,7 @@ export function isValidSyncInterval(value: unknown): value is number | null {
     return value === null || (typeof value === "number" && SYNC_INTERVAL_CHOICES.includes(value));
 }
 
-// The saved interval, or `fallback` (SCHEDULER_INTERVAL_MINUTES) when the
+// The saved interval, or `fallback` (every 6 hours, see config.ts) when the
 // user hasn't picked one.
 export async function getSyncIntervalMinutes(fallback: number): Promise<number | null> {
     const result = await pool.query("select value from app_settings where key = $1", [SETTING_KEY]);

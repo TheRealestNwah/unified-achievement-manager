@@ -4508,8 +4508,7 @@ function showSetup() {
     });
 }
 
-function initSteamKeyRow(setup) {
-    if (!setup.steamApiKeyEditable) return;
+function initSteamKeyRow() {
     document.getElementById("steam-key-row").classList.remove("hidden");
     const btn = document.getElementById("steam-key-change-btn");
     btn.addEventListener("click", async () => {
@@ -5058,7 +5057,7 @@ async function init() {
         await api("/auth/logout", { method: "POST" });
         location.reload();
     });
-    initSteamKeyRow(setup);
+    initSteamKeyRow();
     initSteamGridDbKeyRow();
     initDiscordPresenceRow();
     initSyncIntervalRow();

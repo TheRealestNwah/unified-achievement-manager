@@ -29,8 +29,7 @@ export interface PlatformAccountRow {
 // One sync per account at a time (see #323): pressing Sync while the
 // scheduler is already working through that account joins the running sync
 // and gets its result, instead of starting a second full pass against the
-// platform's API. In-memory is enough - app mode and the classic server are
-// each a single process.
+// platform's API. In-memory is enough - the app is a single process.
 const inFlight = new Map<string, Promise<SyncSummary>>();
 
 // Accounts with a sync under way right now, for the dashboard (see #322).
