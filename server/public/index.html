@@ -682,6 +682,9 @@
         border-color: var(--accent);
     }
     input[type="checkbox"]:checked::before { transform: translateX(17px); }
+    /* The On/Off text beside a settings switch follows the switch (see #325). */
+    .toggle-state::after { content: "Off"; color: var(--text-dim); }
+    input[type="checkbox"]:checked + .toggle-state::after { content: "On"; color: var(--text); }
     .game-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; }
     .game-title { flex: 1; min-width: 0; font-weight: 600; }
     .games-more { display: flex; justify-content: center; padding: 8px 0 16px; }
@@ -1250,7 +1253,7 @@
                         <span class="platform-note">Shows your level and XP on your Discord profile while the app is open (needs a local Discord client running).</span>
                         <div class="platform-actions">
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
-                                <input type="checkbox" id="discord-presence-toggle" /> On
+                                <input type="checkbox" role="switch" aria-label="Discord Rich Presence" id="discord-presence-toggle" /> <span class="toggle-state" aria-hidden="true"></span>
                             </label>
                         </div>
                     </div>
@@ -1264,7 +1267,7 @@
                             <span class="platform-note">Closing the window keeps the app in the system tray, so background syncs keep running. Quit from the tray icon.</span>
                             <div class="platform-actions">
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
-                                    <input type="checkbox" id="desktop-keep-in-tray-toggle" data-desktop-setting="keepInTray" /> On
+                                    <input type="checkbox" role="switch" aria-label="Keep running in the tray" id="desktop-keep-in-tray-toggle" data-desktop-setting="keepInTray" /> <span class="toggle-state" aria-hidden="true"></span>
                                 </label>
                             </div>
                         </div>
@@ -1273,7 +1276,7 @@
                             <span class="platform-note">Starts the app when you sign in to Windows (in the tray, if that's on).</span>
                             <div class="platform-actions">
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
-                                    <input type="checkbox" id="desktop-start-with-windows-toggle" data-desktop-setting="startWithWindows" /> On
+                                    <input type="checkbox" role="switch" aria-label="Start with Windows" id="desktop-start-with-windows-toggle" data-desktop-setting="startWithWindows" /> <span class="toggle-state" aria-hidden="true"></span>
                                 </label>
                             </div>
                         </div>
@@ -1282,7 +1285,7 @@
                             <span class="platform-note">A Windows notification when a sync finds new achievements, platinums, or a level-up while the app isn't in front.</span>
                             <div class="platform-actions">
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
-                                    <input type="checkbox" id="desktop-unlock-notifications-toggle" data-desktop-setting="unlockNotifications" /> On
+                                    <input type="checkbox" role="switch" aria-label="Unlock notifications" id="desktop-unlock-notifications-toggle" data-desktop-setting="unlockNotifications" /> <span class="toggle-state" aria-hidden="true"></span>
                                 </label>
                             </div>
                         </div>
@@ -1291,7 +1294,7 @@
                             <span class="platform-note">Checks for a new version every few hours and downloads it in the background, then asks before restarting. Help &rarr; Check for Updates works either way.</span>
                             <div class="platform-actions">
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
-                                    <input type="checkbox" id="desktop-automatic-updates-toggle" data-desktop-setting="automaticUpdates" /> On
+                                    <input type="checkbox" role="switch" aria-label="Automatic updates" id="desktop-automatic-updates-toggle" data-desktop-setting="automaticUpdates" /> <span class="toggle-state" aria-hidden="true"></span>
                                 </label>
                             </div>
                         </div>
