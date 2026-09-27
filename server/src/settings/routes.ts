@@ -10,6 +10,7 @@ import { getDesktopSettings, isDesktopApp, updateDesktopSettings } from "./deskt
 import { getNewUnlocksSince } from "./newUnlocks";
 import { isValidSyncInterval, setSyncIntervalMinutes, SYNC_INTERVAL_CHOICES } from "./syncInterval";
 import { applySchedulerInterval, getSchedulerStatus } from "../scheduler";
+import { createLocalProfile, MAX_DISPLAY_NAME_LENGTH, ProfileExistsError } from "../auth/localProfile";
 
 export const setupRouter = Router();
 export const settingsRouter = Router();
@@ -149,11 +150,12 @@ settingsRouter.delete("/steamgriddb-api-key", requireAuth, async (_req, res, nex
     }
 });
 
-// Reachable before sign-in: the Steam key has to exist before anyone can sign
-// in with Steam at all.
+// Reachable before there's a profile, for the first-run screen. Once one
+// exists, every request is signed in as it (see #393).
 setupRouter.get("/status", (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.json({
+        profileExists: req.isAuthenticated(),
         steamApiKeyConfigured: hasSteamApiKey(),
         desktopApp: isDesktopApp(),
         csrfToken: getCsrfToken(req),
@@ -221,14 +223,29 @@ setupRouter.get("/discord-presence-data", async (_req, res, next) => {
     }
 });
 
-setupRouter.put("/steam-api-key", async (req, res, next) => {
+// First run (see #393): creates the local profile everything else belongs
+// to, and signs this session in as it. Only while there's no profile yet.
+setupRouter.post("/profile", async (req, res, next) => {
     try {
-        // First-run setup is open; replacing an existing key needs a session.
-        if (hasSteamApiKey() && !req.isAuthenticated()) {
-            res.status(401).json({ error: "Sign in to change the Steam Web API key." });
+        const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim() : "";
+        if (!displayName || displayName.length > MAX_DISPLAY_NAME_LENGTH) {
+            res.status(400).json({ error: `Pick a name up to ${MAX_DISPLAY_NAME_LENGTH} characters long.` });
             return;
         }
+        const profile = await createLocalProfile(displayName);
+        req.login(profile, (err) => (err ? next(err) : res.status(201).json(profile)));
+    } catch (err) {
+        if (err instanceof ProfileExistsError) {
+            res.status(409).json({ error: "This app already has a profile." });
+            return;
+        }
+        next(err);
+    }
+});
 
+// The key is only needed to connect Steam (see #393), which the profile does.
+setupRouter.put("/steam-api-key", requireAuth, async (req, res, next) => {
+    try {
         const apiKey = typeof req.body?.apiKey === "string" ? req.body.apiKey.trim() : "";
         if (!/^[A-Fa-f0-9]{32}$/.test(apiKey)) {
             res.status(400).json({ error: "A Steam Web API key is 32 hexadecimal characters." });

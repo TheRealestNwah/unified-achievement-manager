@@ -16,18 +16,19 @@ Windows 10/11, 64-bit. The installer is about 135 MB because it bundles its own 
 
 ## First run
 
-1. **Steam Web API key.** On first launch the app asks for your own free key. Open [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey), enter `localhost` as the domain name, and paste the key it gives you. The app checks the key with Steam and stores it encrypted on your computer. You can change it later from **Settings → API keys → Steam Web API**.
-2. **Sign in with Steam.** Steam's own sign-in page opens inside the app. Your Steam account becomes your identity in the app.
-3. Click **Sync** to pull your Steam library, then connect other platforms.
+1. **Name your profile.** The app asks what to call you. That's your profile: there's no account to create and nothing to sign in to.
+2. **Connect your platforms** under **Settings → Platforms**, as many or as few as you like. You don't need Steam.
+3. Each platform syncs as soon as it's connected.
 
 ## Connecting platforms
 
+- **Steam:** needs your own free Steam Web API key. Open [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey), enter `localhost` as the domain name, and paste the key it gives you when the app asks. Steam's own sign-in page then opens inside the app to confirm which account is yours; the app never sees your password. The key also lets the app use Steam's public unlock rates to tier games you own on other platforms.
 - **Xbox:** get a personal API key from [xbl.io/dashboard](https://xbl.io/dashboard) (sign in with your Microsoft account there first) and paste it in.
 - **PlayStation:** log into [playstation.com](https://www.playstation.com) in your browser, then in the same browser visit https://ca.account.sony.com/api/v1/ssocookie and paste the `npsso` value it shows. Treat that token like a password, since it grants full account access.
 - **RetroAchievements:** get a personal Web API key from your [account settings page](https://retroachievements.org/settings) and paste it in with your username.
 - **GOG:** click **Log in at GOG**, sign in in your browser, then copy the `code` value out of the address GOG redirects you to and paste it in. Codes are single-use and expire quickly, so paste it straight away.
 
-Links like these open in your normal web browser. Only Steam sign-in happens inside the app.
+Links like these open in your normal web browser. Only Steam's sign-in page opens inside the app.
 
 ## Using it
 
@@ -42,8 +43,8 @@ Links like these open in your normal web browser. Only Steam sign-in happens ins
 - **Updates:** the app checks for new versions in the background and asks before restarting to install one. **Help → Check for Updates** checks right away, and **Settings → Desktop app → Automatic updates** turns the background checks off.
 - **Compact sidebar:** the button next to the app name collapses the sidebar to icons only. It collapses on its own when the window is narrow.
 - **Export:** download your full unlock history as JSON or CSV from **Settings → Export**.
-- **Disconnect:** Xbox, PSN, RetroAchievements, and GOG can each be unlinked, which removes that platform's synced games and achievements. Steam can't be disconnected because it's how you sign in.
-- **Delete account:** permanently removes your account and everything linked to it after you type `DELETE` to confirm.
+- **Disconnect:** any platform can be unlinked, which removes its synced games and achievements.
+- **Delete account:** permanently removes your profile and everything linked to it after you type `DELETE` to confirm. The app then starts over at first run.
 
 ## Your data
 
