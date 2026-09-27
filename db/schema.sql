@@ -199,6 +199,17 @@ do $$ begin
     end if;
 end $$;
 
+-- Pending matches between two games, left behind by splits made before
+-- splitting cleaned them up (see #360). Confirming one would merge an
+-- achievement across games.
+delete from achievement_match_candidates amc
+using achievement_platform_links apl, canonical_achievements source, canonical_achievements target
+where apl.id = amc.achievement_platform_link_id
+  and source.id = apl.canonical_achievement_id
+  and target.id = amc.candidate_canonical_achievement_id
+  and amc.status = 'pending'
+  and source.game_id <> target.game_id;
+
 -- Whole-game merges a matching pass has proposed but won't perform
 -- automatically, because the signal isn't strong enough to trust without a
 -- human - either an exact-title match that involves RetroAchievements (a

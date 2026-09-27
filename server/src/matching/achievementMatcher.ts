@@ -3,6 +3,18 @@ import { wordOverlapScore } from "./normalize";
 import { resolveTierFromRarity } from "../scoring/tier";
 import { deleteIfUploaded } from "../games/uploads";
 
+// A pending match whose two achievements are in different games (see #360) -
+// left behind when a split moves one side to a new game. Confirming it would
+// merge an achievement across games.
+export const CROSS_GAME_PENDING_CANDIDATES = `
+    select amc.id
+    from achievement_match_candidates amc
+    join achievement_platform_links apl on apl.id = amc.achievement_platform_link_id
+    join canonical_achievements source on source.id = apl.canonical_achievement_id
+    join canonical_achievements target on target.id = amc.candidate_canonical_achievement_id
+    where amc.status = 'pending' and source.game_id <> target.game_id
+`;
+
 const AUTO_MERGE_THRESHOLD = 1.0; // exact normalized name match, for now
 const CANDIDATE_THRESHOLD = 0.5; // below this isn't worth recording as a maybe
 
@@ -246,6 +258,10 @@ export async function confirmMatchCandidate(candidateId: string): Promise<void> 
     ]);
     const sourceId = link.rows[0].canonical_achievement_id;
     const targetId = candidate.rows[0].candidate_canonical_achievement_id;
+    const games = await pool.query("select count(distinct game_id)::int as n from canonical_achievements where id = any($1)", [
+        [sourceId, targetId],
+    ]);
+    if (games.rows[0].n > 1) throw new Error("These achievements are in different games, so they can't be merged");
 
     // mergeAchievements repoints any achievement_match_candidates row whose
     // candidate_canonical_achievement_id was the merge's loser - including
@@ -289,14 +305,17 @@ export async function resolveMatchCandidates(
     let skipped = 0;
     for (const id of candidateIds) {
         const current = await pool.query(
-            `select amc.status, apl.canonical_achievement_id as source_id, amc.candidate_canonical_achievement_id as target_id
+            `select amc.status, apl.canonical_achievement_id as source_id, amc.candidate_canonical_achievement_id as target_id,
+                    source.game_id <> target.game_id as cross_game
              from achievement_match_candidates amc
              join achievement_platform_links apl on apl.id = amc.achievement_platform_link_id
+             join canonical_achievements source on source.id = apl.canonical_achievement_id
+             join canonical_achievements target on target.id = amc.candidate_canonical_achievement_id
              where amc.id = $1`,
             [id]
         );
         const row = current.rows[0];
-        if (!row || row.status !== "pending") {
+        if (!row || row.status !== "pending" || row.cross_game) {
             skipped++;
             continue;
         }
