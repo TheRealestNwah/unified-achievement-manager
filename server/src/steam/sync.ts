@@ -93,8 +93,11 @@ export async function syncSteamAccount(userPlatformAccountId: string, steamId: s
         }
 
         const schema = await getSchemaForGame(game.appid);
-        await saveSyncState(userPlatformAccountId, game.appid, game.playtime_forever, game.rtime_last_played);
-        if (schema.length === 0) continue; // game has no achievements
+        if (schema.length === 0) {
+            // Game has no achievements.
+            await saveSyncState(userPlatformAccountId, game.appid, game.playtime_forever, game.rtime_last_played);
+            continue;
+        }
 
         const [playerAchievements, globalPercentages] = await Promise.all([
             getPlayerAchievements(game.appid, steamId),
@@ -145,6 +148,10 @@ export async function syncSteamAccount(userPlatformAccountId: string, steamId: s
         // distribution) is only known now that every achievement has been
         // inserted - re-resolve tiers with that context (see issue #10).
         await normalizeRarityTiersForGame(gameId);
+        // Only once the game is fully recorded - saved earlier, a sync that
+        // failed partway through this game (a rate limit, a network error)
+        // would skip it from then on until it was played again (see #385).
+        await saveSyncState(userPlatformAccountId, game.appid, game.playtime_forever, game.rtime_last_played);
     }
 
     // Built from every appid Steam still reports owning, not just the ones
