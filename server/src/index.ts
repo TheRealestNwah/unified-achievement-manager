@@ -1,4 +1,4 @@
-import express, { ErrorRequestHandler } from "express";
+import express from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
@@ -21,6 +21,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { csrfProtection } from "./middleware/csrf";
 import { nonceMiddleware } from "./middleware/nonce";
+import { jsonErrorHandler } from "./middleware/errorHandler";
 import { sendPageWithNonce } from "./staticPages";
 import { Server } from "node:http";
 
@@ -132,13 +133,6 @@ app.use((req, res, next) => {
 app.use("/uploads", express.static(config.uploadsDir, { index: false }));
 app.use(express.static(path.join(__dirname, "..", "public"), { index: false }));
 
-// Every route above hands failures to next(err); without this, Express's
-// default handler sends an HTML error page, which breaks every fetch()-based
-// call in the dashboard (JSON.parse on "<!DOCTYPE ...").
-const jsonErrorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
-    console.error(err);
-    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
-};
 app.use(jsonErrorHandler);
 
 export async function shutdownServer(server: Server): Promise<void> {
