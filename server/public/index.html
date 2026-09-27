@@ -456,10 +456,11 @@
     .platform-note a, .platform-help a { color: var(--accent); }
     /* Two fixed slots so Sync lines up on every row, including Steam, which
        has no Disconnect button (see #174). */
-    .platform-actions { display: grid; grid-template-columns: auto minmax(104px, auto); gap: 8px; align-items: center; margin-left: auto; }
+    .platform-actions { display: grid; grid-template-columns: auto auto minmax(104px, auto); column-gap: 8px; align-items: center; margin-left: auto; }
     .platform-actions > button { width: 100%; grid-row: 1; }
-    .platform-actions > .slot-1 { grid-column: 1; }
-    .platform-actions > .slot-2 { grid-column: 2; }
+    .platform-actions > .slot-0 { grid-column: 1; }
+    .platform-actions > .slot-1 { grid-column: 2; }
+    .platform-actions > .slot-2 { grid-column: 3; }
     .acronym-override { color: var(--text-dimmer); }
     .platform-help { flex-basis: 100%; margin: 2px 0 0; font-size: 12px; color: var(--text-dim); }
     .settings-heading { font-size: 14px; font-weight: 700; margin: 28px 0 4px; color: var(--text); }
@@ -3572,6 +3573,16 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
         disconnectBtn.addEventListener("click", () => disconnectPlatform(platformId, label));
         actions.appendChild(disconnectBtn);
     }
+    if (platformConnectOptions(platformId)) {
+        // A new key or token for the same account, without disconnecting and
+        // losing what's synced (see #283).
+        const updateBtn = document.createElement("button");
+        updateBtn.type = "button";
+        updateBtn.className = "secondary slot-0";
+        updateBtn.textContent = "Update login…";
+        updateBtn.addEventListener("click", () => showUpdateLoginForm(row, platformId));
+        actions.appendChild(updateBtn);
+    }
 
     row.append(name, note, actions);
     if (account?.last_sync_error) {
@@ -3641,7 +3652,7 @@ function plainInput(id, placeholder, { maxWidth } = {}) {
 // Every not-yet-connected platform is a <form>, so Enter in any field submits
 // it, Connect stays disabled until every field has something in it, and the
 // server's own error message is shown on failure (see #242).
-function connectPlatformForm({ label, fields, help, connectPath, body, fallbackError, extra }) {
+function connectPlatformForm({ label, fields, help, connectPath, body, fallbackError, extra, submitLabel = "Connect", onCancel, onConnected }) {
     const form = document.createElement("form");
     form.className = "platform-row";
     const name = document.createElement("span");
@@ -3655,8 +3666,19 @@ function connectPlatformForm({ label, fields, help, connectPath, body, fallbackE
     const btn = document.createElement("button");
     btn.type = "submit";
     btn.className = "slot-2";
-    btn.textContent = "Connect";
+    btn.textContent = submitLabel;
     actions.appendChild(btn);
+    if (onCancel) {
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "secondary slot-1";
+        cancel.textContent = "Cancel";
+        cancel.addEventListener("click", onCancel);
+        actions.appendChild(cancel);
+        form.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") onCancel();
+        });
+    }
     form.appendChild(actions);
     if (help) appendPlatformHelp(form, help);
 
@@ -3675,7 +3697,8 @@ function connectPlatformForm({ label, fields, help, connectPath, body, fallbackE
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body(...inputs.map((i) => i.value.trim()))),
             });
-            await refreshPlatforms();
+            if (onConnected) await onConnected();
+            else await refreshPlatforms();
         } catch (err) {
             showMessage(err.message || fallbackError);
             console.error(err);
@@ -3683,6 +3706,90 @@ function connectPlatformForm({ label, fields, help, connectPath, body, fallbackE
         }
     });
     return form;
+}
+
+// What each non-Steam platform's connect form asks for. Used both to connect
+// a platform and to update a connected one's key or token in place (#283).
+function platformConnectOptions(platformId) {
+    switch (platformId) {
+        case "xbox":
+            return {
+                label: "Xbox",
+                fields: [secretInput("xbox-key-input", "Paste your OpenXBL API key")],
+                help: `Xbox uses OpenXBL. Get an API key from the <a href="https://xbl.io/dashboard" target="_blank">OpenXBL dashboard</a>.`,
+                connectPath: "/api/xbox/connect",
+                body: (apiKey) => ({ apiKey }),
+                fallbackError: "Couldn't connect that Xbox account. Double check the API key.",
+            };
+        case "psn":
+            return {
+                label: "PSN",
+                fields: [secretInput("psn-key-input", "Paste your NPSSO token")],
+                help: `PSN has no public login. Sign in at <a href="https://www.playstation.com" target="_blank">playstation.com</a>, then open <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank">this page</a> in the same browser and copy the <code>npsso</code> value.`,
+                connectPath: "/api/psn/connect",
+                body: (npsso) => ({ npsso }),
+                fallbackError: "Couldn't connect that PlayStation account.",
+            };
+        case "retroachievements":
+            return {
+                label: "RetroAchievements",
+                fields: [
+                    plainInput("retro-user-input", "Username", { maxWidth: "140px" }),
+                    secretInput("retro-key-input", "Paste your Web API key"),
+                ],
+                help: `Get a Web API key from your RetroAchievements <a href="https://retroachievements.org/settings" target="_blank">account settings</a>.`,
+                connectPath: "/api/retro/connect",
+                body: (username, apiKey) => ({ username, apiKey }),
+                fallbackError: "Couldn't connect that RetroAchievements account.",
+            };
+        case "gog": {
+            const loginLink = document.createElement("a");
+            loginLink.href = "#";
+            loginLink.id = "gog-login-link";
+            loginLink.target = "_blank";
+            loginLink.rel = "noopener";
+            loginLink.textContent = "Log in at GOG";
+            loginLink.addEventListener("click", async (e) => {
+                e.preventDefault();
+                try {
+                    const { url } = await api("/api/gog/login-url");
+                    window.open(url, "_blank", "noopener");
+                } catch (err) {
+                    showMessage("Couldn't get the GOG login link.");
+                    console.error(err);
+                }
+            });
+            return {
+                label: "GOG",
+                extra: loginLink,
+                fields: [secretInput("gog-code-input", "Paste the code from the redirect URL")],
+                connectPath: "/api/gog/connect",
+                body: (code) => ({ code }),
+                fallbackError: "Couldn't connect that GOG account. The code may have expired - try logging in again.",
+            };
+        }
+        default:
+            return null;
+    }
+}
+
+// Swaps a connected platform's row for its connect form, to paste a new key
+// or token. Saving updates the same account - everything already synced from
+// it stays - and then syncs it straight away (see #283).
+function showUpdateLoginForm(row, platformId) {
+    const options = platformConnectOptions(platformId);
+    const form = connectPlatformForm({
+        ...options,
+        submitLabel: "Save",
+        help: `Paste a new login for the same ${options.label} account. Your synced games and achievements stay as they are.<br>${options.help ?? ""}`,
+        onCancel: () => refreshPlatforms(),
+        onConnected: async () => {
+            await refreshPlatforms();
+            document.getElementById(`${PLATFORM_NOTE_PREFIXES[platformId]}-sync-btn`)?.click();
+        },
+    });
+    row.replaceWith(form);
+    form.querySelector("input")?.focus();
 }
 
 function renderPlatforms(accounts) {
@@ -3693,82 +3800,10 @@ function renderPlatforms(accounts) {
     // Steam is always connected here - it's how you signed in.
     list.appendChild(connectedPlatformRow("steam", "Steam", byPlatform.steam, { canDisconnect: false }));
 
-    if (byPlatform.xbox) {
-        list.appendChild(connectedPlatformRow("xbox", "Xbox", byPlatform.xbox));
-    } else {
+    for (const platformId of ["xbox", "psn", "retroachievements", "gog"]) {
+        const options = platformConnectOptions(platformId);
         list.appendChild(
-            connectPlatformForm({
-                label: "Xbox",
-                fields: [secretInput("xbox-key-input", "Paste your OpenXBL API key")],
-                help: `Xbox uses OpenXBL. Get an API key from the <a href="https://xbl.io/dashboard" target="_blank">OpenXBL dashboard</a>.`,
-                connectPath: "/api/xbox/connect",
-                body: (apiKey) => ({ apiKey }),
-                fallbackError: "Couldn't connect that Xbox account. Double check the API key.",
-            })
-        );
-    }
-
-    if (byPlatform.psn) {
-        list.appendChild(connectedPlatformRow("psn", "PSN", byPlatform.psn));
-    } else {
-        list.appendChild(
-            connectPlatformForm({
-                label: "PSN",
-                fields: [secretInput("psn-key-input", "Paste your NPSSO token")],
-                help: `PSN has no public login. Sign in at <a href="https://www.playstation.com" target="_blank">playstation.com</a>, then open <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank">this page</a> in the same browser and copy the <code>npsso</code> value.`,
-                connectPath: "/api/psn/connect",
-                body: (npsso) => ({ npsso }),
-                fallbackError: "Couldn't connect that PlayStation account.",
-            })
-        );
-    }
-
-    if (byPlatform.retroachievements) {
-        list.appendChild(connectedPlatformRow("retroachievements", "RetroAchievements", byPlatform.retroachievements));
-    } else {
-        list.appendChild(
-            connectPlatformForm({
-                label: "RetroAchievements",
-                fields: [
-                    plainInput("retro-user-input", "Username", { maxWidth: "140px" }),
-                    secretInput("retro-key-input", "Paste your Web API key"),
-                ],
-                help: `Get a Web API key from your RetroAchievements <a href="https://retroachievements.org/settings" target="_blank">account settings</a>.`,
-                connectPath: "/api/retro/connect",
-                body: (username, apiKey) => ({ username, apiKey }),
-                fallbackError: "Couldn't connect that RetroAchievements account.",
-            })
-        );
-    }
-
-    if (byPlatform.gog) {
-        list.appendChild(connectedPlatformRow("gog", "GOG", byPlatform.gog));
-    } else {
-        const loginLink = document.createElement("a");
-        loginLink.href = "#";
-        loginLink.id = "gog-login-link";
-        loginLink.target = "_blank";
-        loginLink.rel = "noopener";
-        loginLink.textContent = "Log in at GOG";
-        loginLink.addEventListener("click", async (e) => {
-            e.preventDefault();
-            try {
-                const { url } = await api("/api/gog/login-url");
-                window.open(url, "_blank", "noopener");
-            } catch (err) {
-                showMessage("Couldn't get the GOG login link.");
-                console.error(err);
-            }
-        });
-        list.appendChild(
-            connectPlatformForm({
-                label: "GOG",
-                extra: loginLink,
-                fields: [secretInput("gog-code-input", "Paste the code from the redirect URL")],
-                connectPath: "/api/gog/connect",
-                body: (code) => ({ code }),
-                fallbackError: "Couldn't connect that GOG account. The code may have expired - try logging in again.",
-            })
+            byPlatform[platformId] ? connectedPlatformRow(platformId, options.label, byPlatform[platformId]) : connectPlatformForm(options)
         );
     }
 }

@@ -6,6 +6,7 @@ import { runAccountSync, PlatformAccountRow } from "../sync/runAccountSync";
 import { runMatchingAndGetScore } from "../matching";
 import { config } from "../config";
 import { encryptCredential } from "../security/credentials";
+import { assertSameAccountOnReconnect, clearSyncError, DifferentAccountError } from "../sync/reconnect";
 
 export const gogRouter = Router();
 
@@ -36,6 +37,8 @@ gogRouter.post("/connect", requireAuth, async (req, res, next) => {
         const tokens = await exchangeCodeForTokens(code);
         const username = await getUsername(tokens.userId);
 
+        await assertSameAccountOnReconnect(req.user!.id, "gog", tokens.userId, "GOG");
+
         await pool.query(
             `insert into user_platform_accounts (user_id, platform_id, platform_account_id, display_name, access_token, refresh_token)
              values ($1, 'gog', $2, $3, $4, $5)
@@ -47,8 +50,11 @@ gogRouter.post("/connect", requireAuth, async (req, res, next) => {
             [req.user!.id, tokens.userId, username, encryptCredential(tokens.accessToken, config.credentialEncryptionKey), encryptCredential(tokens.refreshToken, config.credentialEncryptionKey)]
         );
 
+        await clearSyncError(req.user!.id, "gog");
+
         res.json({ username });
     } catch (err) {
+        if (err instanceof DifferentAccountError) return res.status(409).json({ error: err.message });
         if (err instanceof GogApiError && err.status === 401) {
             return res.status(400).json({ error: err.message });
         }
