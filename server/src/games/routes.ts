@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
 import { exportFileName } from "./exportFile";
+import { getSchedulerStatus } from "../scheduler";
 import { getGamesForUser, getAchievementsForGame, getRecentActivity, getFunStats, getFullExportData } from "./queries";
 import { recomputeUserScore } from "../scoring";
 import {
@@ -113,7 +114,13 @@ gamesRouter.get("/sync-status", requireAuth, async (req, res, next) => {
             "select max(last_synced_at) as last_synced_at, max(last_sync_error_at) as last_sync_error_at from user_platform_accounts where user_id = $1",
             [req.user!.id]
         );
-        res.json({ lastSyncedAt: result.rows[0]?.last_synced_at ?? null, lastSyncErrorAt: result.rows[0]?.last_sync_error_at ?? null });
+        const scheduler = getSchedulerStatus();
+        res.json({
+            lastSyncedAt: result.rows[0]?.last_synced_at ?? null,
+            lastSyncErrorAt: result.rows[0]?.last_sync_error_at ?? null,
+            // When the next automatic sync is due, or null when it's off (#289).
+            nextSyncAt: scheduler.nextRunAt,
+        });
     } catch (err) {
         next(err);
     }
