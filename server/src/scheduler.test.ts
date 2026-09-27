@@ -4,7 +4,8 @@ const queryMock = vi.fn(async () => ({ rows: [] }));
 const getSyncIntervalMinutes = vi.fn();
 vi.mock("./db", () => ({ pool: { query: () => queryMock() } }));
 vi.mock("./settings/syncInterval", () => ({ getSyncIntervalMinutes: (fallback: number) => getSyncIntervalMinutes(fallback) }));
-vi.mock("./sync/runAccountSync", () => ({ runAccountSync: vi.fn() }));
+const runAccountSync = vi.fn();
+vi.mock("./sync/runAccountSync", () => ({ runAccountSync: (...args: unknown[]) => runAccountSync(...args) }));
 vi.mock("./scoring", () => ({ recomputeUserScore: vi.fn() }));
 vi.mock("./matching", () => ({ runMatching: vi.fn() }));
 
@@ -47,5 +48,29 @@ describe("scheduler interval (#289)", () => {
 
         stop();
         expect(getSchedulerStatus().enabled).toBe(false);
+    });
+});
+
+describe("scheduler shutdown (#408)", () => {
+    it("stops a run in progress quietly instead of failing every remaining account", async () => {
+        const { startScheduler } = await import("./scheduler");
+        getSyncIntervalMinutes.mockResolvedValue(60);
+        const account = (id: string) => ({ id, user_id: "u", platform_id: "steam" });
+        queryMock.mockResolvedValueOnce({ rows: [account("a"), account("b"), account("c")] } as never);
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        vi.spyOn(console, "log").mockImplementation(() => undefined);
+        let stop: () => void = () => undefined;
+        // The first account's sync is cut off by the app quitting mid-sync.
+        runAccountSync.mockReset().mockImplementationOnce(async () => {
+            stop();
+            throw new Error("Cannot use a pool after calling end on the pool");
+        });
+
+        stop = startScheduler(360);
+        for (let i = 0; i < 20; i++) await Promise.resolve();
+
+        expect(runAccountSync).toHaveBeenCalledTimes(1);
+        expect(consoleError).not.toHaveBeenCalled();
+        vi.restoreAllMocks();
     });
 });

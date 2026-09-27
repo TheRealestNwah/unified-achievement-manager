@@ -92,13 +92,21 @@ async function runScheduledSync(): Promise<void> {
     let succeeded = 0;
 
     for (const account of accounts.rows as PlatformAccountRow[]) {
+        // The app is quitting and closing the database under this run (see
+        // #408): stop here rather than fail, and log, every remaining account.
+        if (!started) break;
         try {
             await runAccountSync(account);
             await recomputeUserScore(account.user_id);
             succeeded++;
         } catch (err) {
+            if (!started) break;
             console.error(`Scheduled sync failed for account ${account.id} (${account.platform_id}):`, err);
         }
+    }
+    if (!started) {
+        console.log("Scheduled sync stopped: shutting down.");
+        return;
     }
 
     // Cross-platform matches/tiers can shift with new data from any account,
