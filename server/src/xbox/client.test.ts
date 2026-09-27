@@ -24,7 +24,7 @@ vi.mock("https", () => {
     return { default: { get }, get };
 });
 
-import { getAccount, getAchievementsForTitle, getTitleIdForProduct, getX360AchievementsForTitle, XboxApiError } from "./client";
+import { getAccount, getAchievementsForTitle, getTitleIdForProduct, getTitles, getX360AchievementsForTitle, XboxApiError } from "./client";
 
 function respond(content: unknown, { status = 200, code = 200, headers }: { status?: number; code?: number; headers?: Record<string, string> } = {}) {
     responses.push({ status, body: { content, code }, headers });
@@ -197,5 +197,23 @@ describe("Xbox (OpenXBL) client response parsing", () => {
     it("still surfaces other title-id lookup failures", async () => {
         responses.push({ status: 500, body: "" });
         await expect(getTitleIdForProduct("key", "9NBLGGH4R315")).rejects.toMatchObject({ status: 500 });
+    });
+
+    it("fingerprints each title's progress from the title list (#384)", async () => {
+        respond({
+            titles: [
+                {
+                    titleId: "1",
+                    name: "Played",
+                    achievement: { totalAchievements: 50, currentAchievements: 12, currentGamerscore: 240 },
+                    titleHistory: { lastTimePlayed: "2026-09-01T10:00:00Z" },
+                },
+                { titleId: "2", name: "No progress fields", achievement: { totalAchievements: 20 } },
+            ],
+        });
+        const titles = await getTitles("key");
+        expect(titles[0].progress).toBe("50|12|240|2026-09-01T10:00:00Z");
+        // Nothing to compare, so sync has to fetch it every time.
+        expect(titles[1].progress).toBeUndefined();
     });
 });
