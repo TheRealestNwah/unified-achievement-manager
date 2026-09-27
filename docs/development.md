@@ -76,26 +76,55 @@ Integration tests need `INTEGRATION_TESTS=true` and a `DATABASE_URL`. The embedd
 
 ## HTTP API
 
-The dashboard is a thin client over these routes (all under the signed-in session, and state-changing requests need the `X-CSRF-Token` from `GET /api/setup/status`):
+The dashboard is a thin client over these routes. Everything needs the signed-in session unless noted, and state-changing requests need the `X-CSRF-Token` from `GET /api/setup/status` or `GET /auth/csrf-token`.
 
+**Sign-in and setup**
+
+- `GET /auth/steam`: Steam OpenID sign-in; `GET /auth/me`: the signed-in user; `POST /auth/logout`
 - `GET /api/setup/status`: whether a Steam Web API key is configured, plus a CSRF token (works before sign-in)
 - `PUT /api/setup/steam-api-key` (body: `{ apiKey }`): set the Steam Web API key (open until one exists; replacing it needs a session)
-- `GET /api/settings/steamgriddb-api-key`: whether a SteamGridDB key is saved; `PUT` (body: `{ apiKey }`) checks the key with SteamGridDB and saves it; `DELETE` removes it
-- `GET /api/me/games/:gameId/cover/steamgriddb/search` (query: `term`, `sgdbGameId`, `styles`, `animated`): SteamGridDB portrait covers for a game, by Steam app ID or title search; `POST /api/me/games/:gameId/cover/steamgriddb/select` (body: `{ url }`) downloads a picked `cdn2.steamgriddb.com/grid/` image and sets it as the cover
-- `POST /api/steam/sync`, `POST /api/xbox/sync`, `POST /api/psn/sync`, `POST /api/retro/sync`, `POST /api/gog/sync`: pull each platform's library and unlocks, and recompute the score
+- `GET /api/setup/desktop-settings`, `GET /api/setup/new-unlocks` (query: `since`), `GET /api/setup/discord-presence-data`: read by the Electron main process, which has no session cookie, so they're unauthenticated. Safe only because the server binds `127.0.0.1`
+
+**Platforms**
+
 - `POST /api/xbox/connect` (body: `{ apiKey }`), `POST /api/psn/connect` (body: `{ npsso }`), `POST /api/retro/connect` (body: `{ username, apiKey }`), `POST /api/gog/connect` (body: `{ code }`): link an account
 - `GET /api/gog/login-url`: the GOG login page whose redirect carries the `code` for `/api/gog/connect`
-- `POST /api/matching/run`: link matched games and achievements across all connected platforms (also `npm run match`)
-- `GET /api/matching/candidates`, `POST /api/matching/candidates/:id/confirm`, `POST /api/matching/candidates/:id/reject`: the review queue for uncertain achievement matches
-- `GET /api/matching/game-candidates`, `POST /api/matching/game-candidates/:id/confirm`, `POST /api/matching/game-candidates/:id/reject`: the same for whole-game merges
-- `POST /api/matching/games/merge` (body: `{ keepGameId, mergeGameId }`): manually merge two library entries
-- `GET /api/me/accounts`: linked platforms and when each last synced
+- `POST /api/steam/sync`, `POST /api/xbox/sync`, `POST /api/psn/sync`, `POST /api/retro/sync`, `POST /api/gog/sync`: pull each platform's library and unlocks, and recompute the score
+- `GET /api/me/accounts`: linked platforms, when each last synced, and whether a sync is running
+- `GET /api/me/sync-status`: a cheap "anything new since I last looked" check the dashboard polls, plus the next scheduled sync and which platforms are syncing now
 - `DELETE /api/me/accounts/:platformId`: disconnect a platform (not Steam) and remove its synced data
-- `DELETE /api/me/account` (body: `{ confirmation: "DELETE" }`): permanently delete the signed-in account and its private data
-- `GET /api/me/games`, `GET /api/me/games/:gameId/achievements`: the combined library, and one game's achievements per platform
-- `GET /api/me/activity`, `GET /api/me/stats`, `GET /api/me/score`: recent unlocks, fun stats, and the total points, level, and progress
-- `GET /api/me/export` (`?format=json` or `?format=csv`): unlock history
+
+**Library**
+
+- `GET /api/me/games`: the combined library; `GET /api/me/games/:gameId`: one game's header data, including hidden and excluded games
+- `GET /api/me/games/:gameId/achievements`: one game's achievements per platform; `GET /api/me/games/:gameId/platforms`: the platform entries it's made of, for the split control
+- `PUT /api/me/games/:gameId/title` (body: `{ gamePlatformLinkId }` or `{ title }`): pick one platform's title or type your own; `PUT /api/me/games/:gameId/title/steamgriddb` (body: `{ sgdbGameId }`): use a SteamGridDB game's name
+- `PUT /api/me/games/:gameId/visibility` (body: `{ mode: "hidden" | "excluded" }`), `DELETE` to undo; `GET /api/me/games/hidden`: hidden and excluded games
 - `PUT /api/me/games/:gameId/cover` (body: `{ url }`), `POST /api/me/games/:gameId/cover/upload` (multipart `file`), `DELETE /api/me/games/:gameId/cover`: cover overrides. The same three routes exist under `/api/me/achievements/:achievementId/icon`
+- `GET /api/me/games/:gameId/cover/steamgriddb/search` (query: `term`, `sgdbGameId`, `styles`, `animated`): SteamGridDB portrait covers for a game, by Steam app ID or title search; `POST /api/me/games/:gameId/cover/steamgriddb/select` (body: `{ url }`) downloads a picked `cdn2.steamgriddb.com/grid/` image and sets it as the cover
+- `GET /api/me/activity` (query: `limit`, `offset`), `GET /api/me/stats`, `GET /api/me/score`, `GET /api/me/scoring-rules`: recent unlocks, fun stats, the total points, level, and progress, and the tier points and rarity thresholds behind "How is this worked out?"
+- `GET /api/me/export` (`?format=json` or `?format=csv`): unlock history
+- `DELETE /api/me/account` (body: `{ confirmation: "DELETE" }`): permanently delete the signed-in account and its private data
+
+**Matching and review**
+
+- `POST /api/matching/run`: link matched games and achievements across all connected platforms (also `npm run match`)
+- `POST /api/matching/games/merge` (body: `{ keepGameId, mergeGameId }`): manually merge two library entries; `POST /api/matching/games/:gameId/split` (body: `{ gamePlatformLinkId }`): split one platform entry back out
+- The three review queues share one shape. `GET` lists pending items; `POST /:id/confirm`, `POST /:id/reject`, and `POST /:id/reopen` (undo a rejection) act on one; `POST /bulk` (body: `{ ids, action: "confirm" | "reject" }`) acts on many with a single rescore:
+  - `/api/matching/candidates`: uncertain achievement matches
+  - `/api/matching/game-candidates`: suggested whole-game merges
+  - `/api/matching/game-split-candidates`: possible bad merges, where confirm splits the flagged platform entry out
+
+**Settings**
+
+- `GET`/`PUT /api/settings/discord-rich-presence` (body: `{ enabled }`)
+- `GET`/`PUT /api/settings/sync-interval` (body: `{ minutes }`, `null` for off)
+- `GET`/`PUT /api/settings/desktop`: tray, start-with-Windows, unlock notification, and automatic update switches
+- `GET`/`PUT /api/settings/search-acronyms`: the user's own acronym list
+- `GET /api/settings/steamgriddb-api-key`: whether a SteamGridDB key is saved; `PUT` (body: `{ apiKey }`) checks the key with SteamGridDB and saves it; `DELETE` removes it
+
+**Health**
+
 - `GET /healthz` (liveness) and `GET /readyz` (database reachable)
 
 ## Scoring and security notes
