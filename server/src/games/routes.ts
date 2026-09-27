@@ -3,6 +3,7 @@ import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
 import { exportFileName } from "./exportFile";
 import { getSchedulerStatus } from "../scheduler";
+import { syncingAccountIds } from "../sync/runAccountSync";
 import { getGamesForUser, getAchievementsForGame, getRecentActivity, getFunStats, getFullExportData } from "./queries";
 import { recomputeUserScore } from "../scoring";
 import {
@@ -60,10 +61,13 @@ gamesRouter.delete("/account", requireAuth, async (req, res, next) => {
 gamesRouter.get("/accounts", requireAuth, async (req, res, next) => {
     try {
         const result = await pool.query(
-            "select platform_id, display_name, linked_at, last_synced_at, last_sync_error, last_sync_error_at from user_platform_accounts where user_id = $1 order by platform_id",
+            "select id, platform_id, display_name, linked_at, last_synced_at, last_sync_error, last_sync_error_at from user_platform_accounts where user_id = $1 order by platform_id",
             [req.user!.id]
         );
-        res.json(result.rows);
+        // `syncing`: a sync of this account is running right now, manual or
+        // scheduled (see #322), so an old error can be shown as superseded.
+        const syncing = syncingAccountIds();
+        res.json(result.rows.map(({ id, ...row }) => ({ ...row, syncing: syncing.has(id) })));
     } catch (err) {
         next(err);
     }
@@ -114,12 +118,16 @@ gamesRouter.get("/sync-status", requireAuth, async (req, res, next) => {
             "select max(last_synced_at) as last_synced_at, max(last_sync_error_at) as last_sync_error_at from user_platform_accounts where user_id = $1",
             [req.user!.id]
         );
+        const accounts = await pool.query("select id, platform_id from user_platform_accounts where user_id = $1 order by platform_id", [req.user!.id]);
+        const syncing = syncingAccountIds();
         const scheduler = getSchedulerStatus();
         res.json({
             lastSyncedAt: result.rows[0]?.last_synced_at ?? null,
             lastSyncErrorAt: result.rows[0]?.last_sync_error_at ?? null,
             // When the next automatic sync is due, or null when it's off (#289).
             nextSyncAt: scheduler.nextRunAt,
+            // Platforms with a sync running right now (see #322).
+            syncingPlatforms: accounts.rows.filter((a) => syncing.has(a.id)).map((a) => a.platform_id),
         });
     } catch (err) {
         next(err);
