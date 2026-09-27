@@ -210,6 +210,18 @@ where apl.id = amc.achievement_platform_link_id
   and amc.status = 'pending'
   and source.game_id <> target.game_id;
 
+-- Pending matches whose target already has a different achievement from the
+-- source's own list, queued before matching skipped them (see #362).
+-- Confirming one would fuse two achievements from one list.
+delete from achievement_match_candidates amc
+using achievement_platform_links source, achievement_platform_links other
+where source.id = amc.achievement_platform_link_id
+  and other.canonical_achievement_id = amc.candidate_canonical_achievement_id
+  and other.platform_id = source.platform_id
+  and other.platform_game_id = source.platform_game_id
+  and other.id <> source.id
+  and amc.status = 'pending';
+
 -- Whole-game merges a matching pass has proposed but won't perform
 -- automatically, because the signal isn't strong enough to trust without a
 -- human - either an exact-title match that involves RetroAchievements (a
