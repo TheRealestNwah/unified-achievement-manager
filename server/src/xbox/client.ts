@@ -89,28 +89,41 @@ export interface XboxTitleSummary {
     name: string;
     totalAchievements: number;
     coverImageUrl?: string;
+    // A fingerprint of this title's progress - total and unlocked counts,
+    // gamerscore, last played - or undefined when OpenXBL left all of the
+    // user-side fields out, in which case sync can't tell it's unchanged and
+    // always fetches it.
+    progress?: string;
 }
 
 // /v2/achievements ("achievements grouped by title") actually returns the
 // same title-with-progress-summary shape as /v2/titles - no per-achievement
-// detail despite what the docs' example implies. Use it just to find which
-// titles have achievements worth fetching individually.
+// detail despite what the docs' example implies. Use it to find which titles
+// have achievements worth fetching individually, and which of those changed.
 export async function getTitles(apiKey: string): Promise<XboxTitleSummary[]> {
     const content = await get<{
         titles: Array<{
             titleId: string;
             name: string;
-            achievement?: { totalAchievements: number };
+            achievement?: { totalAchievements: number; currentAchievements?: number; currentGamerscore?: number };
+            titleHistory?: { lastTimePlayed?: string };
             displayImage?: string;
         }>;
     }>(apiKey, "/v2/achievements");
 
-    return content.titles.map((t) => ({
-        titleId: t.titleId,
-        name: t.name,
-        totalAchievements: t.achievement?.totalAchievements ?? 0,
-        coverImageUrl: t.displayImage,
-    }));
+    return content.titles.map((t) => {
+        const parts = [t.achievement?.currentAchievements, t.achievement?.currentGamerscore, t.titleHistory?.lastTimePlayed];
+        const totalAchievements = t.achievement?.totalAchievements ?? 0;
+        return {
+            titleId: t.titleId,
+            name: t.name,
+            totalAchievements,
+            coverImageUrl: t.displayImage,
+            // The total is in there too, so achievements added by an update
+            // or DLC get fetched before any of them is unlocked.
+            progress: parts.every((p) => p === undefined) ? undefined : [totalAchievements, ...parts].map((p) => p ?? "").join("|"),
+        };
+    });
 }
 
 export interface XboxAchievement {

@@ -353,6 +353,18 @@ create table if not exists steam_game_sync_state (
     primary key (user_platform_account_id, appid)
 );
 
+-- The Xbox equivalent (see #384): each title's progress summary from
+-- OpenXBL's title list, so sync only re-fetches titles whose progress
+-- changed. Without it every sync re-fetched every title and ran through
+-- OpenXBL's hourly request allowance. Written after a title is fully
+-- processed, so a sync cut off by a 429 resumes where it stopped.
+create table if not exists xbox_title_sync_state (
+    user_platform_account_id uuid not null references user_platform_accounts(id) on delete cascade,
+    title_id                 text not null,
+    progress                 text not null,
+    primary key (user_platform_account_id, title_id)
+);
+
 -- getGlobalAchievementPercentages is re-fetched per owned game on every full
 -- sync, but global rarity shifts slowly - see #27. Shared across every user
 -- of the app (unlike steam_game_sync_state above, which is per-account),
