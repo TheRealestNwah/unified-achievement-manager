@@ -151,6 +151,11 @@ function buildMenu(): void {
             {
                 label: "Help",
                 submenu: [
+                    {
+                        // Shows the dashboard's own list (see #288).
+                        label: "Keyboard Shortcuts",
+                        click: () => void mainWindow?.webContents.executeJavaScript("window.uamShowShortcuts?.()").catch(() => undefined),
+                    },
                     { label: "Project Page", click: () => void shell.openExternal(PROJECT_URL) },
                     {
                         label: "About Unified Achievement Manager",

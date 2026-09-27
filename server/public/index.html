@@ -4425,6 +4425,88 @@ function initSidebarNav() {
     });
 }
 
+// Keyboard shortcuts (see #288). Single keys only fire when you're not typing
+// in a field; Ctrl+F and Escape work anywhere.
+const SHORTCUTS = [
+    ["/ or Ctrl+F", "Search your games"],
+    ["Esc", "Clear the search, cancel Link games, or leave a game's page"],
+    ["Ctrl+Shift+S", "Sync all platforms"],
+    ["g then o", "Go to Overview"],
+    ["g then a", "Go to All Games"],
+    ["g then r", "Go to Review"],
+    ["g then s", "Go to Settings"],
+    ["?", "Show these shortcuts"],
+];
+
+function showShortcuts() {
+    return showMessage(`Keyboard shortcuts\n\n${SHORTCUTS.map(([keys, what]) => `${keys}  —  ${what}`).join("\n")}`);
+}
+
+function isTypingTarget(el) {
+    return el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
+}
+
+function focusGamesFilter() {
+    if (document.getElementById("dashboard-view").classList.contains("hidden") || state.activeNav === "overview") {
+        document.querySelector('[data-nav="games"]').click();
+    }
+    const filter = document.getElementById("games-filter");
+    filter.focus();
+    filter.select();
+}
+
+function initKeyboardShortcuts() {
+    let pendingG = 0;
+    document.addEventListener("keydown", (e) => {
+        if (document.querySelector("dialog[open]")) return;
+        const typing = isTypingTarget(e.target);
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "f") {
+            e.preventDefault();
+            focusGamesFilter();
+            return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
+            e.preventDefault();
+            document.getElementById("dashboard-sync-all-btn")?.click();
+            return;
+        }
+        if (e.key === "Escape") {
+            const filter = document.getElementById("games-filter");
+            if (e.target === filter && filter.value) {
+                filter.value = "";
+                renderGames(state.games);
+            } else if (state.linkMode) {
+                document.getElementById("link-games-btn").click();
+            } else if (state.gameViewId) {
+                hideGameView();
+            } else if (typing) {
+                e.target.blur();
+            }
+            return;
+        }
+        if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (Date.now() - pendingG < 1500) {
+            pendingG = 0;
+            const nav = { o: "overview", a: "games", r: "review", s: "platforms" }[e.key.toLowerCase()];
+            if (nav) {
+                e.preventDefault();
+                document.querySelector(`[data-nav="${nav}"]`)?.click();
+            }
+            return;
+        }
+        if (e.key === "g") pendingG = Date.now();
+        else if (e.key === "/") {
+            e.preventDefault();
+            focusGamesFilter();
+        } else if (e.key === "?") {
+            e.preventDefault();
+            showShortcuts();
+        }
+    });
+    // The desktop app's Help menu opens the same list.
+    window.uamShowShortcuts = showShortcuts;
+}
+
 async function init() {
     const setup = await api("/api/setup/status");
     if (!setup.steamApiKeyConfigured) {
@@ -4463,6 +4545,7 @@ async function init() {
     initSidebarNav();
     document.getElementById("game-view-back-btn").addEventListener("click", () => hideGameView());
     initDashboardCustomization();
+    initKeyboardShortcuts();
     document.getElementById("sync-all-btn").addEventListener("click", (e) => {
         trackUserSync(() => syncAllPlatforms(e.target, document.getElementById("sync-all-status")));
     });
