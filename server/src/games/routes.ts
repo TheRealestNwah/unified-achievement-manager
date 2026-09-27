@@ -313,7 +313,17 @@ gamesRouter.delete("/games/:gameId/visibility", requireAuth, async (req, res, ne
 gamesRouter.get("/games/hidden", requireAuth, async (req, res, next) => {
     try {
         const result = await pool.query(
-            `select g.id, g.title, ugv.mode
+            // Platforms and XP earned, so the Settings list can show what each
+            // hidden/excluded game is and what excluding it costs (see #294).
+            `select g.id, g.title, ugv.mode,
+                (select array_agg(distinct upa.platform_id) from user_owned_games uog
+                    join user_platform_accounts upa on upa.id = uog.user_platform_account_id
+                    where upa.user_id = $1 and uog.game_id = g.id) as platforms,
+                (select coalesce(sum(ca.points), 0) from user_achievement_unlocks uau
+                    join user_platform_accounts upa on upa.id = uau.user_platform_account_id
+                    join achievement_platform_links apl on apl.id = uau.achievement_platform_link_id
+                    join canonical_achievements ca on ca.id = apl.canonical_achievement_id
+                    where upa.user_id = $1 and ca.game_id = g.id)::int as points_earned
              from user_game_visibility ugv
              join games g on g.id = ugv.game_id
              where ugv.user_id = $1
