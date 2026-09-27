@@ -2022,7 +2022,7 @@ function renderHiddenGamesPanel(games) {
         <div class="review-row" data-id="${g.id}" data-title="${escapeHtml(g.title)}">
             <span class="review-compare">
                 ${gameTitleLink(g.id, g.title)}
-                ${(g.platforms || []).map((p) => `<span class="platform-badge">${escapeHtml(p)}</span>`).join(" ")}
+                ${(g.platforms || []).map((p) => platformBadge(p)).join(" ")}
                 <span class="achievement-points">${Number(g.points_earned || 0).toLocaleString()} XP${g.mode === "excluded" ? " not counted" : ""}</span>
             </span>
             <select class="hidden-mode-select" aria-label="How ${escapeHtml(g.title)} is hidden">
