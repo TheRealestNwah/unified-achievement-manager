@@ -42,7 +42,7 @@ Links like these open in your normal web browser. Only Steam sign-in happens ins
 
 ## Your data
 
-Everything is stored in `%APPDATA%\Unified Achievement Manager` (open it from **File → Open Data Folder**). Uninstalling keeps it, so reinstalling picks up where you left off. See [docs/operations.md](docs/operations.md) for backups, moving to a new PC, removing everything, and troubleshooting, and [docs/privacy.md](docs/privacy.md) for exactly what is stored and sent where.
+Everything is stored in `%APPDATA%\Unified Achievement Manager` (open it from **File → Open Data Folder**). Uninstalling keeps it, so reinstalling picks up where you left off. **File → Back Up…** and **File → Restore from Backup…** save it to, and restore it from, a single file. See [docs/operations.md](docs/operations.md) for backups, moving to a new PC, removing everything, and troubleshooting, and [docs/privacy.md](docs/privacy.md) for exactly what is stored and sent where.
 
 ## Status
 
