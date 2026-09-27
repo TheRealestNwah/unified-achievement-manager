@@ -658,7 +658,16 @@
         border-color: var(--accent);
     }
     input[type="checkbox"]:checked::before { transform: translateX(17px); }
-    .game-title { flex: 1; font-weight: 600; }
+    .game-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; }
+    .game-title { flex: 1; min-width: 0; font-weight: 600; }
+    .game-badges { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; }
+    .platform-badge { white-space: nowrap; }
+    /* Narrow windows: badges and pips drop under the title instead of
+       squeezing it into a sliver (see #285). */
+    @media (max-width: 900px) {
+        .game-main { flex-direction: column; align-items: flex-start; gap: 6px; }
+        .game-badges { justify-content: flex-start; }
+    }
     .game-actions-btn {
         background: none;
         color: var(--text-dim);
@@ -1617,7 +1626,7 @@ function renderActivity(items, { append = false } = {}) {
                 <div class="activity-name">${escapeHtml(a.name)}${
                     a.points != null ? ` <span class="achievement-points">+${a.points} XP</span>` : ""
                 }</div>
-                <div class="activity-meta">${gameTitleLink(a.game_id, a.game_title)} <span class="platform-badge">${a.platform_id}</span></div>
+                <div class="activity-meta">${gameTitleLink(a.game_id, a.game_title)} ${platformBadge(a.platform_id)}</div>
             </div>
             <div class="activity-time" title="${escapeHtml(new Date(a.unlocked_at).toLocaleString())}" data-relative-time="${escapeHtml(a.unlocked_at)}">${relativeTime(a.unlocked_at)}</div>
         </div>
@@ -1768,13 +1777,28 @@ async function refreshStats() {
 // One badge per linked entry rather than one combined badge per platform
 // (see #193) - a game merged from PS3 and PS4 lists shows "psn (PS3)" and
 // "psn (PS4)" separately, instead of one "psn (PS3, PS4)" badge.
+// Badge text people recognise (see #285): the console where there is one
+// ("PS5", "Xbox 360"), otherwise the platform's short name. The full name is
+// in the tooltip.
+const PLATFORM_SHORT_NAMES = { steam: "Steam", xbox: "Xbox", psn: "PlayStation", retroachievements: "RA", gog: "GOG" };
+const PLATFORM_FULL_NAMES = { steam: "Steam", xbox: "Xbox", psn: "PlayStation", retroachievements: "RetroAchievements", gog: "GOG" };
+
+function platformBadgeText(platformId, variant) {
+    return variant || PLATFORM_SHORT_NAMES[platformId] || platformId;
+}
+
+function platformBadge(platformId, variant = null, extraClass = "") {
+    const full = `${PLATFORM_FULL_NAMES[platformId] || platformId}${variant ? ` (${variant})` : ""}`;
+    return `<span class="platform-badge${extraClass ? ` ${extraClass}` : ""}" title="${escapeHtml(full)}">${escapeHtml(platformBadgeText(platformId, variant))}</span>`;
+}
+
 function platformBadges(game) {
     const variants = game.console_variants || {};
     return (game.platforms || [])
         .flatMap((p) => {
             const v = variants[p];
-            if (!v || v.length === 0) return [`<span class="platform-badge">${p}</span>`];
-            return v.map((variant) => `<span class="platform-badge">${p} (${variant})</span>`);
+            if (!v || v.length === 0) return [platformBadge(p)];
+            return v.map((variant) => platformBadge(p, variant));
         })
         .join("");
 }
@@ -1998,7 +2022,7 @@ function renderHiddenGamesPanel(games) {
         <div class="review-row" data-id="${g.id}" data-title="${escapeHtml(g.title)}">
             <span class="review-compare">
                 ${gameTitleLink(g.id, g.title)}
-                ${(g.platforms || []).map((p) => `<span class="platform-badge">${escapeHtml(p)}</span>`).join(" ")}
+                ${(g.platforms || []).map((p) => platformBadge(p)).join(" ")}
                 <span class="achievement-points">${Number(g.points_earned || 0).toLocaleString()} XP${g.mode === "excluded" ? " not counted" : ""}</span>
             </span>
             <select class="hidden-mode-select" aria-label="How ${escapeHtml(g.title)} is hidden">
@@ -2410,9 +2434,10 @@ function renderGames(games, { refetchExpanded = false } = {}) {
         el.innerHTML = `
             <div class="game-row" data-game-id="${game.id}">
                 ${ImageControls.gameCoverMarkup(game.cover_image_url)}
-                <div class="game-title">${escapeHtml(game.title)}</div>
-                ${platformBadges(game)}
-                <div class="tier-pips">${tierDots(game)}</div>
+                <div class="game-main">
+                    <div class="game-title">${escapeHtml(game.title)}</div>
+                    <div class="game-badges">${platformBadges(game)}<div class="tier-pips">${tierDots(game)}</div></div>
+                </div>
                 <div class="game-progress-text">${game.unlocked_achievements}/${game.total_achievements}</div>
                 <button type="button" class="game-actions-btn" aria-haspopup="menu" aria-label="Actions for ${escapeHtml(game.title)}" title="Game actions">&hellip;</button>
             </div>
@@ -2910,7 +2935,7 @@ function renderAchievementsPanel(panel, gameId, achievements, platformLinks, rel
         const key = a.game_platform_link_id || a.platform_id;
         if (!sections.has(key)) {
             const label = `${a.platform_id}${a.console_variant ? ` (${a.console_variant})` : ""}`;
-            sections.set(key, { platformId: a.platform_id, label, list: [] });
+            sections.set(key, { platformId: a.platform_id, label, displayLabel: platformBadgeText(a.platform_id, a.console_variant), list: [] });
         }
         sections.get(key).list.push(a);
     }
@@ -2920,16 +2945,20 @@ function renderAchievementsPanel(panel, gameId, achievements, platformLinks, rel
     for (const section of sections.values()) labelCounts.set(section.label, (labelCounts.get(section.label) || 0) + 1);
     for (const section of sections.values()) {
         const title = section.list[0].platform_title;
-        if (labelCounts.get(section.label) > 1 && title) section.label = `${section.label} · ${title}`;
+        if (labelCounts.get(section.label) > 1 && title) {
+            section.label = `${section.label} · ${title}`;
+            section.displayLabel = `${section.displayLabel} · ${title}`;
+        }
     }
     // Only a game with several lists needs each row tagged with its own.
     const tagRows = sections.size > 1;
 
     const collapsedPlatforms = getCollapsedPlatforms();
     panel.innerHTML = [...sections.values()]
-        .map(({ platformId, label, list }) => {
+        .map(({ platformId, label, displayLabel, list }) => {
             // The label can now carry a platform's own title.
             const safeLabel = escapeHtml(label);
+            const safeDisplay = escapeHtml(displayLabel);
             const unlockedCount = list.filter((a) => a.unlocked).length;
             // Collapse is remembered per list label ("psn (PS5)"). A bare
             // platform saved before #175 still collapses all of its lists.
@@ -2939,7 +2968,7 @@ function renderAchievementsPanel(panel, gameId, achievements, platformLinks, rel
         <div class="platform-section${collapsed ? " collapsed" : ""}" data-platform-id="${platformId}" data-collapse-key="${safeLabel}">
             <div class="platform-section-header">
                 <span class="platform-section-collapse-chevron">▾</span>
-                <span class="platform-badge">${safeLabel}</span>
+                <span class="platform-badge">${safeDisplay}</span>
                 <span>${unlockedCount}/${list.length}</span>
             </div>
             ${shown.length === 0 ? `<div class="achievement loading-note">No ${view.show} achievements in this list.</div>` : ""}
@@ -2959,7 +2988,7 @@ function renderAchievementsPanel(panel, gameId, achievements, platformLinks, rel
                         <div class="achievement-name">${escapeHtml(a.name)}${
                             a.unlocked && a.points != null ? ` <span class="achievement-points">+${a.points} XP</span>` : ""
                         }${
-                            tagRows ? ` <span class="platform-badge achievement-platform-tag">${safeLabel}</span>` : ""
+                            tagRows ? ` <span class="platform-badge achievement-platform-tag">${safeDisplay}</span>` : ""
                         }</div>
                         ${a.description ? `<div class="achievement-desc">${escapeHtml(a.description)}</div>` : ""}
                         ${
@@ -3039,7 +3068,8 @@ function platformLinksBar(links, gameId, currentTitle) {
 
         const badge = document.createElement("span");
         badge.className = "platform-badge";
-        badge.textContent = link.platform_id + (link.console_variant ? ` (${link.console_variant})` : "");
+        badge.textContent = platformBadgeText(link.platform_id, link.console_variant);
+        badge.title = `${PLATFORM_FULL_NAMES[link.platform_id] || link.platform_id}${link.console_variant ? ` (${link.console_variant})` : ""}`;
         const title = document.createElement("span");
         title.className = "platform-link-title";
         title.textContent = link.platform_title;
@@ -3283,9 +3313,9 @@ function reviewRowHtml(c) {
         <div class="review-row" data-id="${c.id}">
             <span class="review-game">${escapeHtml(c.game_title)}</span>
             <span class="review-compare">
-                <span class="platform-badge">${escapeHtml(c.candidate_platform)}</span> ${escapeHtml(c.candidate_name)}
+                ${platformBadge(c.candidate_platform)} ${escapeHtml(c.candidate_name)}
                 <span class="arrow">vs</span>
-                ${(c.target_platforms || []).map((p) => `<span class="platform-badge">${p}</span>`).join(" ")}
+                ${(c.target_platforms || []).map((p) => platformBadge(p)).join(" ")}
                 ${escapeHtml(c.target_name)} <span class="tier-tag ${c.target_tier}">${c.target_tier}</span>
             </span>
             <span class="review-confidence">${Math.round(c.confidence * 100)}%</span>
@@ -3366,10 +3396,10 @@ function renderGameReviewPanel(candidates) {
         <div class="review-row" data-id="${c.id}">
             <span class="review-game">${GAME_CANDIDATE_REASON_LABELS[c.reason] || c.reason}</span>
             <span class="review-compare">
-                ${(c.game_a_platforms || []).map((p) => `<span class="platform-badge">${p}</span>`).join(" ")}
+                ${(c.game_a_platforms || []).map((p) => platformBadge(p)).join(" ")}
                 ${escapeHtml(c.game_a_title)}
                 <span class="arrow">vs</span>
-                ${(c.game_b_platforms || []).map((p) => `<span class="platform-badge">${p}</span>`).join(" ")}
+                ${(c.game_b_platforms || []).map((p) => platformBadge(p)).join(" ")}
                 ${escapeHtml(c.game_b_title)}
             </span>
             <span class="review-confidence">${Math.round(c.confidence * 100)}%</span>
@@ -3504,10 +3534,10 @@ function renderSplitReviewPanel(candidates) {
             <span class="review-game">${GAME_CANDIDATE_REASON_LABELS[c.reason] || c.reason}</span>
             <span class="review-compare">
                 ${escapeHtml(c.game_title)}:
-                <span class="platform-badge">${c.candidate_platform}${c.candidate_console_variant ? ` (${c.candidate_console_variant})` : ""}</span>
+                ${platformBadge(c.candidate_platform, c.candidate_console_variant)}
                 ${escapeHtml(c.candidate_platform_title)}
                 <span class="arrow">merged with</span>
-                ${(c.other_platforms || []).map((p) => `<span class="platform-badge">${p}</span>`).join(" ")}
+                ${(c.other_platforms || []).map((p) => platformBadge(p)).join(" ")}
             </span>
             <span class="review-actions">
                 <button class="confirm" aria-label="Split ${escapeHtml(c.candidate_platform_title)} out of ${escapeHtml(c.game_title)}">Split apart</button>
