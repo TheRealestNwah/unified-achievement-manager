@@ -2674,9 +2674,6 @@ function renderPresetChip() {
 function renderGames(games, { refetchExpanded = false } = {}) {
     const pane = document.querySelector(".content-pane");
     const scrollTop = pane.scrollTop;
-    document.getElementById("games-heading").textContent =
-        `Your games (${games.length})`;
-
     renderPlatformFilterOptions(games);
     const filterText = document.getElementById("games-filter").value;
     const sortMode = document.getElementById("games-sort").value;
@@ -2686,6 +2683,12 @@ function renderGames(games, { refetchExpanded = false } = {}) {
         .filter(presetMatches)
         .filter((g) => platformFilterMatches(g, platformFilter))
         .sort(gameSorters[sortMode] || gameSorters["unlocked-desc"]);
+
+    // With a smart view or filter on, say how many games it leaves (see #349).
+    document.getElementById("games-heading").textContent =
+        visible.length === games.length
+            ? `Your games (${games.length.toLocaleString()})`
+            : `Your games (${visible.length.toLocaleString()} of ${games.length.toLocaleString()})`;
 
     renderPresetChip();
 
