@@ -27,6 +27,14 @@ describe("getSearchAcronyms", () => {
     });
 });
 
+describe("findDuplicateAcronym (#291)", () => {
+    it("treats case, spacing, and punctuation variants as the same acronym", async () => {
+        const { findDuplicateAcronym } = await import("./searchAcronyms");
+        expect(findDuplicateAcronym([{ acronym: "bg3", expansion: "a" }, { acronym: "BG-3", expansion: "b" }])).toBe("BG-3");
+        expect(findDuplicateAcronym([{ acronym: "bg3", expansion: "a" }, { acronym: "gta", expansion: "b" }])).toBeNull();
+    });
+});
+
 describe("saveSearchAcronyms", () => {
     it("upserts the list as JSON", async () => {
         const { saveSearchAcronyms } = await import("./searchAcronyms");
