@@ -1,6 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { spawn } from "child_process";
 import { Client } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { startEmbeddedDatabase } from "./embeddedDatabase";
@@ -45,12 +46,39 @@ suite("embedded PostgreSQL", () => {
         }
     }, 180_000);
 
-    it("recovers when a previous run never stopped its database", async () => {
-        const orphaned = await startEmbeddedDatabase(dataDir);
+    it("refuses to start on a folder whose database another live run is using (#405)", async () => {
+        const running = await startEmbeddedDatabase(dataDir);
+        try {
+            await expect(startEmbeddedDatabase(dataDir)).rejects.toThrow(/already running/);
+            // The running one's database was left alone.
+            expect(await query(running.url, "select value from persisted")).toEqual([{ value: "kept" }]);
+        } finally {
+            await running.stop();
+        }
+    }, 180_000);
+
+    it("recovers when a previous run crashed without stopping its database", async () => {
+        // Start the database from a separate process, then kill that process
+        // outright: its PostgreSQL keeps running with no owner, as after a crash.
+        const script = `require("ts-node/register/transpile-only");
+            require(${JSON.stringify(path.join(__dirname, "embeddedDatabase.ts"))})
+                .startEmbeddedDatabase(${JSON.stringify(dataDir)})
+                .then((db) => process.stdout.write(db.url));`;
+        const child = spawn(process.execPath, ["-e", script], { stdio: ["ignore", "pipe", "inherit"] });
+        const orphanedUrl = await new Promise<string>((resolve, reject) => {
+            child.once("error", reject);
+            child.stdout.once("data", (chunk) => resolve(String(chunk)));
+        });
+        await new Promise<void>((resolve) => {
+            child.once("exit", () => resolve());
+            child.kill("SIGKILL");
+        });
+        expect(await query(orphanedUrl, "select 1 as ok")).toEqual([{ ok: 1 }]);
+
         const restarted = await startEmbeddedDatabase(dataDir);
         try {
             expect(await query(restarted.url, "select value from persisted")).toEqual([{ value: "kept" }]);
-            await expect(query(orphaned.url, "select 1")).rejects.toThrow();
+            await expect(query(orphanedUrl, "select 1")).rejects.toThrow();
         } finally {
             await restarted.stop();
         }
