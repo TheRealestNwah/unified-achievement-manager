@@ -56,4 +56,22 @@ integration("bulk achievement-candidate review (#252)", () => {
         // Confirmed means merged - it can't be reopened.
         expect(await matcher.reopenMatchCandidate(a)).toBe(false);
     });
+
+    it("records a near-match once however many times matching runs, and keeps it rejected (#345)", async () => {
+        const game = await canonicalStore.getOrCreateCanonicalGame("steam", "rerun-app", "Rerun Game");
+        await canonicalStore.getOrCreateAchievementLink(game, "steam", "rerun-app", "s1", "TR1 | Codex of Peru", undefined, undefined);
+        const xboxLink = await canonicalStore.getOrCreateAchievementLink(game, "xbox", "rerun-title", "x1", "TR Codex of Peru", undefined, undefined);
+        const rows = async () =>
+            (await pool.query("select id, status from achievement_match_candidates where achievement_platform_link_id = $1", [xboxLink])).rows;
+
+        await matcher.matchAchievementsForGame(game);
+        await matcher.matchAchievementsForGame(game);
+        const [only, ...rest] = await rows();
+        expect(rest).toEqual([]);
+        expect(only.status).toBe("pending");
+
+        await matcher.rejectMatchCandidate(only.id);
+        await matcher.matchAchievementsForGame(game);
+        expect(await rows()).toEqual([{ id: only.id, status: "rejected" }]);
+    });
 });

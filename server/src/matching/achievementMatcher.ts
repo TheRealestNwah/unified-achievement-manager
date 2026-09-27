@@ -118,10 +118,16 @@ async function recordCandidate(
     confidence: number,
     status: "confirmed" | "pending"
 ): Promise<void> {
+    // A pair already on record keeps its row (see #345): re-proposing it as
+    // pending does nothing, so a rejected pair stays rejected and a pending
+    // one isn't queued twice. Only an auto-merge upgrades it to confirmed.
     await pool.query(
         `insert into achievement_match_candidates
             (achievement_platform_link_id, candidate_canonical_achievement_id, confidence, status, reviewed_at)
-         values ($1, $2, $3, $4, $5)`,
+         values ($1, $2, $3, $4, $5)
+         on conflict (achievement_platform_link_id, candidate_canonical_achievement_id) do update
+            set status = excluded.status, confidence = excluded.confidence, reviewed_at = excluded.reviewed_at
+            where excluded.status = 'confirmed'`,
         [
             achievementPlatformLinkId,
             candidateCanonicalAchievementId,
@@ -157,10 +163,21 @@ export async function mergeAchievements(idA: string, idB: string): Promise<void>
             "update achievement_platform_links set canonical_achievement_id = $1 where canonical_achievement_id = $2",
             [winnerId, loserId]
         );
+        // Repointing can't create a second row for a pair the winner already
+        // has (see #345); the loser's copy of that pair is dropped instead.
         await client.query(
-            "update achievement_match_candidates set candidate_canonical_achievement_id = $1 where candidate_canonical_achievement_id = $2",
+            `update achievement_match_candidates amc set candidate_canonical_achievement_id = $1
+             where candidate_canonical_achievement_id = $2
+               and not exists (
+                   select 1 from achievement_match_candidates existing
+                   where existing.achievement_platform_link_id = amc.achievement_platform_link_id
+                     and existing.candidate_canonical_achievement_id = $1
+               )`,
             [winnerId, loserId]
         );
+        await client.query("delete from achievement_match_candidates where candidate_canonical_achievement_id = $1", [
+            loserId,
+        ]);
 
         if (!psnRow) {
             // No PSN tier involved - re-resolve from the rarest signal across
@@ -237,9 +254,17 @@ export async function confirmMatchCandidate(candidateId: string): Promise<void> 
     // by the time we get here regardless of which side won.
     await mergeAchievements(targetId, sourceId);
 
-    await pool.query("update achievement_match_candidates set status = 'confirmed', reviewed_at = now() where id = $1", [
-        candidateId,
-    ]);
+    // If the winner already had a row for this link, the merge kept that one
+    // and dropped this one (see #345), so confirm by pair as well as by id.
+    await pool.query(
+        `update achievement_match_candidates set status = 'confirmed', reviewed_at = now()
+         where id = $1
+            or (achievement_platform_link_id = $2
+                and candidate_canonical_achievement_id = (
+                    select canonical_achievement_id from achievement_platform_links where id = $2
+                ))`,
+        [candidateId, candidate.rows[0].achievement_platform_link_id]
+    );
 }
 
 // Puts a rejected candidate back in the review queue - the undo for a

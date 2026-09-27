@@ -178,6 +178,27 @@ create table if not exists achievement_match_candidates (
     reviewed_at                 timestamptz
 );
 
+-- One row per proposed pair (see #345). Every matching pass used to insert
+-- the same pending pair again, and a rejected pair came back as a new
+-- pending row. Older databases keep the most decided copy of each pair
+-- (confirmed, then rejected, then pending) before the index goes on.
+do $$ begin
+    if not exists (select 1 from pg_indexes where indexname = 'achievement_match_candidates_pair_idx') then
+        delete from achievement_match_candidates amc
+        using (
+            select id, row_number() over (
+                partition by achievement_platform_link_id, candidate_canonical_achievement_id
+                order by case status when 'confirmed' then 0 when 'rejected' then 1 else 2 end,
+                         reviewed_at desc nulls last, id
+            ) as rank
+            from achievement_match_candidates
+        ) ranked
+        where amc.id = ranked.id and ranked.rank > 1;
+        create unique index achievement_match_candidates_pair_idx
+            on achievement_match_candidates (achievement_platform_link_id, candidate_canonical_achievement_id);
+    end if;
+end $$;
+
 -- Whole-game merges a matching pass has proposed but won't perform
 -- automatically, because the signal isn't strong enough to trust without a
 -- human - either an exact-title match that involves RetroAchievements (a
