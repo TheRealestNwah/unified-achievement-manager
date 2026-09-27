@@ -888,6 +888,15 @@
     }
     .review-group-count { color: var(--text-dim); font-weight: 500; margin-left: 4px; }
     .review-group .review-game { display: none; }
+    .hidden-mode-select, .hidden-games-filter {
+        background: var(--input-bg);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: 5px 10px;
+        color: var(--text);
+        font-size: 12px;
+    }
+    .hidden-games-filter { flex: 1; font-size: 13px; }
     .review-row-error { flex-basis: 100%; font-size: 12px; color: #B91C1C; }
     .review-actions button.reject { background: transparent; color: var(--text-dim); border: 1px solid var(--border); box-shadow: none; }
 
@@ -1976,24 +1985,56 @@ function renderHiddenGamesPanel(games) {
         panel.innerHTML = `<div class="loading-note">No hidden or excluded games.</div>`;
         return;
     }
-    panel.innerHTML = games
-        .map(
-            (g) => `
-        <div class="review-row" data-id="${g.id}">
-            <span class="review-compare">${escapeHtml(g.title)}</span>
-            <span class="review-confidence">${g.mode}</span>
+    // Each row: the game (opens its page), its platforms and XP, a
+    // hidden/excluded switch, and Unhide (see #294). A filter box appears once
+    // the list is long enough to need one.
+    const reload = () => loadPanel(panel, () => api("/api/me/games/hidden"), renderHiddenGamesPanel);
+    const filterValue = panel.querySelector(".hidden-games-filter")?.value ?? "";
+    panel.innerHTML = `
+        ${games.length > 8 ? `<div class="review-bulk"><input type="search" class="hidden-games-filter" placeholder="Filter hidden games..." aria-label="Filter hidden games" value="${escapeHtml(filterValue)}" /></div>` : ""}
+        ${games
+            .map(
+                (g) => `
+        <div class="review-row" data-id="${g.id}" data-title="${escapeHtml(g.title)}">
+            <span class="review-compare">
+                ${gameTitleLink(g.id, g.title)}
+                ${(g.platforms || []).map((p) => `<span class="platform-badge">${escapeHtml(p)}</span>`).join(" ")}
+                <span class="achievement-points">${Number(g.points_earned || 0).toLocaleString()} XP${g.mode === "excluded" ? " not counted" : ""}</span>
+            </span>
+            <select class="hidden-mode-select" aria-label="How ${escapeHtml(g.title)} is hidden">
+                <option value="hidden" ${g.mode === "hidden" ? "selected" : ""}>Hidden (still counts)</option>
+                <option value="excluded" ${g.mode === "excluded" ? "selected" : ""}>Excluded from score</option>
+            </select>
             <span class="review-actions">
                 <button class="confirm" aria-label="Unhide ${escapeHtml(g.title)}">Unhide</button>
             </span>
         </div>
     `
-        )
-        .join("");
+            )
+            .join("")}
+    `;
+    bindGameTitleLinks(panel);
+    const filter = panel.querySelector(".hidden-games-filter");
+    const applyFilter = () => {
+        const text = filter?.value ?? "";
+        panel.querySelectorAll(".review-row").forEach((row) => {
+            row.classList.toggle("hidden", !SearchText.titleMatchesSearch(row.dataset.title, text, state.searchAcronyms));
+        });
+    };
+    filter?.addEventListener("input", applyFilter);
+    applyFilter();
     panel.querySelectorAll(".review-row").forEach((row) => {
         row.querySelector(".confirm").addEventListener("click", () =>
             runRowAction(row, async () => {
                 await clearGameVisibility(row.dataset.id);
-                await loadPanel(panel, () => api("/api/me/games/hidden"), renderHiddenGamesPanel);
+                await reload();
+            })
+        );
+        const select = row.querySelector(".hidden-mode-select");
+        select.addEventListener("change", () =>
+            runRowAction(row, async () => {
+                await setGameVisibility(row.dataset.id, select.value);
+                await reload();
             })
         );
     });
