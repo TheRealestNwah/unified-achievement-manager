@@ -2009,12 +2009,27 @@ async function refreshStats() {
 const PLATFORM_SHORT_NAMES = { steam: "Steam", xbox: "Xbox", psn: "PlayStation", retroachievements: "RA", gog: "GOG" };
 const PLATFORM_FULL_NAMES = { steam: "Steam", xbox: "Xbox", psn: "PlayStation", retroachievements: "RetroAchievements", gog: "GOG" };
 
+// PSN sends one trophy list's consoles comma-joined ("PS3,PSVITA,PS4"), and
+// a couple of its console codes aren't what people call them (see #346).
+const CONSOLE_NAMES = { PSVITA: "PS Vita", PSPC: "PS PC" };
+
+function consoleList(variant) {
+    return String(variant || "")
+        .split(",")
+        .map((code) => code.trim())
+        .filter(Boolean);
+}
+
+function consoleName(code) {
+    return CONSOLE_NAMES[code] || code;
+}
+
 function platformBadgeText(platformId, variant) {
-    return variant || PLATFORM_SHORT_NAMES[platformId] || platformId;
+    return variant ? consoleList(variant).map(consoleName).join(" / ") : PLATFORM_SHORT_NAMES[platformId] || platformId;
 }
 
 function platformBadge(platformId, variant = null, extraClass = "") {
-    const full = `${PLATFORM_FULL_NAMES[platformId] || platformId}${variant ? ` (${variant})` : ""}`;
+    const full = `${PLATFORM_FULL_NAMES[platformId] || platformId}${variant ? ` (${platformBadgeText(platformId, variant)})` : ""}`;
     return `<span class="platform-badge${extraClass ? ` ${extraClass}` : ""}" title="${escapeHtml(full)}">${escapeHtml(platformBadgeText(platformId, variant))}</span>`;
 }
 
@@ -2567,28 +2582,40 @@ function presetMatches(game) {
     return true;
 }
 
-// Platform filter (see #246): one option per platform, plus one per console
-// variant ("psn (PS5)") where the library has them. Values are "psn" or
-// "psn:PS5".
+// Platform filter (see #246, #346): one option per platform by its full
+// name, each followed by one per console the library has on it ("PS4"),
+// matching any game with a list on that console. Values are "psn" or
+// "psn:PS4".
+function gameConsoles(game, platform) {
+    return (game.console_variants?.[platform] || []).flatMap(consoleList);
+}
+
 function platformFilterMatches(game, value) {
     if (!value) return true;
-    const [platform, variant] = value.split(":");
+    const [platform, code] = value.split(":");
     if (!(game.platforms || []).includes(platform)) return false;
-    return !variant || (game.console_variants?.[platform] || []).includes(variant);
+    return !code || gameConsoles(game, platform).includes(code);
 }
 
 function renderPlatformFilterOptions(games) {
     const select = document.getElementById("games-platform-filter");
-    const options = new Map();
+    const consolesByPlatform = new Map();
     for (const game of games) {
         for (const platform of game.platforms || []) {
-            options.set(platform, platform);
-            for (const variant of game.console_variants?.[platform] || []) options.set(`${platform}:${variant}`, `${platform} (${variant})`);
+            if (!consolesByPlatform.has(platform)) consolesByPlatform.set(platform, new Set());
+            for (const code of gameConsoles(game, platform)) consolesByPlatform.get(platform).add(code);
         }
     }
+    const platformName = (platform) => PLATFORM_FULL_NAMES[platform] || platform;
+    const options = [new Option("All platforms", "")];
+    for (const platform of [...consolesByPlatform.keys()].sort((a, b) => platformName(a).localeCompare(platformName(b)))) {
+        options.push(new Option(platformName(platform), platform));
+        const codes = [...consolesByPlatform.get(platform)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        for (const code of codes) options.push(new Option(` ${consoleName(code)}`, `${platform}:${code}`));
+    }
     const current = select.value || getGamesListPrefs().platform || "";
-    select.replaceChildren(new Option("All platforms", ""), ...[...options].sort(([a], [b]) => a.localeCompare(b)).map(([value, label]) => new Option(label, value)));
-    select.value = options.has(current) ? current : "";
+    select.replaceChildren(...options);
+    select.value = options.some((o) => o.value === current) ? current : "";
 }
 
 // The games list's sort and platform choices are remembered per viewer.
