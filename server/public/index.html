@@ -408,6 +408,8 @@
     @media (prefers-color-scheme: dark) {
         :root:not([data-theme="light"]) .sync-problems a, :root:not([data-theme="light"]) .platform-sync-error { color: #FCA5A5; }
     }
+    /* A failure a new sync is already retrying (see #322) - context, not an alarm. */
+    :root .platform-row .platform-sync-error.superseded { color: var(--text-dim); }
     .empty-library { text-align: center; padding: 40px 24px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
     .empty-library h3 { margin: 0 0 8px; font-size: 16px; }
     .empty-library p { margin: 0 auto 16px; max-width: 460px; color: var(--text-dim); line-height: 1.5; font-size: 13px; }
@@ -1716,6 +1718,7 @@ async function initSyncIntervalRow() {
 // the latest sync time moves keeps the page current without a reload. The
 // user's own syncs refresh the page themselves, so they're skipped here.
 const SYNC_POLL_INTERVAL_MS = 60_000;
+const SYNC_POLL_FAST_INTERVAL_MS = 10_000;
 
 async function pollSyncStatus({ silent = false } = {}) {
     let status;
@@ -1729,10 +1732,15 @@ async function pollSyncStatus({ silent = false } = {}) {
     // A failed background sync doesn't move lastSyncedAt, but its error
     // should still show up without a reload (see #282).
     const newError = state.knownSyncErrorAt !== undefined && status.lastSyncErrorAt !== state.knownSyncErrorAt;
+    // A sync starting or finishing anywhere changes what the platform rows
+    // should say, even before it records a result (see #322).
+    const syncingKey = (status.syncingPlatforms || []).join(",");
+    const syncingChanged = state.knownSyncing !== undefined && syncingKey !== state.knownSyncing;
     state.knownSyncAt = status.lastSyncedAt;
     state.knownSyncErrorAt = status.lastSyncErrorAt;
+    state.knownSyncing = syncingKey;
     if (silent || state.userSyncs > 0) return;
-    if (newError && !changed) {
+    if ((newError || syncingChanged) && !changed) {
         await refreshPlatforms().catch((err) => console.error(err));
         return;
     }
@@ -3993,6 +4001,17 @@ async function disconnectPlatform(platformId, label) {
 // synced 2 hours ago" (exact time on hover), then Sync and Disconnect in
 // fixed slots so the buttons line up down the list. Steam has no Disconnect
 // because it's how you signed in, so its second slot stays empty.
+// While a new sync runs, the previous failure is shown dimmed as what's
+// being retried rather than as a live alarm (see #322). The next render
+// after the sync either drops it (success) or shows the new failure.
+function markSyncErrorSuperseded(row) {
+    const error = row.querySelector(".platform-sync-error");
+    if (!error || error.classList.contains("superseded")) return;
+    error.classList.add("superseded");
+    error.removeAttribute("role");
+    error.firstChild.textContent = "Syncing again - the previous attempt failed ";
+}
+
 function connectedPlatformRow(platformId, label, account, { canDisconnect = true } = {}) {
     const row = document.createElement("div");
     row.className = "platform-row";
@@ -4015,6 +4034,9 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
     } else {
         note.textContent = `${prefix}${prefix ? "not" : "Not"} synced yet`;
     }
+    // A sync is already running for this account - the background scheduler's
+    // or one started elsewhere (see #322).
+    if (account?.syncing) note.textContent = `${prefix}Syncing…`;
 
     const actions = document.createElement("div");
     actions.className = "platform-actions";
@@ -4023,8 +4045,10 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
     syncBtn.className = "secondary slot-1";
     syncBtn.id = `${PLATFORM_NOTE_PREFIXES[platformId]}-sync-btn`;
     syncBtn.textContent = "Sync";
+    syncBtn.disabled = Boolean(account?.syncing);
     syncBtn.addEventListener("click", (e) => {
         const button = e.currentTarget;
+        markSyncErrorSuperseded(row);
         trackUserSync(() => syncPlatform(PLATFORM_SYNC_SLUGS[platformId], label, button, note));
     });
     actions.appendChild(syncBtn);
@@ -4058,6 +4082,7 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
         when.textContent = relativeTime(account.last_sync_error_at);
         error.append("Last sync failed ", when, `: ${account.last_sync_error}`);
         row.appendChild(error);
+        if (account.syncing) markSyncErrorSuperseded(row);
     }
     return row;
 }
@@ -4286,7 +4311,8 @@ async function refreshPlatforms() {
 // Settings row has the details and the fix.
 function renderSyncProblems(accounts) {
     const banner = document.getElementById("sync-problems");
-    const failing = accounts.filter((a) => a.last_sync_error);
+    // One being synced again right now isn't a problem yet (see #322).
+    const failing = accounts.filter((a) => a.last_sync_error && !a.syncing);
     banner.classList.toggle("hidden", failing.length === 0);
     if (failing.length === 0) return;
     const names = failing.map((a) => PLATFORM_LABELS[a.platform_id] || a.platform_id);
@@ -4871,6 +4897,11 @@ async function init() {
     });
     setInterval(refreshRelativeTimes, 60_000);
     setInterval(() => pollSyncStatus(), SYNC_POLL_INTERVAL_MS);
+    // Check more often while a sync is running, so its row updates soon
+    // after it finishes (see #322).
+    setInterval(() => {
+        if (state.knownSyncing && document.visibilityState === "visible") pollSyncStatus();
+    }, SYNC_POLL_FAST_INTERVAL_MS);
     // Coming back to the window is a good moment to catch up.
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") pollSyncStatus();
