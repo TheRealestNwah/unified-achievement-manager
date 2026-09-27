@@ -2,7 +2,7 @@
 
 ## Next up
 
-1.0 ships as a standalone Windows desktop app: an Electron shell around the server, with its own bundled PostgreSQL, a first-run profile setup, and an installer built and smoke-tested in CI ([#124](https://github.com/TheRealestNwah/unified-achievement-manager/issues/124)–[#129](https://github.com/TheRealestNwah/unified-achievement-manager/issues/129)). What remains is getting it out the door: **run the live parts of the [1.0 release checklist](docs/release-checklist.md)** on a real Windows machine (Steam sign-in, every platform, sync twice, disconnect/reconnect, crash recovery, uninstall/reinstall), then tag once approved.
+1.0 ships as a standalone Windows desktop app: an Electron shell around the server, with its own bundled PostgreSQL, a first-run profile setup, and an installer built and smoke-tested in CI ([#124](https://github.com/TheRealestNwah/unified-achievement-manager/issues/124)–[#129](https://github.com/TheRealestNwah/unified-achievement-manager/issues/129)). What remains is getting it out the door: **run the live parts of the [1.0 release checklist](docs/release-checklist.md)** on a real Windows machine (first-run profile, Steam connect, every platform, sync twice, disconnect/reconnect, crash recovery, uninstall/reinstall), then tag once approved.
 
 After 1.0: code-sign the installer (removes the SmartScreen warning) and macOS/Linux builds. Auto-update from GitHub Releases is built ([#314](https://github.com/TheRealestNwah/unified-achievement-manager/issues/314)) and takes effect from the first release after 1.0.0. The code is already cross-platform apart from the installer.
 
