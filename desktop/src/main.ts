@@ -3,9 +3,10 @@ import path from "path";
 import { format } from "util";
 import { app, BrowserWindow, dialog, Menu, session, shell } from "electron";
 import { startDiscordPresence, stopDiscordPresence } from "./discordPresence";
-import { handleWindowClose, launchedHidden, markQuitting, showWindow, startTray, stopTray, unlockNotificationsEnabled } from "./tray";
+import { handleWindowClose, HIDDEN_LAUNCH_ARG, launchedHidden, markQuitting, showWindow, startTray, stopTray, unlockNotificationsEnabled } from "./tray";
 import { startUnlockNotifications, stopUnlockNotifications } from "./notifications";
 import { loadWindowState, trackWindowState } from "./windowState";
+import { backupDataFolder, defaultBackupName, restoreDataFolder } from "./backup";
 
 interface RunningApp {
     url: string;
@@ -172,6 +173,91 @@ function buildMenu(): void {
     );
 }
 
+const BUSY_PAGE = (message: string) =>
+    `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
+<html><head><meta charset="utf-8"><title>Unified Achievement Manager</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; height: 100vh; display: grid; place-items: center; font-family: "Segoe UI", system-ui, sans-serif; background: Canvas; color: CanvasText; }
+  p { opacity: .7; }
+</style></head>
+<body><div style="text-align:center"><h2>Unified Achievement Manager</h2><p>${message}</p></div></body></html>`)}`;
+
+let maintenanceRunning = false;
+
+// Backups and restores need the database stopped (see #295), so both shut the
+// server down, do their work, and relaunch the app - simpler and safer than
+// restarting the in-process server and everything wired to it.
+async function withServerStopped(message: string, task: () => Promise<void>): Promise<void> {
+    if (maintenanceRunning) return;
+    maintenanceRunning = true;
+    stopTray();
+    stopUnlockNotifications();
+    await mainWindow?.loadURL(BUSY_PAGE(message)).catch(() => undefined);
+    await stopServer();
+    try {
+        await task();
+    } catch (err) {
+        console.error(`${message} failed:`, err);
+        await dialog.showMessageBox({
+            type: "error",
+            title: "Unified Achievement Manager",
+            message: err instanceof Error ? err.message : String(err),
+            detail: `Nothing was changed. Details are in the log file:\n${logFile}`,
+        });
+    }
+    app.relaunch({ args: process.argv.slice(1).filter((arg) => arg !== HIDDEN_LAUNCH_ARG) });
+    app.exit(0);
+}
+
+async function backUp(): Promise<void> {
+    const options: Electron.SaveDialogOptions = {
+        title: "Back Up Unified Achievement Manager",
+        defaultPath: path.join(app.getPath("documents"), defaultBackupName()),
+        filters: [{ name: "Backup", extensions: ["gz"] }],
+    };
+    const { canceled, filePath } = mainWindow ? await dialog.showSaveDialog(mainWindow, options) : await dialog.showSaveDialog(options);
+    if (canceled || !filePath) return;
+    await withServerStopped("Backing up&hellip; the app will restart when it's done.", async () => {
+        await backupDataFolder(dataDir, filePath);
+        console.log(`Backed up to ${filePath}`);
+        await dialog.showMessageBox({
+            title: "Backup complete",
+            message: "Your library, logins, and settings are backed up.",
+            detail: `${filePath}\n\nThe backup includes your platform logins - keep it somewhere private.`,
+        });
+    });
+}
+
+async function restoreFromBackup(): Promise<void> {
+    const options: Electron.OpenDialogOptions = {
+        title: "Restore from Backup",
+        defaultPath: app.getPath("documents"),
+        filters: [{ name: "Backup", extensions: ["gz"] }],
+        properties: ["openFile"],
+    };
+    const { canceled, filePaths } = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+    if (canceled || filePaths.length === 0) return;
+    const { response } = await dialog.showMessageBox({
+        type: "warning",
+        title: "Restore from Backup",
+        message: "Replace everything in the app with this backup?",
+        detail: `${filePaths[0]}\n\nYour current library, logins, and settings are moved aside into the data folder (not deleted), and the app restarts.`,
+        buttons: ["Restore", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+    });
+    if (response !== 0) return;
+    await withServerStopped("Restoring&hellip; the app will restart when it's done.", async () => {
+        const previous = await restoreDataFolder(dataDir, filePaths[0]);
+        console.log(`Restored ${filePaths[0]}; previous data kept in ${previous}`);
+        await dialog.showMessageBox({
+            title: "Restore complete",
+            message: "The backup has been restored.",
+            detail: `Your previous data was kept in:\n${previous}\n\nDelete that folder once you're happy with the restore.`,
+        });
+    });
+}
 async function start(): Promise<void> {
     captureLogs();
     console.log(`Starting Unified Achievement Manager ${app.getVersion()} (data: ${dataDir})`);

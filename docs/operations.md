@@ -18,10 +18,13 @@ The program itself is installed separately (by default in `%LOCALAPPDATA%\Progra
 
 ## Backing up and moving to a new PC
 
-1. Quit Unified Achievement Manager (closing the window quits it, unless **Keep running in the tray** is on in Settings; then right-click the tray icon and choose **Quit**).
-2. Copy the whole `%APPDATA%\Unified Achievement Manager` folder somewhere safe.
+**File → Back Up…** saves everything above except the logs into one `.tar.gz` file (Documents by default). The app briefly stops its database so the copy is consistent, then restarts. The backup contains your platform logins and the key that decrypts them, so keep it somewhere private.
 
-To restore, or to move to another PC: install Unified Achievement Manager, don't launch it (or quit it), replace `%APPDATA%\Unified Achievement Manager` with your copy, and start the app. Always copy the folder as a whole. `secrets.json` and `postgres\` only work together, and a copy taken while the app is running may not be consistent.
+**File → Restore from Backup…** replaces your data with a backup and restarts the app. It checks the file first, and your current data isn't deleted: it's moved into a `before restore <date>` folder inside the data folder. Delete that folder once you're happy with the restore.
+
+To move to another PC: back up on the old one, install Unified Achievement Manager on the new one, and use **File → Restore from Backup…** there.
+
+You can also back up by hand: quit the app (closing the window quits it, unless **Keep running in the tray** is on in Settings; then right-click the tray icon and choose **Quit**), and copy the files listed above. Restore by quitting the app and putting them back. `secrets.json` and `postgres\` only work together, and a copy taken while the app is running may not be consistent.
 
 **Settings → Export** gives you a portable JSON or CSV of your unlock history too, but it isn't something the app can import back.
 
