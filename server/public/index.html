@@ -164,6 +164,17 @@
         cursor: pointer;
     }
     .nav-item svg { flex-shrink: 0; }
+    /* One distinct shape per section, so they stay tellable apart in the
+       icon-only rail without their labels (see #371). */
+    .nav-icon {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
     .nav-item .nav-item-label { flex: 1; }
     .nav-badge {
         min-width: 18px;
@@ -1015,19 +1026,19 @@
         <div class="sidebar-section hidden" data-signed-in-only>
             <span class="sidebar-label">Library</span>
             <button type="button" class="nav-item active" data-nav="overview">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M8 8L11 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1.3"/><rect x="9" y="2" width="5" height="5" rx="1.3"/><rect x="2" y="9" width="5" height="5" rx="1.3"/><rect x="9" y="9" width="5" height="5" rx="1.3"/></svg>
                 <span class="nav-item-label">Overview</span>
             </button>
             <button type="button" class="nav-item" data-nav="platforms">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/><path d="M8 2.3v1.6M8 12.1v1.6M13.7 8h-1.6M3.9 8H2.3M12.2 3.8l-1.1 1.1M4.9 11.1l-1.1 1.1M12.2 12.2l-1.1-1.1M4.9 4.9 3.8 3.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.6 4.5h1.9M2.5 11.5h1.9M7.6 11.5h5.9"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg>
                 <span class="nav-item-label">Settings</span>
             </button>
             <button type="button" class="nav-item" data-nav="games">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="7" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="11.5" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+                <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4.5h6a3.5 3.5 0 0 1 3.4 4.3l-.6 2.6a1.6 1.6 0 0 1-2.8.6L9.6 10H6.4L5 12a1.6 1.6 0 0 1-2.8-.6l-.6-2.6A3.5 3.5 0 0 1 5 4.5z"/><path d="M5.2 6.4v2.4M4 7.6h2.4M10.4 7.6h1.2"/></svg>
                 <span class="nav-item-label">All Games</span>
             </button>
             <button type="button" class="nav-item" data-nav="review">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 4.5h10M3 8h10M3 11.5h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="12.3" cy="11.5" r="1.7" stroke="currentColor" stroke-width="1.2"/></svg>
+                <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 9.5 3.6 3.6A1.5 1.5 0 0 1 5 2.5h6a1.5 1.5 0 0 1 1.4 1.1L14 9.5v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/><path d="M2 9.5h3.3l1 1.6h3.4l1-1.6H14"/></svg>
                 <span class="nav-item-label">Review</span>
                 <span class="nav-badge hidden" id="review-nav-badge"></span>
             </button>
@@ -1035,15 +1046,15 @@
         <div class="sidebar-section hidden" data-signed-in-only>
             <span class="sidebar-label">Smart Views</span>
             <button type="button" class="nav-item" data-nav="in-progress">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M8 5v3l2.2 2.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h8M4 14h8M5 2v2.2a3 3 0 0 0 1.3 2.5L8 8l1.7-1.3A3 3 0 0 0 11 4.2V2M5 14v-2.2a3 3 0 0 1 1.3-2.5L8 8l1.7 1.3a3 3 0 0 1 1.3 2.5V14"/></svg>
                 <span class="nav-item-label">In Progress</span>
             </button>
             <button type="button" class="nav-item" data-nav="completed">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8.2l1.8 1.8 3.2-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5h6v3.5a3 3 0 0 1-6 0z"/><path d="M5 3.5H3a2 2 0 0 0 2 3M11 3.5h2a2 2 0 0 1-2 3M8 9v3.5M5.5 13.5h5"/></svg>
                 <span class="nav-item-label">Completed</span>
             </button>
             <button type="button" class="nav-item" data-nav="almost-there">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M8 2a6 6 0 0 1 5.7 7.9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+                <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 14V2.5M3.5 3h8l-1.8 2.8 1.8 2.7h-8"/></svg>
                 <span class="nav-item-label">Almost There</span>
             </button>
         </div>
