@@ -30,6 +30,6 @@ Those requests are subject to each provider's own terms and privacy policies. Th
 ## Deleting data
 
 - **Disconnect** removes that platform's linked account and its synced ownership and unlock data.
-- **Delete account** removes your profile, sessions, linked accounts, unlocks, scores, and overrides, and deletes uploaded images. App-wide settings stay: the Steam Web API key and, if you added one, the SteamGridDB key. Remove the SteamGridDB key from its settings row.
+- **Delete profile** removes your profile, sessions, linked accounts, unlocks, scores, and overrides, and deletes uploaded images. App-wide settings stay: the Steam Web API key and, if you added one, the SteamGridDB key. Remove the SteamGridDB key from its settings row.
 - **Uninstalling** removes the program but keeps the data folder. Delete `%APPDATA%\Unified Achievement Manager` to remove everything.
 - Credentials you issued (API keys, tokens) can also be revoked on each platform's own site.

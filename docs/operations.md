@@ -30,7 +30,7 @@ You can also back up by hand: quit the app (closing the window quits it, unless 
 
 ## Removing everything
 
-Delete your account from the dashboard (**Delete account**), or simply uninstall Unified Achievement Manager and then delete the `%APPDATA%\Unified Achievement Manager` folder. Platform credentials you gave the app (Xbox/OpenXBL key, PSN token, RetroAchievements key, GOG login) can also be revoked on those platforms' own sites.
+Delete your profile from **Settings → Profile → Delete profile**, or simply uninstall Unified Achievement Manager and then delete the `%APPDATA%\Unified Achievement Manager` folder. Platform credentials you gave the app (Xbox/OpenXBL key, PSN token, RetroAchievements key, GOG login) can also be revoked on those platforms' own sites.
 
 ## Troubleshooting
 

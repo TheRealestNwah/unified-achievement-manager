@@ -44,7 +44,7 @@ Links like these open in your normal web browser. Only Steam's sign-in page open
 - **Compact sidebar:** the button next to the app name collapses the sidebar to icons only. It collapses on its own when the window is narrow.
 - **Export:** download your full unlock history as JSON or CSV from **Settings → Export**.
 - **Disconnect:** any platform can be unlinked, which removes its synced games and achievements.
-- **Delete account:** permanently removes your profile and everything linked to it after you type `DELETE` to confirm. The app then starts over at first run.
+- **Delete profile:** permanently removes your profile and everything linked to it after you type `DELETE` to confirm. The app then starts over at first run.
 
 ## Your data
 

@@ -19,7 +19,7 @@ A green CI run is required, but it doesn't replace the live checks below. **Do n
 - [ ] **Existing data:** install over a copy that was set up with Steam sign-in. It opens straight to the same library with Steam still connected, and no first-run screen.
 - [ ] **Platforms:** link one account on each platform. External links (xbl.io, PSN token page, GOG login, RetroAchievements settings) open in the system browser. Sync each twice and confirm the second sync doesn't duplicate games, achievements, ownership, or unlocks.
 - [ ] **Everyday features:** find/review matches, link games, set a cover via URL and via upload, and export JSON and CSV (the save dialog appears).
-- [ ] **Disconnect/reconnect** one platform, then **delete account**. The confirmation dialog requires `DELETE`, private data is gone, and uploaded overrides are removed.
+- [ ] **Disconnect/reconnect** one platform, then **delete the profile**. The confirmation dialog requires `DELETE`, private data is gone, and uploaded overrides are removed.
 - [ ] **Single instance:** launching a second copy focuses the first window instead.
 - [ ] **Clean quit:** after closing the window, no `Unified Achievement Manager.exe` or bundled `postgres.exe` remains in Task Manager.
 - [ ] **Crash recovery:** end `Unified Achievement Manager.exe` in Task Manager, then relaunch. It starts normally.

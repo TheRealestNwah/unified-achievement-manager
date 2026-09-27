@@ -44,7 +44,7 @@ function destroyCurrentSession(req: import("express").Request): Promise<void> {
 gamesRouter.delete("/account", requireAuth, async (req, res, next) => {
     try {
         if (req.body?.confirmation !== "DELETE") {
-            return res.status(400).json({ error: 'Type "DELETE" to permanently delete your account.' });
+            return res.status(400).json({ error: 'Type "DELETE" to permanently delete your profile.' });
         }
 
         const result = await deleteUserAccount(req.user!.id);

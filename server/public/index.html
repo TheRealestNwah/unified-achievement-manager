@@ -1398,13 +1398,13 @@
                     </div>
                 </div>
 
-                <h3 class="settings-heading">Account</h3>
+                <h3 class="settings-heading">Profile</h3>
                 <div class="platforms">
                     <div class="platform-row danger-row" id="delete-account-row">
-                        <span class="platform-name">Delete account</span>
-                        <span class="platform-note">Permanently removes your account, linked data, and private overrides. Your SteamGridDB key is kept.</span>
+                        <span class="platform-name">Delete profile</span>
+                        <span class="platform-note">Permanently removes your profile, linked platforms, and private overrides, then starts over at first run. Your Steam Web API and SteamGridDB keys are kept.</span>
                         <div class="platform-actions">
-                            <button type="button" class="secondary danger-btn slot-2" id="delete-account-btn">Delete account</button>
+                            <button type="button" class="secondary danger-btn slot-2" id="delete-account-btn">Delete profile</button>
                         </div>
                     </div>
                 </div>
@@ -4824,14 +4824,14 @@ async function initSearchAcronymsRow() {
 function initAccountDeletion() {
     const button = document.getElementById("delete-account-btn");
     button.addEventListener("click", async () => {
-        const confirmation = await askText("This permanently deletes your account and private data. Type DELETE to continue.", {
-            okLabel: "Delete account",
+        const confirmation = await askText("This permanently deletes your profile and private data. Type DELETE to continue.", {
+            okLabel: "Delete profile",
         });
         if (confirmation === null) return;
         // A wrong entry used to close the dialog with no word at all, which
         // looked like the click was ignored (see #337).
         if (confirmation !== "DELETE") {
-            await showMessage("Your account was not deleted. Type DELETE, in capitals, to confirm.");
+            await showMessage("Your profile was not deleted. Type DELETE, in capitals, to confirm.");
             return;
         }
 
@@ -4845,7 +4845,7 @@ function initAccountDeletion() {
             if (result?.message) await showMessage(result.message);
             location.href = "/";
         } catch (err) {
-            showMessage(err.message || "Couldn't delete your account. Please try again.");
+            showMessage(err.message || "Couldn't delete your profile. Please try again.");
             button.disabled = false;
         }
     });
