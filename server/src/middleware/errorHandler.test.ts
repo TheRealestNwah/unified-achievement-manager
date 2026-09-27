@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DatabaseError } from "pg";
-import { errorResponse } from "./errorHandler";
+import type { NextFunction, Request, Response } from "express";
+import { errorResponse, jsonErrorHandler } from "./errorHandler";
 
 function dbError(code: string, message: string): DatabaseError {
     const err = new DatabaseError(message, message.length, "error");
@@ -27,5 +28,16 @@ describe("errorResponse", () => {
     it("passes other errors' messages through as a 500", () => {
         expect(errorResponse(new Error("Xbox token expired"))).toEqual({ status: 500, error: "Xbox token expired" });
         expect(errorResponse("nope")).toEqual({ status: 500, error: "Internal server error" });
+    });
+});
+
+describe("jsonErrorHandler", () => {
+    it("hands an error after the response was sent to Express instead of writing again (#408)", () => {
+        const res = { headersSent: true, status: vi.fn(), json: vi.fn() };
+        const next = vi.fn();
+        const err = new Error("Cannot use a pool after calling end on the pool");
+        jsonErrorHandler(err, {} as Request, res as unknown as Response, next as NextFunction);
+        expect(next).toHaveBeenCalledWith(err);
+        expect(res.status).not.toHaveBeenCalled();
     });
 });

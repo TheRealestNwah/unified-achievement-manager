@@ -23,7 +23,11 @@ export function errorResponse(err: unknown): { status: number; error: string } {
 // Every route hands failures to next(err); without this, Express's default
 // handler sends an HTML error page, which breaks every fetch()-based call in
 // the dashboard (JSON.parse on "<!DOCTYPE ...").
-export const jsonErrorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+export const jsonErrorHandler: ErrorRequestHandler = (err, _req, res, next) => {
+    // Too late for a JSON body (e.g. the session store failing after the
+    // response went out while the app quits, see #408); Express's own
+    // handler just closes the connection.
+    if (res.headersSent) return next(err);
     const { status, error } = errorResponse(err);
     if (status >= 500) console.error(err);
     res.status(status).json({ error });
