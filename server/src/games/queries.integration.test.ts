@@ -126,4 +126,22 @@ integration("getFunStats tier totals", () => {
         expect(single.visibility).toBe("excluded");
         expect(Number(single.unlocked_achievements)).toBe(1);
     });
+
+    it("leaves a list attached only for rarity data out of the game's total (#344)", async () => {
+        const { getGamesForUser, getGameCompletionCountsForUser } = await import("./queries");
+        const rarityGameId = await canonicalStore.getOrCreateCanonicalGame("steam", "rarity-app", "Rarity Game");
+        await canonicalStore.recordOwnership(accountId, rarityGameId);
+        const steamLink = await canonicalStore.getOrCreateAchievementLink(rarityGameId, "steam", "rarity-app", "r1", "Owned One", undefined, undefined);
+        await canonicalStore.recordUnlock(accountId, steamLink, new Date("2026-03-01T00:00:00Z"));
+        // Catalog enrichment: an Xbox list for the same game, never owned there.
+        await canonicalStore.getOrCreateAchievementLink(rarityGameId, "xbox", "rarity-title", "x1", "Owned One", undefined, 2);
+        await canonicalStore.getOrCreateAchievementLink(rarityGameId, "xbox", "rarity-title", "x2", "Xbox Only", undefined, 3);
+
+        const [game] = await getGamesForUser(userId, { gameId: rarityGameId });
+        expect(game.total_achievements).toBe(1);
+        expect(game.unlocked_achievements).toBe(1);
+        expect(game.platinum_synthetic).toBe(true);
+        const completions = await getGameCompletionCountsForUser(userId);
+        expect(completions).toContainEqual({ totalAchievements: 1, unlockedAchievements: 1, platinumUnlocked: 0 });
+    });
 });
