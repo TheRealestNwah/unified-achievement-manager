@@ -40,9 +40,17 @@ Keeping `tier_source` explicit means you can always answer "why does this achiev
 
 `achievement_match_candidates` holds proposed links between a platform achievement and a canonical achievement, with a `confidence` score and `pending/confirmed/rejected` status. High-confidence matches (e.g. identical name + description) can auto-confirm; low-confidence ones sit for manual review. This keeps the fuzzy-matching algorithm's mistakes correctable without re-scraping anything.
 
-## Game matching has no review queue - it has manual merge instead
+## Game matching auto-merges only exact titles, and queues the rest
 
-Unlike achievements, game matching (`matchGames`, `gameMatcher.ts`) has no candidate/review table - it's exact-normalized-title only, deliberately not fuzzy, since two games with similar titles (`Skyrim` vs `Skyrim Special Edition`) are often genuinely different achievement lists, and a wrong automatic merge is much harder to undo cleanly than a wrong achievement merge. Real formatting differences across platforms (`Skyrim` on PSN vs `The Elder Scrolls V: Skyrim` on Steam) fall outside exact-title matching entirely, so `POST /api/matching/games/merge` exposes the same `mergeGames` function used internally, gated on the requesting user owning both games, for a human to merge by hand from the dashboard's "Link games" mode. It re-runs achievement matching and rarity normalization scoped to just the merged game (`matchAchievementsForGame`/`normalizeRarityTiersForGame`, not the `*ForAllGames` variants) rather than the full `runMatching()` pipeline, since re-scanning the entire library for an interactive single-game merge made the button take ~20 seconds against a 570-game library.
+Game matching (`matchGames`, `gameMatcher.ts`) only auto-merges on an exact normalized title, since two games with similar titles (`Skyrim` vs `Skyrim Special Edition`) are often genuinely different achievement lists, and a wrong automatic merge is much harder to undo cleanly than a wrong achievement merge. Anything riskier goes to `game_merge_candidates` (the Review page's **Game merges** tab) for a human instead:
+
+- An exact title where one side is RetroAchievements or a legacy-only PSN/Xbox release, since a modern remake can share its original's exact name (`Resident Evil 2` 1998 vs. 2019).
+- An exact title that already appears on more than one game on the same platform, the only available sign that it may cover different releases.
+- A near-title match: one title is the other plus an appended suffix (`Grand Theft Auto V` vs. `Grand Theft Auto V: Legacy`).
+
+`game_split_candidates` (the **Possible bad merges** tab) is the other direction: `detectLegacySignalSplitCandidates` flags games that already combine a legacy-signal platform entry with a modern one, the shape auto-merge now refuses to create. Confirming splits that entry back out. Confirmed, rejected, and pending rows are all kept, so a decision isn't asked again.
+
+Title differences too large for either pass (`Skyrim` on PSN vs `The Elder Scrolls V: Skyrim` on Steam) are left to the user. `POST /api/matching/games/merge` exposes the same `mergeGames` function used internally, gated on the requesting user owning both games, for the dashboard's "Link games" mode, and `POST /api/matching/games/:gameId/split` (`splitPlatformLink`, `gameSplitter.ts`) undoes a merge one platform entry at a time. A manual merge re-runs achievement matching and rarity normalization scoped to just the merged game (`matchAchievementsForGame`/`normalizeRarityTiersForGame`, not the `*ForAllGames` variants) rather than the full `runMatching()` pipeline, since re-scanning the entire library for an interactive single-game merge made the button take ~20 seconds against a 570-game library.
 
 ## Scoring counts every unlock, not every achievement
 
@@ -52,7 +60,7 @@ The achievement-detail view (`/api/me/games/:gameId/achievements`) returns one r
 
 ## Scoring is cached, not computed live
 
-`user_scores` holds each user's current `total_points` and `level`, recomputed by a job whenever new unlocks come in — profile pages read the cache, not a live join, so viewing a profile stays cheap.
+`user_scores` holds each user's current `total_points` and `level`, recomputed by a job whenever new unlocks come in (and for everyone when the desktop app starts). The dashboard reads the cache, not a live join, so showing the score stays cheap.
 
 ## Level curve
 

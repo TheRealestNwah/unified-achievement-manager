@@ -18,11 +18,11 @@ Working discipline for unmonitored runs is unchanged: one focused PR per item, `
 |---|---|---|---|
 | 1 | **User auth** | ✅ Done | Steam OpenID login is the identity system (no separate email/password). Sessions persisted in Postgres via `connect-pg-simple` so restarts don't log users out. |
 | 2 | **Steam client** | ✅ Done | Pulls owned games + achievement unlocks via Steam's public API. |
-| 3 | **Game matching job** | ✅ Done | Links each platform's game ID to one canonical `games` row (exact normalized-title matching). |
-| 4 | **Achievement matching job** | ✅ Done | Word-overlap fuzzy match to a canonical row per game; auto-merges at confidence 1.0, queues 0.5–0.99 in `achievement_match_candidates`. A dashboard "Review matches" panel lets you confirm/reject queued candidates by hand. |
+| 3 | **Game matching job** | ✅ Done | Links each platform's game ID to one canonical `games` row (exact normalized-title matching auto-merges; legacy-platform, duplicate, and near-title matches go to review - see [docs/data-model.md](docs/data-model.md)). |
+| 4 | **Achievement matching job** | ✅ Done | Word-overlap fuzzy match to a canonical row per game; auto-merges at confidence 1.0, queues 0.5–0.99 in `achievement_match_candidates`. The Review page lets you confirm/reject queued candidates by hand, alongside the Game merges and Possible bad merges queues. |
 | 5 | **Scoring engine** | ✅ Done | Resolves tier (native/cross-match/rarity fallback, capped at gold) → points → level via `tier_points`/`level_thresholds`; recomputes `user_scores` on new unlocks. Sums *every* unlock across every linked platform — re-earning the same achievement on a second platform (a second platinum, a second 100%) counts again rather than being deduped. The level curve's exponent is fit against a real PSN account's level/points (see `server/src/scoring/levelCurve.ts`) rather than guessed — an earlier guess was off by ~3 orders of magnitude at high levels. |
 | 6 | **Sync pipeline** | ✅ Done | Orchestrates 2–5 for a linked account: fetch unlocks, upsert games/achievements, run matching, trigger scoring. |
-| 7 | **Backend API** | ✅ Done | Serves a user's unified profile (accounts, games, achievements, score, matching) — see README for the endpoint list. |
+| 7 | **Backend API** | ✅ Done | Serves a user's unified profile (accounts, games, achievements, score, matching) — see [docs/development.md](docs/development.md) for the endpoint list. |
 | 8 | **Dashboard UI** | ✅ Done | Combined per-game rows across platforms; expanding a game groups its achievement list by platform so multiple platinums/100%s on the same game each show up distinctly, with PSN's tier borrowed in either group. |
 
 ## P1 — platform expansion
@@ -38,7 +38,7 @@ Working discipline for unmonitored runs is unchanged: one focused PR per item, `
 
 | # | Component | Status | What it does |
 |---|---|---|---|
-| 12 | **Background job scheduler** | ✅ Done | Periodic re-sync of every linked account (`server/src/scheduler.ts`), off by default (`SCHEDULER_ENABLED`/`SCHEDULER_INTERVAL_MINUTES`). One account's sync failing (expired PSN token, revoked key) is logged and skipped rather than aborting the run. Runs matching + rescores everyone once per pass if anything synced. |
+| 12 | **Background job scheduler** | ✅ Done | Periodic re-sync of every linked account (`server/src/scheduler.ts`), on by default in the desktop app (every 6 hours, changeable under Settings → Background sync) and off by default in classic server mode (`SCHEDULER_ENABLED`/`SCHEDULER_INTERVAL_MINUTES`). One account's sync failing (expired PSN token, revoked key) is logged and skipped rather than aborting the run. Runs matching + rescores everyone once per pass if anything synced. |
 | 13 | **Rate-limit/caching layer** | ✅ Done | Steam's global achievement percentages are cached per appid for 24 hours (`steam_global_rarity_cache`), and Steam sync skips games whose playtime and last-played time haven't changed. Xbox sync retries transient 429s with backoff. Inbound API and auth routes are rate-limited (`RATE_LIMIT_*`). |
 | 14 | **Public shareable profiles** | ❌ Removed | Shipped, then removed ([#124](https://github.com/TheRealestNwah/unified-achievement-manager/issues/124)) when 1.0 became a local, single-user desktop app with no shared server for other people to reach. |
 | 15 | **Leaderboards / friend comparison** | ❌ Removed | Same as item 14 ([#124](https://github.com/TheRealestNwah/unified-achievement-manager/issues/124)). |
