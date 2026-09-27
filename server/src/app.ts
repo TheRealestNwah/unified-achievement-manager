@@ -38,6 +38,8 @@ export async function startApp({ dataDir = defaultDataDir(), port }: { dataDir?:
         // touches it may load before the variables above are in place.
         const { applySchema } = await import("./db/migrate");
         await applySchema();
+        const { recomputeAllUserScores } = await import("./scoring");
+        await recomputeAllUserScores();
         const { startServer } = await import("./index");
         const { config } = await import("./config");
         const server = await startServer({ handleSignals: false });

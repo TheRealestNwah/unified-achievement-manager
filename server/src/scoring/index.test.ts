@@ -85,3 +85,19 @@ describe("recomputeUserScore", () => {
         expect(pointsSumCall[0]).toContain("mode = 'excluded'");
     });
 });
+
+describe("recomputeAllUserScores", () => {
+    it("recomputes and stores every user's score (#356)", async () => {
+        const { recomputeAllUserScores } = await import("./index");
+        getGameCompletionCountsForUserMock.mockResolvedValue([]);
+        queueQueryResults(
+            [{ id: "user-1" }, { id: "user-2" }],
+            ...[1, 2].flatMap(() => [[{ total: "100" }], [{ level: 1 }], [], [{ points_required: 0 }], [{ points_required: 500 }]])
+        );
+
+        await recomputeAllUserScores();
+
+        const upserts = queryMock.mock.calls.filter(([sql]) => String(sql).includes("insert into user_scores"));
+        expect(upserts.map(([, params]) => (params as unknown[])[0])).toEqual(["user-1", "user-2"]);
+    });
+});
