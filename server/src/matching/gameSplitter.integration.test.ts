@@ -76,6 +76,9 @@ integration("splitPlatformLink", () => {
              join canonical_achievements ca on ca.id = apl.canonical_achievement_id where ca.name = 'Shared'`
         );
         expect(shared.rows[0].n).toBe(2);
+        // "Xbox only" vs "Steam only" is left waiting for review (see #360).
+        const pending = await pool.query("select 1 from achievement_match_candidates where status = 'pending'");
+        expect(pending.rows).toHaveLength(1);
     });
 
     it("moves the platform entry, its achievements and its owners onto a new game", async () => {
@@ -111,6 +114,10 @@ integration("splitPlatformLink", () => {
             ])
         );
         expect(owners.rows).toHaveLength(2);
+
+        // Its two sides are now in different games, so it's gone (#360).
+        const pending = await pool.query("select 1 from achievement_match_candidates where status = 'pending'");
+        expect(pending.rows).toHaveLength(0);
     });
 
     it("doesn't get merged back by the next matching run", async () => {

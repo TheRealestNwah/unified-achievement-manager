@@ -1,4 +1,5 @@
 import { pool } from "../db";
+import { CROSS_GAME_PENDING_CANDIDATES } from "./achievementMatcher";
 
 export class GameSplitError extends Error {}
 
@@ -125,6 +126,9 @@ export async function splitPlatformLink(gameId: string, gamePlatformLinkId: stri
             [first, second]
         );
 
+        // Matches still waiting for review between the two halves now pair
+        // achievements from different games (see #360).
+        await client.query(`delete from achievement_match_candidates where id in (${CROSS_GAME_PENDING_CANDIDATES})`);
         await client.query("commit");
         return { newGameId, achievementsMoved, achievementsCopied };
     } catch (err) {

@@ -150,6 +150,8 @@ matchingRouter.get("/candidates", requireAuth, async (_req, res, next) => {
             join games g on g.id = source_ca.game_id
             join canonical_achievements target on target.id = amc.candidate_canonical_achievement_id
             where amc.status = 'pending'
+              -- Never offer a pair that spans two games (see #360).
+              and source_ca.game_id = target.game_id
             order by amc.confidence desc
         `);
         res.json(result.rows);
