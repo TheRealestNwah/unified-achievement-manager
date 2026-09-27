@@ -904,6 +904,7 @@
     .review-side-badges { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px; padding-top: 1px; }
     .review-side-name { grid-column: 2; line-height: 1.45; overflow-wrap: anywhere; }
     .review-side .tier-tag { grid-column: 3; justify-self: end; }
+    .review-side-lead { color: var(--text-dim); }
     @media (max-width: 600px) {
         /* Too narrow for a badge column: badges sit above each name. */
         .review-compare.review-pair { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
@@ -3584,12 +3585,20 @@ function bindReviewUndo(panel) {
 }
 
 // The two sides of a review row, stacked one per line (see #315). `badges`
-// and `extra` are already-escaped HTML; `name` is escaped here.
+// and `extra` are already-escaped HTML; `name` and the dimmed `lead` are
+// escaped here.
+// A platform link's badges: one per console when a PSN trophy list spans
+// several ("PS3,PSVITA" - see #327).
+function variantBadges(platformId, variant) {
+    const variants = variant ? String(variant).split(",").map((v) => v.trim()).filter(Boolean) : [];
+    return variants.length ? variants.map((v) => platformBadge(platformId, v)).join("") : platformBadge(platformId);
+}
+
 function reviewPairHtml(a, b) {
-    const side = ({ badges, name, extra = "" }) => `
+    const side = ({ badges, name, lead = "", extra = "" }) => `
                 <span class="review-side">
                     <span class="review-side-badges">${badges}</span>
-                    <span class="review-side-name">${escapeHtml(name)}</span>
+                    <span class="review-side-name">${lead ? `<span class="review-side-lead">${escapeHtml(lead)}</span> ` : ""}${escapeHtml(name)}</span>
                     ${extra}
                 </span>`;
     return `<span class="review-compare review-pair">${side(a)}${side(b)}</span>`;
@@ -3818,13 +3827,14 @@ function renderSplitReviewPanel(candidates) {
             (c) => `
         <div class="review-row" data-id="${c.id}">
             <span class="review-game">${GAME_CANDIDATE_REASON_LABELS[c.reason] || c.reason}</span>
-            <span class="review-compare">
-                ${escapeHtml(c.game_title)}:
-                ${platformBadge(c.candidate_platform, c.candidate_console_variant)}
-                ${escapeHtml(c.candidate_platform_title)}
-                <span class="arrow">merged with</span>
-                ${(c.other_platforms || []).map((p) => platformBadge(p)).join(" ")}
-            </span>
+            ${reviewPairHtml(
+                { badges: variantBadges(c.candidate_platform, c.candidate_console_variant), name: c.candidate_platform_title },
+                {
+                    badges: (c.others || []).map((o) => variantBadges(o.platform, o.variant)).join(""),
+                    lead: "merged with",
+                    name: [...new Set((c.others || []).map((o) => o.title))].join(" / "),
+                }
+            )}
             <span class="review-actions">
                 <button class="confirm" aria-label="Split ${escapeHtml(c.candidate_platform_title)} out of ${escapeHtml(c.game_title)}">Split apart</button>
                 <button class="reject" aria-label="Keep ${escapeHtml(c.candidate_platform_title)} merged into ${escapeHtml(c.game_title)}">Keep merged</button>

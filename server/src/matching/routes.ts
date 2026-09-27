@@ -322,8 +322,11 @@ matchingRouter.get("/game-split-candidates", requireAuth, async (_req, res, next
                 gpl.platform_id as candidate_platform,
                 gpl.console_variant as candidate_console_variant,
                 gpl.platform_title as candidate_platform_title,
-                (select array_agg(distinct platform_id || coalesce(' (' || console_variant || ')', ''))
-                 from game_platform_links where game_id = g.id and id != gsc.game_platform_link_id) as other_platforms
+                -- What the release is merged with, titles included, so the
+                -- reviewer can see what a split would separate (see #327).
+                (select coalesce(json_agg(json_build_object('platform', o.platform_id, 'variant', o.console_variant, 'title', o.platform_title)
+                                          order by o.platform_id, o.platform_title), '[]'::json)
+                 from game_platform_links o where o.game_id = g.id and o.id != gsc.game_platform_link_id) as others
             from game_split_candidates gsc
             join games g on g.id = gsc.game_id
             join game_platform_links gpl on gpl.id = gsc.game_platform_link_id
