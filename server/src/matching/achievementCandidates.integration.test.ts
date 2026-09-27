@@ -74,4 +74,36 @@ integration("bulk achievement-candidate review (#252)", () => {
         await matcher.matchAchievementsForGame(game);
         expect(await rows()).toEqual([{ id: only.id, status: "rejected" }]);
     });
+
+    it("merges names that match once Xbox's per-game tag is removed, unless the name is ambiguous (#357)", async () => {
+        const game = await canonicalStore.getOrCreateCanonicalGame("steam", "tag-app", "FFX/X-2");
+        const steam = ["Mega Strike", "All Together", "Learning!", "Sphere Hunter", "Sphere Hunter"];
+        const xbox = ["FFX: Mega Strike", "FFX: All Together", "FFX: Learning!", "FFX: Sphere Hunter", "FFX-2: Sphere Hunter", "FFX-2: Teamwork!", "FFX-2: Just Starting"];
+        for (const [i, name] of steam.entries()) await canonicalStore.getOrCreateAchievementLink(game, "steam", "tag-app", `s${i}`, name, undefined, undefined);
+        for (const [i, name] of xbox.entries()) await canonicalStore.getOrCreateAchievementLink(game, "xbox", "tag-title", `x${i}`, name, undefined, undefined);
+
+        await matcher.matchAchievementsForGame(game);
+
+        const platformsByName = async (name: string) =>
+            (
+                await pool.query(
+                    `select array_agg(apl.platform_id order by apl.platform_id) as platforms
+                     from canonical_achievements ca join achievement_platform_links apl on apl.canonical_achievement_id = ca.id
+                     where ca.game_id = $1 and ca.name = $2 group by ca.id`,
+                    [game, name]
+                )
+            ).rows.map((r) => r.platforms);
+        for (const name of ["Mega Strike", "All Together", "Learning!"]) expect(await platformsByName(name)).toEqual([["steam", "xbox"]]);
+        // Two Steam "Sphere Hunter"s and two tagged Xbox ones: left for review.
+        expect(await platformsByName("Sphere Hunter")).toEqual([["steam"], ["steam"]]);
+    });
+
+    it("keeps an ordinary exact name match auto-merging", async () => {
+        const game = await canonicalStore.getOrCreateCanonicalGame("steam", "plain-app", "Plain Game");
+        await canonicalStore.getOrCreateAchievementLink(game, "steam", "plain-app", "s1", "First Blood", undefined, undefined);
+        const xboxLink = await canonicalStore.getOrCreateAchievementLink(game, "xbox", "plain-title", "x1", "First Blood", undefined, undefined);
+        await matcher.matchAchievementsForGame(game);
+        const status = await pool.query("select status from achievement_match_candidates where achievement_platform_link_id = $1", [xboxLink]);
+        expect(status.rows).toEqual([{ status: "confirmed" }]);
+    });
 });

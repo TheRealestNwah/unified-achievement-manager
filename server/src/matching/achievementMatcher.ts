@@ -1,5 +1,6 @@
 import { pool } from "../db";
-import { wordOverlapScore } from "./normalize";
+import { normalize, wordOverlapScore } from "./normalize";
+import { countStrippedNames, stripListTags } from "./achievementTags";
 import { resolveTierFromRarity } from "../scoring/tier";
 import { deleteIfUploaded } from "../games/uploads";
 
@@ -42,6 +43,21 @@ export async function matchAchievementsForAllGames(): Promise<AchievementMatchRe
     return { gamesProcessed: games.rows.length, achievementsMerged, candidatesRecorded };
 }
 
+// Each link's name with its platform list's per-game tag removed (see #357).
+function strippedNamesByLink(achievements: AchievementRow[]): Map<string, string> {
+    const byPlatform = new Map<string, AchievementRow[]>();
+    for (const a of achievements) {
+        if (!byPlatform.has(a.platformId)) byPlatform.set(a.platformId, []);
+        byPlatform.get(a.platformId)!.push(a);
+    }
+    const stripped = new Map<string, string>();
+    for (const rows of byPlatform.values()) {
+        const names = stripListTags(rows.map((r) => r.name));
+        rows.forEach((row, i) => stripped.set(row.linkId, names[i]));
+    }
+    return stripped;
+}
+
 async function getAchievements(gameId: string): Promise<AchievementRow[]> {
     const result = await pool.query(
         `select ca.id as canonical_id, apl.id as link_id, apl.platform_id, ca.name
@@ -75,6 +91,10 @@ export async function matchAchievementsForGame(gameId: string): Promise<{ merged
         const basePool = achievements.filter((a) => seenPlatforms.includes(a.platformId));
         const incoming = achievements.filter((a) => a.platformId === platforms[i]);
         const consumed = new Set<string>();
+        const stripped = strippedNamesByLink(achievements);
+        const baseNameCounts = countStrippedNames(basePool.map((a) => ({ key: a.canonicalId, stripped: stripped.get(a.linkId)! })));
+        const incomingNameCounts = countStrippedNames(incoming.map((a) => ({ key: a.canonicalId, stripped: stripped.get(a.linkId)! })));
+        const isUnique = (counts: Map<string, number>, name: string) => counts.get(normalize(name)) === 1;
 
         for (const candidate of incoming) {
             // Already the same canonical achievement as something in the base
@@ -91,7 +111,23 @@ export async function matchAchievementsForGame(gameId: string): Promise<{ merged
             let best: { row: AchievementRow; score: number } | null = null;
             for (const base of basePool) {
                 if (consumed.has(base.canonicalId)) continue;
-                const score = wordOverlapScore(candidate.name, base.name);
+                const candidateRest = stripped.get(candidate.linkId)!;
+                const baseRest = stripped.get(base.linkId)!;
+                let score = wordOverlapScore(candidate.name, base.name);
+                if (score < AUTO_MERGE_THRESHOLD) {
+                    // Names that are the same once a per-game tag is removed
+                    // (see #357) only count as exact when that name is
+                    // unambiguous on both sides - a collection's games can
+                    // share one. Otherwise the tagless score can still make
+                    // it a likelier candidate, short of an auto-merge.
+                    const exactWithoutTags =
+                        normalize(candidateRest) === normalize(baseRest) &&
+                        isUnique(incomingNameCounts, candidateRest) &&
+                        isUnique(baseNameCounts, baseRest);
+                    score = exactWithoutTags
+                        ? AUTO_MERGE_THRESHOLD
+                        : Math.max(score, Math.min(wordOverlapScore(candidateRest, baseRest), 0.99));
+                }
                 if (!best || score > best.score) best = { row: base, score };
             }
 
