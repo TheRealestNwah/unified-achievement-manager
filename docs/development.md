@@ -62,17 +62,20 @@ Integration tests need `INTEGRATION_TESTS=true` and a `DATABASE_URL` for a throw
 - **Data folder:** `secrets.json` holds the session secret and the credential-encryption key, generated once on first run and never regenerated. `database.json` holds the embedded database password. `postgres/` is the PostgreSQL cluster, `uploads/` holds cover and icon overrides, and `logs/main.log` is the app log.
 - **Database:** PostgreSQL 17 from the `@embedded-postgres/*` binary packages, driven through `pg_ctl` (`server/src/runtime/embeddedDatabase.ts`). It listens on `127.0.0.1` at a free port and is fast-stopped on quit. An instance orphaned by a crash is stopped on the next launch, and by the installer and uninstaller.
 - **Server:** binds `127.0.0.1` on the port saved in `app.json`, or a new free port (then saved) when that one is taken. Keeping the port stable keeps the dashboard's origin stable, so its `localStorage` preferences survive restarts. Rate limits are loose, since only this machine can reach the server, and background sync runs every 6 hours until the user changes it. `.env` files are ignored.
-- **Window:** Steam OpenID sign-in stays in the window so the session cookie lands in the app. Every other link opens in the system browser.
+- **Profile, no sign-in:** the app has one local profile, named on first run. A request without a session is signed in as it (`server/src/middleware/localProfileSession.ts`). That's only safe because the server listens on `127.0.0.1` and refuses any request whose `Host` isn't `127.0.0.1` or `localhost` on its own port, which stops a web page that points its own domain at this machine (DNS rebinding). A database from before the profile adopts its existing user.
+- **Window:** connecting Steam stays in the window, so the Steam OpenID return lands in the app's session and links to the profile. Every other link opens in the system browser.
 
 ## HTTP API
 
-The dashboard is a thin client over these routes. Everything needs the signed-in session unless noted, and state-changing requests need the `X-CSRF-Token` from `GET /api/setup/status` or `GET /auth/csrf-token`.
+The dashboard is a thin client over these routes. Everything needs the profile to exist unless noted (every request is signed in as it then), and state-changing requests need the `X-CSRF-Token` from `GET /api/setup/status` or `GET /auth/csrf-token`.
 
-**Sign-in and setup**
+**Profile and setup**
 
-- `GET /auth/steam`: Steam OpenID sign-in; `GET /auth/me`: the signed-in user; `POST /auth/logout`
-- `GET /api/setup/status`: whether a Steam Web API key is configured, plus a CSRF token (works before sign-in)
-- `PUT /api/setup/steam-api-key` (body: `{ apiKey }`): set the Steam Web API key (open until one exists; replacing it needs a session)
+- `GET /api/setup/status`: whether the profile exists and a Steam Web API key is configured, plus a CSRF token (works before there's a profile)
+- `POST /api/setup/profile` (body: `{ displayName }`): first run only; creates the profile (409 once one exists)
+- `GET /auth/me`: the profile
+- `GET /auth/steam`: connect Steam. Steam's OpenID page confirms the account, and `/auth/steam/return` links it to the profile (needs a Steam Web API key)
+- `PUT /api/setup/steam-api-key` (body: `{ apiKey }`): set the Steam Web API key, which is checked with Steam first
 - `GET /api/setup/desktop-settings`, `GET /api/setup/new-unlocks` (query: `since`), `GET /api/setup/discord-presence-data`: read by the Electron main process, which has no session cookie, so they're unauthenticated. Safe only because the server binds `127.0.0.1`
 
 **Platforms**
@@ -82,7 +85,7 @@ The dashboard is a thin client over these routes. Everything needs the signed-in
 - `POST /api/steam/sync`, `POST /api/xbox/sync`, `POST /api/psn/sync`, `POST /api/retro/sync`, `POST /api/gog/sync`: pull each platform's library and unlocks, and recompute the score
 - `GET /api/me/accounts`: linked platforms, when each last synced, and whether a sync is running
 - `GET /api/me/sync-status`: a cheap "anything new since I last looked" check the dashboard polls, plus the next scheduled sync and which platforms are syncing now
-- `DELETE /api/me/accounts/:platformId`: disconnect a platform (not Steam) and remove its synced data
+- `DELETE /api/me/accounts/:platformId`: disconnect a platform and remove its synced data
 
 **Library**
 

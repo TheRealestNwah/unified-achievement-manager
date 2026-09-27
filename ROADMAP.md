@@ -2,7 +2,7 @@
 
 ## Next up
 
-1.0 ships as a standalone Windows desktop app: an Electron shell around the server, with its own bundled PostgreSQL, a first-run Steam key setup, and an installer built and smoke-tested in CI ([#124](https://github.com/TheRealestNwah/unified-achievement-manager/issues/124)–[#129](https://github.com/TheRealestNwah/unified-achievement-manager/issues/129)). What remains is getting it out the door: **run the live parts of the [1.0 release checklist](docs/release-checklist.md)** on a real Windows machine (Steam sign-in, every platform, sync twice, disconnect/reconnect, crash recovery, uninstall/reinstall), then tag once approved.
+1.0 ships as a standalone Windows desktop app: an Electron shell around the server, with its own bundled PostgreSQL, a first-run profile setup, and an installer built and smoke-tested in CI ([#124](https://github.com/TheRealestNwah/unified-achievement-manager/issues/124)–[#129](https://github.com/TheRealestNwah/unified-achievement-manager/issues/129)). What remains is getting it out the door: **run the live parts of the [1.0 release checklist](docs/release-checklist.md)** on a real Windows machine (Steam sign-in, every platform, sync twice, disconnect/reconnect, crash recovery, uninstall/reinstall), then tag once approved.
 
 After 1.0: code-sign the installer (removes the SmartScreen warning) and macOS/Linux builds. Auto-update from GitHub Releases is built ([#314](https://github.com/TheRealestNwah/unified-achievement-manager/issues/314)) and takes effect from the first release after 1.0.0. The code is already cross-platform apart from the installer.
 
@@ -16,7 +16,7 @@ Working discipline for unmonitored runs is unchanged: one focused PR per item, `
 
 | # | Component | Status | What it does |
 |---|---|---|---|
-| 1 | **User auth** | ✅ Done | Steam OpenID login is the identity system (no separate email/password). Sessions persisted in Postgres via `connect-pg-simple` so restarts don't log users out. |
+| 1 | **User auth** | ✅ Done | A local profile, named on first run, with no sign-in ([#393](https://github.com/TheRealestNwah/unified-achievement-manager/issues/393)). Steam OpenID was the identity until then; now it only confirms which Steam account to link. |
 | 2 | **Steam client** | ✅ Done | Pulls owned games + achievement unlocks via Steam's public API. |
 | 3 | **Game matching job** | ✅ Done | Links each platform's game ID to one canonical `games` row (exact normalized-title matching auto-merges; legacy-platform, duplicate, and near-title matches go to review - see [docs/data-model.md](docs/data-model.md)). |
 | 4 | **Achievement matching job** | ✅ Done | Word-overlap fuzzy match to a canonical row per game; auto-merges at confidence 1.0, queues 0.5–0.99 in `achievement_match_candidates`. The Review page lets you confirm/reject queued candidates by hand, alongside the Game merges and Possible bad merges queues. |

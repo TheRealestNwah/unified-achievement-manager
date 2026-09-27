@@ -1,5 +1,5 @@
 import passport from "passport";
-import { Strategy as SteamStrategy, SteamProfile } from "passport-steam";
+import { Strategy as SteamStrategy } from "passport-steam";
 import { config } from "../config";
 import { pool } from "../db";
 
@@ -16,38 +16,12 @@ passport.deserializeUser(async (id: string, done) => {
     }
 });
 
-async function findOrCreateSteamUser(profile: SteamProfile): Promise<Express.User> {
-    const steamId = profile.id;
-
-    const existing = await pool.query(
-        `select u.* from users u
-         join user_platform_accounts upa on upa.user_id = u.id
-         where upa.platform_id = 'steam' and upa.platform_account_id = $1`,
-        [steamId]
-    );
-    if (existing.rows[0]) return existing.rows[0];
-
-    const client = await pool.connect();
-    try {
-        await client.query("begin");
-        const userResult = await client.query(
-            "insert into users (username) values ($1) returning *",
-            [profile.displayName]
-        );
-        const user = userResult.rows[0];
-        await client.query(
-            `insert into user_platform_accounts (user_id, platform_id, platform_account_id, display_name)
-             values ($1, 'steam', $2, $3)`,
-            [user.id, steamId, profile.displayName]
-        );
-        await client.query("commit");
-        return user;
-    } catch (err) {
-        await client.query("rollback");
-        throw err;
-    } finally {
-        client.release();
-    }
+// What Steam's OpenID page tells us: which Steam account the user proved is
+// theirs. Used with passport.authorize, so it lands on req.account and never
+// replaces the signed-in local profile (see #393).
+export interface SteamIdentity {
+    steamId: string;
+    displayName: string;
 }
 
 // Re-registered whenever the Steam Web API key changes; passport replaces a
@@ -61,9 +35,8 @@ export function configureSteamStrategy(apiKey: string): void {
                 apiKey,
             },
             (_identifier, profile, done) => {
-                findOrCreateSteamUser(profile)
-                    .then((user) => done(null, user))
-                    .catch((err) => done(err));
+                const identity: SteamIdentity = { steamId: profile.id, displayName: profile.displayName };
+                done(null, identity);
             }
         )
     );

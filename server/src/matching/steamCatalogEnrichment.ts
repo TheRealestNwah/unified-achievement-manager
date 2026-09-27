@@ -2,6 +2,7 @@ import { pool } from "../db";
 import { searchApps, getSchemaForGame, getGlobalAchievementPercentages } from "../steam/client";
 import { getOrCreateAchievementLink } from "../sync/canonicalStore";
 import { normalize } from "./normalize";
+import { hasSteamApiKey } from "../settings/steamApiKey";
 
 export interface SteamCatalogEnrichmentResult {
     gamesEnriched: number;
@@ -16,6 +17,10 @@ export interface SteamCatalogEnrichmentResult {
 // achievement bronze despite Steam publishing real per-achievement unlock
 // rates for the same game.
 export async function enrichGamesWithSteamCatalog(): Promise<SteamCatalogEnrichmentResult> {
+    // The Steam key is optional since Steam stopped being the sign-in (see
+    // #393). Nothing is recorded as attempted, so adding a key later still
+    // enriches these games.
+    if (!hasSteamApiKey()) return { gamesEnriched: 0 };
     const candidates = await pool.query(`
         select distinct g.id, g.title
         from games g

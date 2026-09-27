@@ -61,7 +61,8 @@ function isAppUrl(url: string): boolean {
 }
 
 // Steam's OpenID sign-in has to happen inside the app window so the session
-// cookie it ends with lands in the app, not in the user's browser.
+// it returns to is the app's own, and Steam gets linked to the profile (see #393)
+// rather than ending up in the user's browser.
 function isSteamSignIn(url: string): boolean {
     try {
         const parsed = new URL(url);

@@ -20,6 +20,7 @@ import { startScheduler } from "./scheduler";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { csrfProtection } from "./middleware/csrf";
+import { requireLocalHost, signInLocalProfile } from "./middleware/localProfileSession";
 import { nonceMiddleware } from "./middleware/nonce";
 import { jsonErrorHandler } from "./middleware/errorHandler";
 import { sendPageWithNonce } from "./staticPages";
@@ -28,6 +29,7 @@ import { Server } from "node:http";
 export const app = express();
 
 app.disable("x-powered-by");
+app.use(requireLocalHost(config.port));
 app.use(nonceMiddleware);
 app.use(
     helmet({
@@ -100,6 +102,7 @@ app.use(
 app.use(csrfProtection);
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(signInLocalProfile);
 
 app.use("/auth", authRateLimit);
 app.use("/api", apiRateLimit);

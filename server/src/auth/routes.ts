@@ -1,28 +1,29 @@
 import { Router } from "express";
-import { passport } from "./passport";
+import { passport, SteamIdentity } from "./passport";
 import { getCsrfToken } from "../middleware/csrf";
 import { requireAuth } from "../middleware/requireAuth";
 import { hasSteamApiKey } from "../settings/steamApiKey";
+import { linkSteamAccount, SteamLinkError } from "./steamLink";
 
 export const authRouter = Router();
 
-// No strategy is registered until a Steam Web API key exists; send the user
-// back to the dashboard's setup screen instead of a passport error.
-authRouter.use("/steam", (_req, res, next) => (hasSteamApiKey() ? next() : res.redirect("/")));
+// Connecting Steam (see #393): Steam's OpenID page proves which Steam account
+// is the user's, and it's linked to the local profile. There's no strategy
+// until a Steam Web API key exists, so without one, go back to the dashboard.
+authRouter.use("/steam", requireAuth, (_req, res, next) => (hasSteamApiKey() ? next() : res.redirect("/")));
 
-authRouter.get("/steam", passport.authenticate("steam"));
+authRouter.get("/steam", passport.authorize("steam"));
 
-authRouter.get(
-    "/steam/return",
-    passport.authenticate("steam", { failureRedirect: "/" }),
-    (_req, res) => res.redirect("/")
-);
-
-authRouter.post("/logout", (req, res, next) => {
-    req.logout((err) => {
-        if (err) return next(err);
-        res.status(204).end();
-    });
+authRouter.get("/steam/return", passport.authorize("steam", { failureRedirect: "/?steam=failed" }), async (req, res, next) => {
+    try {
+        // passport.authorize puts the Steam identity here, off the session.
+        const identity = (req as typeof req & { account: SteamIdentity }).account;
+        await linkSteamAccount(req.user!.id, identity);
+        res.redirect("/");
+    } catch (err) {
+        if (err instanceof SteamLinkError) return res.redirect(`/?steam=${encodeURIComponent(err.message)}`);
+        next(err);
+    }
 });
 
 authRouter.get("/me", requireAuth, (req, res) => {
