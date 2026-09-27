@@ -25,7 +25,28 @@ export interface PlatformAccountRow {
 // Shared by each platform's own /sync route and the background scheduler
 // (scheduler.ts) so this per-platform logic - including PSN's token refresh -
 // only lives in one place.
-export async function runAccountSync(account: PlatformAccountRow): Promise<SyncSummary> {
+//
+// One sync per account at a time (see #323): pressing Sync while the
+// scheduler is already working through that account joins the running sync
+// and gets its result, instead of starting a second full pass against the
+// platform's API. In-memory is enough - app mode and the classic server are
+// each a single process.
+const inFlight = new Map<string, Promise<SyncSummary>>();
+
+// Accounts with a sync under way right now, for the dashboard (see #322).
+export function syncingAccountIds(): Set<string> {
+    return new Set(inFlight.keys());
+}
+
+export function runAccountSync(account: PlatformAccountRow): Promise<SyncSummary> {
+    const running = inFlight.get(account.id);
+    if (running) return running;
+    const sync = syncAndRecord(account).finally(() => inFlight.delete(account.id));
+    inFlight.set(account.id, sync);
+    return sync;
+}
+
+async function syncAndRecord(account: PlatformAccountRow): Promise<SyncSummary> {
     try {
         const summary = await syncByPlatform(account);
         await pool.query("update user_platform_accounts set last_sync_error = null, last_sync_error_at = null where id = $1", [account.id]);
