@@ -1,6 +1,7 @@
 import { pool } from "../db";
 import { wordOverlapScore } from "./normalize";
 import { resolveTierFromRarity } from "../scoring/tier";
+import { deleteIfUploaded } from "../games/uploads";
 
 const AUTO_MERGE_THRESHOLD = 1.0; // exact normalized name match, for now
 const CANDIDATE_THRESHOLD = 0.5; // below this isn't worth recording as a maybe
@@ -182,8 +183,30 @@ export async function mergeAchievements(idA: string, idB: string): Promise<void>
             }
         }
 
+        // Carry each user's custom icon for the loser over to the winner (see
+        // #342) - the on-delete-cascade FK would otherwise drop it silently.
+        // Where the user already has one on the winner, that one stays.
+        const droppedIcons = await client.query(
+            `select loser.icon_url from user_achievement_icon_overrides loser
+             where loser.canonical_achievement_id = $2
+               and exists (
+                   select 1 from user_achievement_icon_overrides x
+                   where x.user_id = loser.user_id and x.canonical_achievement_id = $1
+               )`,
+            [winnerId, loserId]
+        );
+        await client.query(
+            `insert into user_achievement_icon_overrides (user_id, canonical_achievement_id, icon_url)
+             select user_id, $1, icon_url from user_achievement_icon_overrides where canonical_achievement_id = $2
+             on conflict (user_id, canonical_achievement_id) do nothing`,
+            [winnerId, loserId]
+        );
+
         await client.query("delete from canonical_achievements where id = $1", [loserId]);
         await client.query("commit");
+        // An uploaded icon that lost out to one already on the winner has
+        // nothing pointing at it any more.
+        for (const row of droppedIcons.rows) deleteIfUploaded(row.icon_url);
     } catch (err) {
         await client.query("rollback");
         throw err;
