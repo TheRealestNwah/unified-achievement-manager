@@ -91,3 +91,11 @@ async function getScoreBreakdown(totalPoints: number, level: number): Promise<Us
         pointsForNextLevel: nextThreshold.rows[0] ? Number(nextThreshold.rows[0].points_required) : null,
     };
 }
+
+// Every user's score, from scratch. The desktop app runs this at startup
+// (see #356) so an update that changes how points are counted shows up in
+// the level straight away, not only after the next sync.
+export async function recomputeAllUserScores(): Promise<void> {
+    const users = await pool.query("select id from users");
+    for (const user of users.rows) await recomputeUserScore(user.id);
+}
