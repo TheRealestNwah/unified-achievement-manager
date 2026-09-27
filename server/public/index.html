@@ -2016,7 +2016,7 @@ function renderStats(stats) {
             statCard(
                 "Rarest achievement owned",
                 escapeHtml(r.name),
-                `${gameTitleLink(r.game_id, r.game_title)} (${r.platform_id}) — ${Number(r.global_unlock_rarity).toFixed(2)}% of players`
+                `${gameTitleLink(r.game_id, r.game_title)} (${escapeHtml(PLATFORM_FULL_NAMES[r.platform_id] || r.platform_id)}) — ${Number(r.global_unlock_rarity).toFixed(2)}% of players`
             )
         );
     }
@@ -3519,7 +3519,9 @@ async function useGameTitleFrom(gameId, link, button) {
 }
 
 async function splitPlatformLink(gameId, link, button) {
-    if (!await askConfirm(`Split "${link.platform_title}" (${link.platform_id}) back out into its own game? Your unlocks stay as they are.`, { okLabel: "Split" })) return;
+    // The console ("PS4") where there is one, like the list's badge.
+    const platformName = link.console_variant ? platformBadgeText(link.platform_id, link.console_variant) : PLATFORM_FULL_NAMES[link.platform_id] || link.platform_id;
+    if (!await askConfirm(`Split "${link.platform_title}" (${platformName}) back out into its own game? Your unlocks stay as they are.`, { okLabel: "Split" })) return;
     const status = document.getElementById("match-status");
     button.disabled = true;
     try {
