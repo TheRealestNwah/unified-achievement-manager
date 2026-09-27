@@ -210,6 +210,18 @@ where apl.id = amc.achievement_platform_link_id
   and amc.status = 'pending'
   and source.game_id <> target.game_id;
 
+-- Pending matches whose target already has a different achievement from the
+-- source's own list, queued before matching skipped them (see #362).
+-- Confirming one would fuse two achievements from one list.
+delete from achievement_match_candidates amc
+using achievement_platform_links source, achievement_platform_links other
+where source.id = amc.achievement_platform_link_id
+  and other.canonical_achievement_id = amc.candidate_canonical_achievement_id
+  and other.platform_id = source.platform_id
+  and other.platform_game_id = source.platform_game_id
+  and other.id <> source.id
+  and amc.status = 'pending';
+
 -- Whole-game merges a matching pass has proposed but won't perform
 -- automatically, because the signal isn't strong enough to trust without a
 -- human - either an exact-title match that involves RetroAchievements (a
@@ -418,6 +430,71 @@ insert into platforms (id, name, has_native_tiers) values
     ('retroachievements', 'RetroAchievements', false),
     ('gog', 'GOG', false)
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Data repairs
+-- ---------------------------------------------------------------------------
+
+-- Achievement links whose platform list belongs to a different game than
+-- their canonical achievement (see #363), left by early merge/split code.
+-- The list's game never shows them, while the score still counts their
+-- unlocks. Each such group gets its own canonical achievement on the list's
+-- game, or the row itself moves there when nothing stays behind. Unlocks
+-- are keyed by link id, so none are lost.
+do $$
+declare
+    stray record;
+    copy_id uuid;
+    repaired boolean := false;
+begin
+    for stray in
+        select distinct apl.canonical_achievement_id as id, gpl.game_id as list_game_id
+        from achievement_platform_links apl
+        join canonical_achievements ca on ca.id = apl.canonical_achievement_id
+        join game_platform_links gpl
+          on gpl.platform_id = apl.platform_id and gpl.platform_game_id = apl.platform_game_id
+        where gpl.game_id <> ca.game_id
+    loop
+        repaired := true;
+        if not exists (
+            select 1 from achievement_platform_links apl
+            where apl.canonical_achievement_id = stray.id
+              and not exists (
+                  select 1 from game_platform_links gpl
+                  where gpl.platform_id = apl.platform_id and gpl.platform_game_id = apl.platform_game_id
+                    and gpl.game_id = stray.list_game_id
+              )
+        ) then
+            update canonical_achievements set game_id = stray.list_game_id where id = stray.id;
+            continue;
+        end if;
+
+        insert into canonical_achievements (game_id, name, description, tier, tier_source, points, icon_url)
+        select stray.list_game_id, name, description, tier, tier_source, points, icon_url
+        from canonical_achievements where id = stray.id
+        returning id into copy_id;
+        update achievement_platform_links apl set canonical_achievement_id = copy_id
+        where apl.canonical_achievement_id = stray.id
+          and exists (
+              select 1 from game_platform_links gpl
+              where gpl.platform_id = apl.platform_id and gpl.platform_game_id = apl.platform_game_id
+                and gpl.game_id = stray.list_game_id
+          );
+        insert into user_achievement_icon_overrides (user_id, canonical_achievement_id, icon_url)
+        select user_id, copy_id, icon_url from user_achievement_icon_overrides where canonical_achievement_id = stray.id;
+    end loop;
+
+    -- Pending matches this left spanning two games (see #360).
+    if repaired then
+        delete from achievement_match_candidates amc
+        using achievement_platform_links apl, canonical_achievements source, canonical_achievements target
+        where apl.id = amc.achievement_platform_link_id
+          and source.id = apl.canonical_achievement_id
+          and target.id = amc.candidate_canonical_achievement_id
+          and amc.status = 'pending'
+          and source.game_id <> target.game_id;
+    end if;
+end $$;
 
 -- Whitespace some platforms pad titles and names with (see #364), trimmed
 -- as they're stored now (chr(160) is a no-break space). The raw

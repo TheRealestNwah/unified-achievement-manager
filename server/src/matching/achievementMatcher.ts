@@ -16,6 +16,20 @@ export const CROSS_GAME_PENDING_CANDIDATES = `
     where amc.status = 'pending' and source.game_id <> target.game_id
 `;
 
+// A pending match whose target already has a different achievement from the
+// source's own list (see #362). A list never holds the same achievement
+// twice, so it can't be right, and confirming it would fuse the two.
+export const SAME_LIST_PENDING_CANDIDATES = `
+    select amc.id
+    from achievement_match_candidates amc
+    join achievement_platform_links source on source.id = amc.achievement_platform_link_id
+    join achievement_platform_links other
+      on other.canonical_achievement_id = amc.candidate_canonical_achievement_id
+     and other.platform_id = source.platform_id and other.platform_game_id = source.platform_game_id
+     and other.id <> source.id
+    where amc.status = 'pending'
+`;
+
 const AUTO_MERGE_THRESHOLD = 1.0; // exact normalized name match, for now
 const CANDIDATE_THRESHOLD = 0.5; // below this isn't worth recording as a maybe
 
@@ -23,6 +37,7 @@ interface AchievementRow {
     canonicalId: string;
     linkId: string;
     platformId: string;
+    platformGameId: string;
     name: string;
 }
 
@@ -72,7 +87,7 @@ function strippedNamesByLink(achievements: AchievementRow[]): Map<string, string
 
 async function getAchievements(gameId: string): Promise<AchievementRow[]> {
     const result = await pool.query(
-        `select ca.id as canonical_id, apl.id as link_id, apl.platform_id, ca.name
+        `select ca.id as canonical_id, apl.id as link_id, apl.platform_id, apl.platform_game_id, ca.name
          from canonical_achievements ca
          join achievement_platform_links apl on apl.canonical_achievement_id = ca.id
          where ca.game_id = $1`,
@@ -82,6 +97,7 @@ async function getAchievements(gameId: string): Promise<AchievementRow[]> {
         canonicalId: r.canonical_id,
         linkId: r.link_id,
         platformId: r.platform_id,
+        platformGameId: r.platform_game_id,
         name: r.name,
     }));
 }
@@ -94,7 +110,7 @@ export async function matchAchievementsForGame(gameId: string): Promise<{ merged
     const platforms = [...new Set(achievements.map((a) => a.platformId))];
 
     let merged = 0;
-    let candidates = 0;
+    const proposed = new Set<string>();
 
     // Fold each platform's achievements into a running pool one at a time,
     // matching against whatever's accumulated from earlier platforms so far.
@@ -107,6 +123,15 @@ export async function matchAchievementsForGame(gameId: string): Promise<{ merged
         const baseNameCounts = countStrippedNames(basePool.map((a) => ({ key: a.canonicalId, stripped: stripped.get(a.linkId)! })));
         const incomingNameCounts = countStrippedNames(incoming.map((a) => ({ key: a.canonicalId, stripped: stripped.get(a.linkId)! })));
         const isUnique = (counts: Map<string, number>, name: string) => counts.get(normalize(name)) === 1;
+        // A list never holds the same achievement twice, so a canonical
+        // achievement that already has one from the incoming list is never a
+        // match for another (see #362) - whichever order the rows come in.
+        const listKey = (a: AchievementRow) => `${a.platformId}:${a.platformGameId}`;
+        const listsByCanonical = new Map<string, Set<string>>();
+        for (const a of achievements) {
+            if (!listsByCanonical.has(a.canonicalId)) listsByCanonical.set(a.canonicalId, new Set());
+            listsByCanonical.get(a.canonicalId)!.add(listKey(a));
+        }
 
         for (const candidate of incoming) {
             // Already the same canonical achievement as something in the base
@@ -123,6 +148,7 @@ export async function matchAchievementsForGame(gameId: string): Promise<{ merged
             let best: { row: AchievementRow; score: number } | null = null;
             for (const base of basePool) {
                 if (consumed.has(base.canonicalId)) continue;
+                if (listsByCanonical.get(base.canonicalId)!.has(listKey(candidate))) continue;
                 const candidateRest = stripped.get(candidate.linkId)!;
                 const baseRest = stripped.get(base.linkId)!;
                 let score = wordOverlapScore(candidate.name, base.name);
@@ -147,17 +173,29 @@ export async function matchAchievementsForGame(gameId: string): Promise<{ merged
                 await recordCandidate(candidate.linkId, best.row.canonicalId, best.score, "confirmed");
                 await mergeAchievements(best.row.canonicalId, candidate.canonicalId);
                 consumed.add(best.row.canonicalId);
+                listsByCanonical.get(best.row.canonicalId)!.add(listKey(candidate));
                 merged++;
             } else if (best && best.score >= CANDIDATE_THRESHOLD) {
                 await recordCandidate(candidate.linkId, best.row.canonicalId, best.score, "pending");
-                candidates++;
+                proposed.add(candidate.linkId);
             }
         }
 
         achievements = await getAchievements(gameId); // ids shift after merges
     }
 
-    return { merged, candidates };
+    // An exact match later in the same pass can give a target the list an
+    // earlier near-match came from, so sweep those out once merging is done.
+    const dropped = await pool.query(
+        `delete from achievement_match_candidates
+         where id in (${SAME_LIST_PENDING_CANDIDATES})
+           and candidate_canonical_achievement_id in (select id from canonical_achievements where game_id = $1)
+         returning achievement_platform_link_id`,
+        [gameId]
+    );
+    for (const row of dropped.rows) proposed.delete(row.achievement_platform_link_id);
+
+    return { merged, candidates: proposed.size };
 }
 
 async function recordCandidate(
@@ -298,6 +336,18 @@ export async function confirmMatchCandidate(candidateId: string): Promise<void> 
         [sourceId, targetId],
     ]);
     if (games.rows[0].n > 1) throw new Error("These achievements are in different games, so they can't be merged");
+    const sameList = await pool.query(
+        `select 1 from achievement_platform_links source
+         join achievement_platform_links other
+           on other.platform_id = source.platform_id and other.platform_game_id = source.platform_game_id
+          and other.id <> source.id
+         where source.id = $1 and other.canonical_achievement_id = $2
+         limit 1`,
+        [candidate.rows[0].achievement_platform_link_id, targetId]
+    );
+    if (sameList.rows.length > 0) {
+        throw new Error("That achievement already has a different one from the same list, so they can't be merged");
+    }
 
     // mergeAchievements repoints any achievement_match_candidates row whose
     // candidate_canonical_achievement_id was the merge's loser - including
