@@ -2,7 +2,7 @@ import { Router } from "express";
 import { pool } from "../db";
 import { getCsrfToken } from "../middleware/csrf";
 import { requireAuth } from "../middleware/requireAuth";
-import { isValidSteamApiKey, saveSteamApiKey, steamApiKeySource } from "./steamApiKey";
+import { hasSteamApiKey, isValidSteamApiKey, saveSteamApiKey } from "./steamApiKey";
 import { getSteamGridDbApiKey, isValidSteamGridDbApiKey, removeSteamGridDbApiKey, saveSteamGridDbApiKey } from "./steamGridDbKey";
 import { getDiscordPresenceEnabled, setDiscordPresenceEnabled } from "./discordPresence";
 import { findDuplicateAcronym, getSearchAcronyms, saveSearchAcronyms, type SearchAcronym } from "./searchAcronyms";
@@ -31,9 +31,8 @@ settingsRouter.put("/discord-rich-presence", requireAuth, async (req, res, next)
     }
 });
 
-// Background sync interval (see #289). `available` is false when the
-// scheduler is off altogether (classic server mode without
-// SCHEDULER_ENABLED), so the dashboard can leave the setting out.
+// Background sync interval (see #289). `available` is false only until the
+// scheduler has started.
 settingsRouter.get("/sync-interval", requireAuth, async (_req, res, next) => {
     try {
         const status = getSchedulerStatus();
@@ -154,10 +153,8 @@ settingsRouter.delete("/steamgriddb-api-key", requireAuth, async (_req, res, nex
 // in with Steam at all.
 setupRouter.get("/status", (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    const source = steamApiKeySource();
     res.json({
-        steamApiKeyConfigured: source !== null,
-        steamApiKeyEditable: source !== "env",
+        steamApiKeyConfigured: hasSteamApiKey(),
         desktopApp: isDesktopApp(),
         csrfToken: getCsrfToken(req),
     });
@@ -226,13 +223,8 @@ setupRouter.get("/discord-presence-data", async (_req, res, next) => {
 
 setupRouter.put("/steam-api-key", async (req, res, next) => {
     try {
-        const source = steamApiKeySource();
-        if (source === "env") {
-            res.status(409).json({ error: "The Steam Web API key is set by the STEAM_API_KEY environment variable." });
-            return;
-        }
         // First-run setup is open; replacing an existing key needs a session.
-        if (source !== null && !req.isAuthenticated()) {
+        if (hasSteamApiKey() && !req.isAuthenticated()) {
             res.status(401).json({ error: "Sign in to change the Steam Web API key." });
             return;
         }

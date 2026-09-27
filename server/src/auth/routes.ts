@@ -2,13 +2,13 @@ import { Router } from "express";
 import { passport } from "./passport";
 import { getCsrfToken } from "../middleware/csrf";
 import { requireAuth } from "../middleware/requireAuth";
-import { steamApiKeySource } from "../settings/steamApiKey";
+import { hasSteamApiKey } from "../settings/steamApiKey";
 
 export const authRouter = Router();
 
 // No strategy is registered until a Steam Web API key exists; send the user
 // back to the dashboard's setup screen instead of a passport error.
-authRouter.use("/steam", (_req, res, next) => (steamApiKeySource() ? next() : res.redirect("/")));
+authRouter.use("/steam", (_req, res, next) => (hasSteamApiKey() ? next() : res.redirect("/")));
 
 authRouter.get("/steam", passport.authenticate("steam"));
 

@@ -40,7 +40,3 @@ Delete your account from the dashboard (**Delete account**), or simply uninstall
 - **After a crash:** a database left running by a crash is stopped cleanly the next time the app starts. The installer and uninstaller also stop it, so updates and uninstalling aren't blocked by locked files.
 - **Steam sign-in or sync fails right after setup:** check the Steam Web API key under **Settings → API keys → Steam Web API**. Steam rejects mistyped keys, and a key revoked on Steam's site stops working here too.
 - **PSN or GOG stops syncing:** their tokens expire. Disconnect and reconnect that platform with a fresh token or code.
-
-## Running as a classic server
-
-The server can still run against an external PostgreSQL with a `.env` (see [development.md](development.md)). In that mode: keep `SESSION_SECRET` and `CREDENTIAL_ENCRYPTION_KEY` stable across deploys, run `npm run db:migrate` before starting a new version (it's safe to re-run), wait for `GET /readyz` to return 200 before routing traffic, and send SIGTERM to drain. Back up with `pg_dump --format=custom` against the same `DATABASE_URL`, and store the encryption key separately from database backups.

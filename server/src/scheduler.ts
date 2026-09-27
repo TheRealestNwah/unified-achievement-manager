@@ -4,15 +4,14 @@ import { recomputeUserScore } from "./scoring";
 import { runMatching } from "./matching";
 import { getSyncIntervalMinutes } from "./settings/syncInterval";
 
-// Off by default (see config.ts / .env.example) - every account still syncs
-// fine on demand from the dashboard, and this just automates that instead of
-// requiring a click. One account failing (an expired PSN NPSSO, a revoked
+// Every account still syncs fine on demand from the dashboard; this just
+// automates that instead of requiring a click. One account failing (an expired PSN NPSSO, a revoked
 // Xbox key) logs and moves on rather than aborting the whole run, since a
 // scheduled job with no one watching it shouldn't silently stop covering
 // every other account over one bad one.
 //
 // The interval is the user's Settings -> Background sync choice when there is
-// one (see #289), falling back to SCHEDULER_INTERVAL_MINUTES, and can be
+// one (see #289), falling back to every 6 hours, and can be
 // changed without a restart via applySchedulerInterval().
 let started = false;
 let defaultIntervalMinutes = 360;

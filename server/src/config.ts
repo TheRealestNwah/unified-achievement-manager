@@ -3,10 +3,19 @@ import path from "path";
 import { parseCredentialEncryptionKey } from "./security/credentials";
 import { loadOrCreateSecrets } from "./runtime/secrets";
 
-// The self-contained app (app.ts) never reads a .env: everything it needs is
-// generated or passed in, so a stray .env in the working directory can't
-// point it at some other database.
+// The app (app.ts) never reads a .env: everything it needs is generated or
+// passed in, so a stray .env in the working directory can't point it at some
+// other database. Outside the app - the tests and db:* scripts - a .env can
+// supply DATABASE_URL (see .env.example).
 if (process.env.UAM_APP !== "1") dotenv.config();
+
+// The one server mode is the single-user app (see #392): it only ever
+// listens on this machine.
+const HOST = "127.0.0.1";
+
+// Where a from-source run keeps its data when nothing says otherwise - never
+// the installed app's own folder, so the two can't share one database.
+export const DEV_DATA_DIR = path.join(__dirname, "..", ".dev-data");
 
 function required(name: string): string {
     const value = process.env[name];
@@ -14,38 +23,29 @@ function required(name: string): string {
     return value;
 }
 
-// Set by the desktop app to its per-user data folder. When present, secrets
-// are generated there on first run and uploads live there instead of inside
-// the (read-only once installed) app bundle.
-const dataDir = process.env.UAM_DATA_DIR ? path.resolve(process.env.UAM_DATA_DIR) : undefined;
-const generatedSecrets = dataDir ? loadOrCreateSecrets(dataDir) : undefined;
+// Set by app.ts (and so by the desktop app) to the per-user data folder.
+// Secrets are generated there on first run, and uploads live there.
+const dataDir = path.resolve(process.env.UAM_DATA_DIR || DEV_DATA_DIR);
+const secrets = loadOrCreateSecrets(dataDir);
 const port = Number(process.env.PORT ?? 3000);
-const host = process.env.HOST || undefined;
-// Must match the host the browser actually uses: session cookies for
-// localhost and 127.0.0.1 are separate, so a mismatched Steam return URL
-// would silently drop the login.
-const defaultBaseHost = !host || host === "0.0.0.0" || host === "::" ? "localhost" : host.includes(":") ? `[${host}]` : host;
 
 export const config = {
     port,
-    host,
-    baseUrl: process.env.BASE_URL || `http://${defaultBaseHost}:${port}`,
+    host: HOST,
+    // Must match the host the browser actually uses: session cookies for
+    // localhost and 127.0.0.1 are separate, so a mismatched Steam return URL
+    // would silently drop the login.
+    baseUrl: `http://${HOST}:${port}`,
     dataDir,
-    uploadsDir: dataDir ? path.join(dataDir, "uploads") : path.join(__dirname, "..", "public", "uploads"),
+    uploadsDir: path.join(dataDir, "uploads"),
     databaseUrl: required("DATABASE_URL"),
-    // Optional: without it the dashboard asks the user for their own key on
-    // first run and stores it encrypted (see settings/steamApiKey.ts).
-    steamApiKey: process.env.STEAM_API_KEY || undefined,
-    sessionSecret: process.env.SESSION_SECRET || generatedSecrets?.sessionSecret || required("SESSION_SECRET"),
-    credentialEncryptionKey: parseCredentialEncryptionKey(
-        process.env.CREDENTIAL_ENCRYPTION_KEY || generatedSecrets?.credentialEncryptionKey || required("CREDENTIAL_ENCRYPTION_KEY")
-    ),
-    trustProxy: process.env.TRUST_PROXY === "true",
-    rateLimitWindowMinutes: Number(process.env.RATE_LIMIT_WINDOW_MINUTES ?? 15),
-    rateLimitMaxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS ?? 300),
-    authRateLimitMaxRequests: Number(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS ?? 30),
-    // Off by default - see scheduler.ts. Every account already syncs fine
-    // on demand from the dashboard; this just automates that.
-    schedulerEnabled: process.env.SCHEDULER_ENABLED === "true",
-    schedulerIntervalMinutes: Number(process.env.SCHEDULER_INTERVAL_MINUTES ?? 360),
+    sessionSecret: secrets.sessionSecret,
+    credentialEncryptionKey: parseCredentialEncryptionKey(secrets.credentialEncryptionKey),
+    // Loose: one person clicking around can't trip limits meant for a
+    // shared public server, and nobody else can reach this one.
+    rateLimitWindowMinutes: 15,
+    rateLimitMaxRequests: 5000,
+    authRateLimitMaxRequests: 300,
+    // Until the user picks one under Settings -> Background sync.
+    schedulerIntervalMinutes: 360,
 };

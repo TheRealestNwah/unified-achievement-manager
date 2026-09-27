@@ -5,3 +5,4 @@ dist/
 server/public/uploads/
 desktop/staging/
 desktop/release/
+server/.dev-data/

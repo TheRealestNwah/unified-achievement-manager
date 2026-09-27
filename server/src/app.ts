@@ -22,13 +22,7 @@ export async function startApp({ dataDir = defaultDataDir(), port }: { dataDir?:
     const resolvedDataDir = path.resolve(dataDir);
     process.env.UAM_APP = "1";
     process.env.UAM_DATA_DIR = resolvedDataDir;
-    process.env.HOST = "127.0.0.1";
     process.env.PORT = String(port ?? (await resolveAppPort(resolvedDataDir)));
-    // Single-user defaults: nobody else is going to press Sync, and one person
-    // clicking around can't trip limits meant for a shared public server.
-    process.env.SCHEDULER_ENABLED ??= "true";
-    process.env.RATE_LIMIT_MAX_REQUESTS ??= "5000";
-    process.env.AUTH_RATE_LIMIT_MAX_REQUESTS ??= "300";
 
     const database = await startEmbeddedDatabase(resolvedDataDir);
     try {
@@ -42,7 +36,7 @@ export async function startApp({ dataDir = defaultDataDir(), port }: { dataDir?:
         await recomputeAllUserScores();
         const { startServer } = await import("./index");
         const { config } = await import("./config");
-        const server = await startServer({ handleSignals: false });
+        const server = await startServer();
 
         let stopping: Promise<void> | undefined;
         return {
@@ -56,8 +50,11 @@ export async function startApp({ dataDir = defaultDataDir(), port }: { dataDir?:
     }
 }
 
+// Running from source (npm run dev / npm run app). Uses its own data folder
+// unless UAM_DATA_DIR says otherwise, so it never opens the installed app's
+// database - which may well be running at the same time.
 if (require.main === module) {
-    startApp({ dataDir: process.env.UAM_DATA_DIR || undefined, port: Number(process.env.PORT) || undefined })
+    startApp({ dataDir: process.env.UAM_DATA_DIR || path.join(__dirname, "..", ".dev-data"), port: Number(process.env.PORT) || 3000 })
         .then((app) => {
             console.log(`Unified Achievement Manager is running at ${app.url} (data in ${app.dataDir})`);
             const onSignal = () => {
