@@ -890,6 +890,26 @@
     .review-row:last-child { border-bottom: none; }
     .review-game { font-size: 11px; color: var(--text-dim); width: 110px; flex-shrink: 0; }
     .review-compare { flex: 1; font-size: 13px; min-width: 0; }
+    /* A vs B rows (see #315): one line per side, badges in their own column,
+       so long names wrap under themselves and both names start aligned. */
+    .review-compare.review-pair {
+        display: grid;
+        flex: 1 1 280px;
+        grid-template-columns: 124px minmax(0, 1fr) auto;
+        column-gap: 10px;
+        row-gap: 6px;
+        align-items: start;
+    }
+    .review-side { display: contents; }
+    .review-side-badges { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px; padding-top: 1px; }
+    .review-side-name { grid-column: 2; line-height: 1.45; overflow-wrap: anywhere; }
+    .review-side .tier-tag { grid-column: 3; justify-self: end; }
+    @media (max-width: 600px) {
+        /* Too narrow for a badge column: badges sit above each name. */
+        .review-compare.review-pair { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+        .review-side-name { grid-column: 1; margin-bottom: 6px; }
+        .review-side .tier-tag { grid-column: 2; }
+    }
     .review-compare .arrow { color: var(--text-dim); margin: 0 6px; }
     .review-confidence { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); width: 50px; flex-shrink: 0; text-align: right; }
     .review-actions { display: flex; gap: 6px; flex-shrink: 0; }
@@ -3552,16 +3572,30 @@ function bindReviewUndo(panel) {
     });
 }
 
+// The two sides of a review row, stacked one per line (see #315). `badges`
+// and `extra` are already-escaped HTML; `name` is escaped here.
+function reviewPairHtml(a, b) {
+    const side = ({ badges, name, extra = "" }) => `
+                <span class="review-side">
+                    <span class="review-side-badges">${badges}</span>
+                    <span class="review-side-name">${escapeHtml(name)}</span>
+                    ${extra}
+                </span>`;
+    return `<span class="review-compare review-pair">${side(a)}${side(b)}</span>`;
+}
+
 function reviewRowHtml(c) {
     return `
         <div class="review-row" data-id="${c.id}">
             <span class="review-game">${escapeHtml(c.game_title)}</span>
-            <span class="review-compare">
-                ${platformBadge(c.candidate_platform)} ${escapeHtml(c.candidate_name)}
-                <span class="arrow">vs</span>
-                ${(c.target_platforms || []).map((p) => platformBadge(p)).join(" ")}
-                ${escapeHtml(c.target_name)} <span class="tier-tag ${c.target_tier}">${c.target_tier}</span>
-            </span>
+            ${reviewPairHtml(
+                { badges: platformBadge(c.candidate_platform), name: c.candidate_name },
+                {
+                    badges: (c.target_platforms || []).map((p) => platformBadge(p)).join(""),
+                    name: c.target_name,
+                    extra: `<span class="tier-tag ${c.target_tier}">${c.target_tier}</span>`,
+                }
+            )}
             <span class="review-confidence">${Math.round(c.confidence * 100)}%</span>
             <span class="review-actions">
                 <button class="confirm" aria-label="Same achievement: ${escapeHtml(c.candidate_name)} and ${escapeHtml(c.target_name)}">Same</button>
@@ -3639,13 +3673,10 @@ function renderGameReviewPanel(candidates) {
             (c) => `
         <div class="review-row" data-id="${c.id}">
             <span class="review-game">${GAME_CANDIDATE_REASON_LABELS[c.reason] || c.reason}</span>
-            <span class="review-compare">
-                ${(c.game_a_platforms || []).map((p) => platformBadge(p)).join(" ")}
-                ${escapeHtml(c.game_a_title)}
-                <span class="arrow">vs</span>
-                ${(c.game_b_platforms || []).map((p) => platformBadge(p)).join(" ")}
-                ${escapeHtml(c.game_b_title)}
-            </span>
+            ${reviewPairHtml(
+                { badges: (c.game_a_platforms || []).map((p) => platformBadge(p)).join(""), name: c.game_a_title },
+                { badges: (c.game_b_platforms || []).map((p) => platformBadge(p)).join(""), name: c.game_b_title }
+            )}
             <span class="review-confidence">${Math.round(c.confidence * 100)}%</span>
             <span class="review-actions">
                 <button class="confirm" aria-label="Same game: ${escapeHtml(c.game_a_title)} and ${escapeHtml(c.game_b_title)}">Same game</button>
