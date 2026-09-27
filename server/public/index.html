@@ -4595,7 +4595,13 @@ function initAccountDeletion() {
         const confirmation = await askText("This permanently deletes your account and private data. Type DELETE to continue.", {
             okLabel: "Delete account",
         });
-        if (confirmation !== "DELETE") return;
+        if (confirmation === null) return;
+        // A wrong entry used to close the dialog with no word at all, which
+        // looked like the click was ignored (see #337).
+        if (confirmation !== "DELETE") {
+            await showMessage("Your account was not deleted. Type DELETE, in capitals, to confirm.");
+            return;
+        }
 
         button.disabled = true;
         try {
