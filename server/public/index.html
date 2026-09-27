@@ -438,6 +438,21 @@
         font-size: 13px;
     }
     .sync-problems span { flex: 1; min-width: 200px; }
+    .sync-problems-dismiss {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        margin: -4px -6px -4px 0;
+        padding: 0;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-dim);
+        cursor: pointer;
+    }
+    .sync-problems-dismiss:hover { background: rgba(252, 165, 165, 0.25); color: var(--text); }
     .sync-problems a, .platform-sync-error { color: #B91C1C; }
     :root[data-theme="dark"] .sync-problems a, :root[data-theme="dark"] .platform-sync-error { color: #FCA5A5; }
     @media (prefers-color-scheme: dark) {
@@ -4395,14 +4410,30 @@ async function refreshPlatforms() {
     renderSyncProblems(accounts);
 }
 
+// Which set of failures the user closed the banner on (see #388): each
+// failing platform and when it failed. A later failure changes that, so the
+// banner comes back. Per-viewer, so localStorage like the other preferences.
+const DISMISSED_SYNC_PROBLEMS_KEY = "unified-achievement-manager:dismissedSyncProblems";
+
+function syncProblemsKey(failing) {
+    return failing.map((a) => `${a.platform_id}@${a.last_sync_error_at}`).sort().join(",");
+}
+
 // A dashboard banner for platforms whose last sync failed (see #282) - the
 // Settings row has the details and the fix.
 function renderSyncProblems(accounts) {
     const banner = document.getElementById("sync-problems");
     // One being synced again right now isn't a problem yet (see #322).
     const failing = accounts.filter((a) => a.last_sync_error && !a.syncing);
-    banner.classList.toggle("hidden", failing.length === 0);
-    if (failing.length === 0) return;
+    let dismissed = null;
+    try {
+        dismissed = localStorage.getItem(DISMISSED_SYNC_PROBLEMS_KEY);
+    } catch {
+        // Storage unavailable - the banner just can't stay dismissed.
+    }
+    const key = syncProblemsKey(failing);
+    banner.classList.toggle("hidden", failing.length === 0 || key === dismissed);
+    if (failing.length === 0 || key === dismissed) return;
     const names = failing.map((a) => PLATFORM_LABELS[a.platform_id] || a.platform_id);
     const text = document.createElement("span");
     text.textContent =
@@ -4416,7 +4447,21 @@ function renderSyncProblems(accounts) {
         e.preventDefault();
         document.querySelector('[data-nav="platforms"]').click();
     });
-    banner.replaceChildren(text, link);
+    const dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.className = "sync-problems-dismiss";
+    dismiss.setAttribute("aria-label", "Dismiss");
+    dismiss.title = "Dismiss";
+    dismiss.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+    dismiss.addEventListener("click", () => {
+        try {
+            localStorage.setItem(DISMISSED_SYNC_PROBLEMS_KEY, key);
+        } catch {
+            // Hidden for now, just not remembered.
+        }
+        banner.classList.add("hidden");
+    });
+    banner.replaceChildren(text, link, dismiss);
 }
 
 const PLATFORM_LABELS = { steam: "Steam", xbox: "Xbox", psn: "PSN", retroachievements: "RetroAchievements", gog: "GOG" };
