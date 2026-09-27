@@ -54,16 +54,32 @@ async function promptRestart(): Promise<void> {
     }
 }
 
+// "Nothing published yet" isn't a failure: until the first release after
+// 1.0.0 exists, every check ends this way (see #324).
+function isNoRelease(err: Error): boolean {
+    const code = (err as Error & { code?: string }).code;
+    return code === "ERR_UPDATER_NO_PUBLISHED_VERSIONS" || (code === "ERR_XML_MISSED_ELEMENT" && err.message.includes("No published versions"));
+}
+
+// A release without latest.yml attached - a release-checklist miss, not
+// something the user can act on.
+function isMissingChannelFile(err: Error): boolean {
+    return (err as Error & { code?: string }).code === "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND";
+}
+
 function backgroundCheck(): void {
     if (downloadedVersion || !options?.automaticUpdatesEnabled()) return;
-    autoUpdater.checkForUpdates().catch((err) => console.warn("Update check failed:", err));
+    // Failures are logged once, by the "error" handler.
+    autoUpdater.checkForUpdates().catch(() => undefined);
 }
 
 export function startAutoUpdates(opts: UpdaterOptions): void {
     // Dev runs have no app-update.yml, and the smoke test quits in seconds.
     if (!app.isPackaged || process.env.UAM_SMOKE_TEST === "1") return;
     options = opts;
-    autoUpdater.logger = console;
+    // electron-updater's own error logging would repeat what the "error"
+    // handler below logs, so only its info/warn lines go to the log.
+    autoUpdater.logger = { info: console.info, warn: console.warn, error: () => undefined, debug: () => undefined };
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
 
@@ -83,6 +99,14 @@ export function startAutoUpdates(opts: UpdaterOptions): void {
         void showMessage({ title: "No updates", message: `You're on the latest version (${app.getVersion()}).` });
     });
     autoUpdater.on("error", (err) => {
+        if (isNoRelease(err) || isMissingChannelFile(err)) {
+            if (isNoRelease(err)) console.info("Update check: no release published yet");
+            else console.warn(`Update check: the latest release has no latest.yml (${err.message.split(":")[0]})`);
+            if (!manualCheck) return;
+            manualCheck = false;
+            void showMessage({ title: "No updates", message: `You're on the latest version (${app.getVersion()}).` });
+            return;
+        }
         console.error("Auto-update failed:", err);
         if (!manualCheck) return;
         manualCheck = false;
