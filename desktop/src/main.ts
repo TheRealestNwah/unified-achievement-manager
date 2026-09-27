@@ -3,10 +3,11 @@ import path from "path";
 import { format } from "util";
 import { app, BrowserWindow, dialog, Menu, session, shell } from "electron";
 import { startDiscordPresence, stopDiscordPresence } from "./discordPresence";
-import { handleWindowClose, HIDDEN_LAUNCH_ARG, launchedHidden, markQuitting, showWindow, startTray, stopTray, unlockNotificationsEnabled } from "./tray";
+import { automaticUpdatesEnabled, handleWindowClose, HIDDEN_LAUNCH_ARG, launchedHidden, markQuitting, showWindow, startTray, stopTray, unlockNotificationsEnabled } from "./tray";
 import { startUnlockNotifications, stopUnlockNotifications } from "./notifications";
 import { loadWindowState, trackWindowState } from "./windowState";
 import { backupDataFolder, defaultBackupName, restoreDataFolder } from "./backup";
+import { checkForUpdatesNow, startAutoUpdates, stopAutoUpdates } from "./updater";
 
 interface RunningApp {
     url: string;
@@ -157,6 +158,7 @@ function buildMenu(): void {
                         label: "Keyboard Shortcuts",
                         click: () => void mainWindow?.webContents.executeJavaScript("window.uamShowShortcuts?.()").catch(() => undefined),
                     },
+                    { label: "Check for Updates…", click: () => void checkForUpdatesNow() },
                     { label: "Project Page", click: () => void shell.openExternal(PROJECT_URL) },
                     {
                         label: "About Unified Achievement Manager",
@@ -287,6 +289,7 @@ async function start(): Promise<void> {
     if (process.env.UAM_SMOKE_TEST !== "1") {
         await startTray(running.url, () => mainWindow);
         startUnlockNotifications(running.url, () => mainWindow, unlockNotificationsEnabled);
+        startAutoUpdates({ getWindow: () => mainWindow, automaticUpdatesEnabled, beforeInstall: prepareForUpdate });
     }
 
     // CI launches the packaged app with this set to prove it boots end to end.
@@ -297,6 +300,16 @@ async function start(): Promise<void> {
         console.log(`Smoke test passed: readyz ${ready.status}, dashboard "${title}"`);
         app.quit();
     }
+}
+
+// Shut everything down ahead of the update installer, which replaces the
+// bundled PostgreSQL binaries (see #314).
+async function prepareForUpdate(): Promise<void> {
+    markQuitting();
+    stopAutoUpdates();
+    stopTray();
+    stopUnlockNotifications();
+    await stopServer();
 }
 
 function stopServer(): Promise<void> {
@@ -321,6 +334,7 @@ if (!app.requestSingleInstanceLock()) {
         markQuitting();
         if (readyToQuit) return;
         event.preventDefault();
+        stopAutoUpdates();
         stopTray();
         stopUnlockNotifications();
         void stopServer().finally(() => {

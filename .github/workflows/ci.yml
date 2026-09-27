@@ -101,5 +101,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Unified-Achievement-Manager-Setup
-          path: desktop/release/Unified-Achievement-Manager-Setup-*.exe
+          # latest.yml and the .blockmap are what auto-update reads (see #314);
+          # they're attached to the GitHub Release alongside the installer.
+          path: |
+            desktop/release/Unified-Achievement-Manager-Setup-*.exe
+            desktop/release/Unified-Achievement-Manager-Setup-*.exe.blockmap
+            desktop/release/latest.yml
           retention-days: 14

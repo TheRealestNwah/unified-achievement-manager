@@ -8,7 +8,7 @@ A green CI run is required, but it doesn't replace the live checks below. **Do n
 - [ ] `master` is clean and current, and its CI is green: server lint/typecheck/unit/integration/embedded-PostgreSQL tests, the `desktop` typecheck, and the `windows-installer` job, including its install → launch → uninstall smoke test.
 - [ ] `npm audit --omit=dev` in `server/` and `desktop/`. Review any remaining advisory rather than suppressing it.
 - [ ] `desktop/package.json` and `server/package.json` versions match the version being released.
-- [ ] Download the `Unified-Achievement-Manager-Setup` artifact from the release commit's CI run. That exact file is what gets published.
+- [ ] Download the `Unified-Achievement-Manager-Setup` artifact from the release commit's CI run. Those exact files (the installer, its `.blockmap`, and `latest.yml`) are what get published.
 
 ## Installer smoke test (on a real Windows machine, not a dev checkout)
 
@@ -23,11 +23,12 @@ A green CI run is required, but it doesn't replace the live checks below. **Do n
 - [ ] **Crash recovery:** end `Unified Achievement Manager.exe` in Task Manager, then relaunch. It starts normally.
 - [ ] **Uninstall/reinstall:** uninstall. The program folder is gone and `%APPDATA%\Unified Achievement Manager` remains. Reinstall, and the data is still there.
 - [ ] **Upgrade** (from 1.0.1 onward): install the previous release, add data, then install the candidate over it. Data and sign-in survive.
+- [ ] **Auto-update** (from 1.0.1 onward): with the previous release installed and the candidate published, Help → Check for Updates finds it, downloads it, and "Restart now" relaunches on the new version with data and sign-in intact. Repeat with "Later" and confirm it installs on quit.
 - [ ] **Your own PostgreSQL untouched:** on a machine that also runs a separately installed PostgreSQL, install, crash-recover, and uninstall without affecting it.
 
 ## Publishing (only after explicit approval)
 
-- [ ] Tag the release commit and publish a GitHub Release with `Unified-Achievement-Manager-Setup-<version>.exe` attached and short release notes: what's new, the SmartScreen note, and where data lives.
+- [ ] Tag the release commit (`v<version>`) and publish a GitHub Release with `Unified-Achievement-Manager-Setup-<version>.exe`, its `.blockmap`, and `latest.yml` attached - installed copies auto-update from the latest release's `latest.yml`, so a release without it is invisible to them. Publish as a full release, not a draft or pre-release and short release notes: what's new, the SmartScreen note, and where data lives.
 - [ ] Record the commit, the CI run the installer came from, and the smoke-test results in the release notes.
 - [ ] Branch cleanup happens only after PRs are merged.
 
