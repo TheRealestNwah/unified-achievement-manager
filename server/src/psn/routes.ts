@@ -6,6 +6,7 @@ import { runAccountSync, PlatformAccountRow } from "../sync/runAccountSync";
 import { runMatchingAndGetScore } from "../matching";
 import { config } from "../config";
 import { encryptCredential } from "../security/credentials";
+import { assertSameAccountOnReconnect, clearSyncError, DifferentAccountError } from "../sync/reconnect";
 
 export const psnRouter = Router();
 
@@ -32,6 +33,8 @@ psnRouter.post("/connect", requireAuth, async (req, res, next) => {
         const tokens = await exchangeAccessCodeForTokens(accessCode);
         const { onlineId, accountId } = decodeIdToken(tokens.idToken);
 
+        await assertSameAccountOnReconnect(req.user!.id, "psn", accountId, "PSN");
+
         await pool.query(
             `insert into user_platform_accounts (user_id, platform_id, platform_account_id, display_name, access_token, refresh_token)
              values ($1, 'psn', $2, $3, $4, $5)
@@ -43,8 +46,11 @@ psnRouter.post("/connect", requireAuth, async (req, res, next) => {
             [req.user!.id, accountId, onlineId, encryptCredential(tokens.accessToken, config.credentialEncryptionKey), encryptCredential(tokens.refreshToken, config.credentialEncryptionKey)]
         );
 
+        await clearSyncError(req.user!.id, "psn");
+
         res.json({ onlineId });
     } catch (err) {
+        if (err instanceof DifferentAccountError) return res.status(409).json({ error: err.message });
         if (err instanceof PsnApiError && err.status === 401) {
             return res.status(400).json({ error: err.message });
         }
