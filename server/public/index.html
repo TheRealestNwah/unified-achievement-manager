@@ -36,7 +36,11 @@
         --gold: #D6AD57;
         --platinum: #C9CEDB;
         --ring-bg: #EFEFF1;
-        --ring-track: rgba(0,0,0,0.06);
+        --ring-track: rgba(0,0,0,0.08);
+        /* Level ring sweep - its own hues, not the trophy-tier metals, so
+           it doesn't read as a tier (see #373). */
+        --level-from: #0071E3;
+        --level-to: #8E44E8;
         --placeholder-bg: rgba(0,0,0,0.05);
         --scrollbar-thumb: rgba(0,0,0,.15);
         --chip-accent-bg: rgba(0,113,227,0.1);
@@ -62,7 +66,9 @@
             /* White on #0A84FF is 3.65:1; buttons use a deeper blue (5.1:1). */
             --accent-fill: #0A6CD6;
             --ring-bg: #3A3A3C;
-            --ring-track: rgba(255,255,255,0.08);
+            --ring-track: rgba(255,255,255,0.12);
+            --level-from: #0A84FF;
+            --level-to: #BF5AF2;
             --placeholder-bg: rgba(255,255,255,0.06);
             --scrollbar-thumb: rgba(255,255,255,.15);
             --chip-accent-bg: rgba(10,132,255,0.16);
@@ -85,7 +91,9 @@
         --accent: #0A84FF;
         --accent-fill: #0A6CD6;
         --ring-bg: #3A3A3C;
-        --ring-track: rgba(255,255,255,0.08);
+        --ring-track: rgba(255,255,255,0.12);
+        --level-from: #0A84FF;
+        --level-to: #BF5AF2;
         --placeholder-bg: rgba(255,255,255,0.06);
         --scrollbar-thumb: rgba(255,255,255,.15);
         --chip-accent-bg: rgba(10,132,255,0.16);
@@ -385,10 +393,11 @@
         justify-content: center;
         gap: 1px;
     }
-    .level-ring .n .num { font-family: var(--font-ui); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
-    .level-ring .n .lbl { font-size: 8px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+    .level-ring .n .num { font-family: var(--font-ui); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+    .level-ring .n .lbl { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
     .score-info { flex: 1; min-width: 0; }
-    .score-info .points { font-family: var(--font-mono); font-size: 14px; color: var(--text-dim); }
+    .score-info .xp-total { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+    .score-info .xp-next { font-size: 13px; color: var(--text-dim); margin: 2px 0 0; font-variant-numeric: tabular-nums; }
     #level-tier-counts { margin-top: 8px; }
     .sync-problems {
         display: flex;
@@ -1088,10 +1097,8 @@
                         <svg width="108" height="108" viewBox="0 0 108 108">
                             <defs>
                                 <linearGradient id="tierSweep" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stop-color="var(--bronze)"/>
-                                    <stop offset="35%" stop-color="var(--silver)"/>
-                                    <stop offset="68%" stop-color="var(--gold)"/>
-                                    <stop offset="100%" stop-color="var(--platinum)"/>
+                                    <stop offset="0%" stop-color="var(--level-from)"/>
+                                    <stop offset="100%" stop-color="var(--level-to)"/>
                                 </linearGradient>
                             </defs>
                             <circle cx="54" cy="54" r="46" fill="none" stroke="var(--ring-track)" stroke-width="9"/>
@@ -1104,7 +1111,8 @@
                         </div>
                     </div>
                     <div class="score-info">
-                        <div class="points" id="points-text">-</div>
+                        <div class="xp-total" id="xp-total">-</div>
+                        <div class="xp-next" id="xp-next"></div>
                         <div class="tier-pips" id="level-tier-counts"></div>
                         <button type="button" class="link-button" id="scoring-help-btn">How is this worked out?</button>
                         <div class="sync-freshness">
@@ -1636,11 +1644,11 @@ const LEVEL_RING_CIRCUMFERENCE = 289.03;
 
 function renderScore(score) {
     document.getElementById("level-number").textContent = score.level;
-    document.getElementById("points-text").textContent =
-        `${score.totalPoints.toLocaleString()} XP` +
-        (score.pointsForNextLevel != null
-            ? ` — ${(score.pointsForNextLevel - score.totalPoints).toLocaleString()} XP to level ${score.level + 1}`
-            : " — max level");
+    document.getElementById("xp-total").textContent = `${score.totalPoints.toLocaleString()} XP`;
+    document.getElementById("xp-next").textContent =
+        score.pointsForNextLevel != null
+            ? `${(score.pointsForNextLevel - score.totalPoints).toLocaleString()} XP to level ${score.level + 1}`
+            : "Max level";
 
     const span = score.pointsForNextLevel != null ? score.pointsForNextLevel - score.pointsForCurrentLevel : 1;
     const progressed = score.totalPoints - score.pointsForCurrentLevel;
