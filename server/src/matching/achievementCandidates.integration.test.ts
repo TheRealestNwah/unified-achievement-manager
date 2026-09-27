@@ -43,18 +43,39 @@ integration("bulk achievement-candidate review (#252)", () => {
     it("rejects a batch, reopens one, then confirms it and skips ones already resolved", async () => {
         const [a, b] = [await candidatePair(1), await candidatePair(2)];
 
-        expect(await matcher.resolveMatchCandidates([a, b], "reject")).toEqual({ resolved: 2, skipped: 0 });
+        expect(await matcher.resolveMatchCandidates([a, b], "reject")).toEqual({ resolved: 2, skipped: 0, conflicted: 0 });
         expect(await statusOf(a)).toBe("rejected");
 
         expect(await matcher.reopenMatchCandidate(a)).toBe(true);
         expect(await statusOf(a)).toBe("pending");
 
-        expect(await matcher.resolveMatchCandidates([a, b], "confirm")).toEqual({ resolved: 1, skipped: 1 });
+        expect(await matcher.resolveMatchCandidates([a, b], "confirm")).toEqual({ resolved: 1, skipped: 1, conflicted: 0 });
         expect(await statusOf(a)).toBe("confirmed");
         expect(await statusOf(b)).toBe("rejected");
 
         // Confirmed means merged - it can't be reopened.
         expect(await matcher.reopenMatchCandidate(a)).toBe(false);
+    });
+
+    it("confirms the rest of a batch when one candidate can't be merged, and leaves that one pending (#406)", async () => {
+        const [a, b] = [await candidatePair(10), await candidatePair(11)];
+        // A second Xbox achievement from the same list, proposed as the same
+        // achievement as the one a's Xbox link already merges into.
+        const extraXbox = await canonicalStore.getOrCreateAchievementLink(gameId, "xbox", "bulk-title", "xbox-10b", "Xbox 10b", undefined, undefined);
+        const aTarget = await pool.query("select candidate_canonical_achievement_id as id from achievement_match_candidates where id = $1", [a]);
+        const conflict = (
+            await pool.query(
+                `insert into achievement_match_candidates (achievement_platform_link_id, candidate_canonical_achievement_id, confidence)
+                 values ($1, $2, 0.9) returning id`,
+                [extraXbox, aTarget.rows[0].id]
+            )
+        ).rows[0].id;
+
+        expect(await matcher.resolveMatchCandidates([a, conflict, b], "confirm")).toEqual({ resolved: 2, skipped: 0, conflicted: 1 });
+        expect(await statusOf(a)).toBe("confirmed");
+        expect(await statusOf(b)).toBe("confirmed");
+        expect(await statusOf(conflict)).toBe("pending");
+        await expect(matcher.confirmMatchCandidate(conflict)).rejects.toMatchObject({ status: 409 });
     });
 
     it("records a near-match once however many times matching runs, and keeps it rejected (#345)", async () => {
