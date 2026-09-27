@@ -3507,7 +3507,7 @@ async function useGameTitleFrom(gameId, link, button) {
 }
 
 async function splitPlatformLink(gameId, link, button) {
-    if (!await askConfirm(`Split "${link.platform_title}" (${link.platform_id}) back out into its own game? Your unlocks stay as they are.`)) return;
+    if (!await askConfirm(`Split "${link.platform_title}" (${link.platform_id}) back out into its own game? Your unlocks stay as they are.`, { okLabel: "Split" })) return;
     const status = document.getElementById("match-status");
     button.disabled = true;
     try {
@@ -4089,7 +4089,7 @@ async function syncPlatform(platformId, label, button, noteEl) {
 }
 
 async function disconnectPlatform(platformId, label) {
-    if (!await askConfirm(`Disconnect ${label}? This removes its synced games and achievements from your library.`)) return;
+    if (!await askConfirm(`Disconnect ${label}? This removes its synced games and achievements from your library.`, { okLabel: "Disconnect" })) return;
     try {
         const result = await api(`/api/me/accounts/${platformId}`, { method: "DELETE" });
         renderScore(result.score);
@@ -4560,7 +4560,7 @@ async function initSteamGridDbKeyRow() {
     });
 
     removeBtn.addEventListener("click", async () => {
-        if (!await askConfirm("Remove your SteamGridDB API key? Covers you already picked stay as they are.")) return;
+        if (!await askConfirm("Remove your SteamGridDB API key? Covers you already picked stay as they are.", { okLabel: "Remove" })) return;
         removeBtn.disabled = true;
         try {
             await api("/api/settings/steamgriddb-api-key", { method: "DELETE" });
