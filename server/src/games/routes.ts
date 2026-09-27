@@ -192,10 +192,19 @@ gamesRouter.get("/games/:gameId/platforms", requireAuth, async (req, res, next) 
         if (!(await userOwnsGame(req.user!.id, req.params.gameId))) {
             return res.status(404).json({ error: "Game not found in your library" });
         }
+        // Only platforms the user owns the game on: a list attached purely
+        // for rarity data (catalog enrichment, #78) isn't something they
+        // merged or could split out (see #344).
         const result = await pool.query(
-            `select id, platform_id, platform_title, console_variant from game_platform_links
-             where game_id = $1 order by platform_id, console_variant nulls first`,
-            [req.params.gameId]
+            `select gpl.id, gpl.platform_id, gpl.platform_title, gpl.console_variant from game_platform_links gpl
+             where gpl.game_id = $1
+               and exists (
+                   select 1 from user_owned_games uog
+                   join user_platform_accounts upa on upa.id = uog.user_platform_account_id
+                   where upa.user_id = $2 and uog.game_id = gpl.game_id and upa.platform_id = gpl.platform_id
+               )
+             order by gpl.platform_id, gpl.console_variant nulls first`,
+            [req.params.gameId, req.user!.id]
         );
         res.json(result.rows);
     } catch (err) {

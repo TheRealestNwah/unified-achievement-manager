@@ -57,7 +57,7 @@ export async function getGamesForUser(userId: string, { includeHidden = false, g
                 where game_id = g.id and console_variant is not null
                 group by platform_id
             ) grouped) as console_variants,
-            count(ca.id) as total_achievements,
+            count(apl.id) as total_achievements,
             count(uau.id) as unlocked_achievements,
             coalesce(sum(ca.points) filter (where uau.id is not null), 0) as points_earned,
             -- For the "Recently unlocked" sort (see #246).
@@ -68,7 +68,16 @@ export async function getGamesForUser(userId: string, { includeHidden = false, g
             count(*) filter (where ca.tier = 'bronze' and uau.id is not null) as bronze_unlocked
          from games g
          join canonical_achievements ca on ca.game_id = g.id
-         left join achievement_platform_links apl on apl.canonical_achievement_id = ca.id
+         -- Only lists on platforms the user owns the game on count toward
+         -- its total (see #344): catalog enrichment attaches other platforms'
+         -- lists purely for rarity data, like getAchievementsForGame skips.
+         left join achievement_platform_links apl
+                on apl.canonical_achievement_id = ca.id
+               and exists (
+                   select 1 from user_owned_games uog
+                   join user_platform_accounts upa on upa.id = uog.user_platform_account_id
+                   where upa.user_id = $1 and uog.game_id = ca.game_id and upa.platform_id = apl.platform_id
+               )
          left join user_achievement_unlocks uau
                 on uau.achievement_platform_link_id = apl.id
                and uau.user_platform_account_id in (
@@ -141,12 +150,21 @@ export async function getGamesForUser(userId: string, { includeHidden = false, g
 export async function getGameCompletionCountsForUser(userId: string): Promise<GameCompletionCounts[]> {
     const result = await pool.query(
         `select
-            count(ca.id) as total_achievements,
+            count(apl.id) as total_achievements,
             count(uau.id) as unlocked_achievements,
             count(*) filter (where ca.tier = 'platinum' and uau.id is not null) as platinum_unlocked
          from games g
          join canonical_achievements ca on ca.game_id = g.id
-         left join achievement_platform_links apl on apl.canonical_achievement_id = ca.id
+         -- Only lists on platforms the user owns the game on count toward
+         -- its total (see #344): catalog enrichment attaches other platforms'
+         -- lists purely for rarity data, like getAchievementsForGame skips.
+         left join achievement_platform_links apl
+                on apl.canonical_achievement_id = ca.id
+               and exists (
+                   select 1 from user_owned_games uog
+                   join user_platform_accounts upa on upa.id = uog.user_platform_account_id
+                   where upa.user_id = $1 and uog.game_id = ca.game_id and upa.platform_id = apl.platform_id
+               )
          left join user_achievement_unlocks uau
                 on uau.achievement_platform_link_id = apl.id
                and uau.user_platform_account_id in (
