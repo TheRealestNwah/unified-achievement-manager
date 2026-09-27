@@ -408,7 +408,7 @@ export async function getAchievementsForGame(userId: string, gameId: string) {
 
     const result = await pool.query(
         `select
-            ca.id, ca.name, ca.description, ca.tier, ca.points,
+            ca.id, ca.name, ca.description, ca.tier, ca.tier_source, ca.points,
             -- A user's own pasted icon (see #32) wins over the auto-detected
             -- one on canonical_achievements.icon_url, same reasoning as
             -- cover art overrides in getGamesForUser above.

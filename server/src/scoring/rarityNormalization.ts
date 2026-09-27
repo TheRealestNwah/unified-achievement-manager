@@ -14,7 +14,7 @@ const MIN_SAMPLE_SIZE = 5;
 // just true outliers. Measuring the actual gold share directly separates
 // Payday 2 (93% gold under fixed thresholds - the case issue #10 was filed
 // over) from ordinary games like Half-Life 2/Portal (~14%, left alone).
-const SKEW_GOLD_SHARE = 0.5;
+export const SKEW_GOLD_SHARE = 0.5;
 
 // Re-resolves tier/points for every rarity_fallback achievement in one game,
 // choosing between the fixed global thresholds and the per-game percentile
