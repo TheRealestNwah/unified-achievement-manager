@@ -39,9 +39,11 @@ import {
     getUserTitles,
     getUserTrophiesEarnedForTitle,
     PsnApiError,
+    psnRetry,
 } from "./client";
 
 beforeEach(() => {
+    psnRetry.baseDelayMs = 0;
     responses.length = 0;
     requests.length = 0;
 });
@@ -106,5 +108,36 @@ describe("PSN client response parsing", () => {
             status: 401,
             message: "PSN access token was rejected",
         });
+    });
+});
+
+describe("PSN client transient failures (see #318)", () => {
+    const titlesPage = { trophyTitles: [], totalItemCount: 0 };
+
+    it("retries a 503 and succeeds once Sony answers", async () => {
+        responses.push({ status: 503 }, { status: 502 }, { status: 200, body: titlesPage });
+        await expect(getUserTitles("access")).resolves.toEqual([]);
+        expect(requests).toHaveLength(3);
+    });
+
+    it("gives up after four attempts with a plain-language message", async () => {
+        responses.push({ status: 503 }, { status: 503 }, { status: 503 }, { status: 503 });
+        await expect(getUserTitles("access")).rejects.toMatchObject({
+            status: 503,
+            message: "PlayStation Network is temporarily unavailable (503). Try again in a few minutes.",
+        });
+        expect(requests).toHaveLength(4);
+    });
+
+    it("honors Retry-After on a 429", async () => {
+        responses.push({ status: 429, headers: { "retry-after": "0" } }, { status: 200, body: titlesPage });
+        await expect(getUserTitles("access")).resolves.toEqual([]);
+        expect(requests).toHaveLength(2);
+    });
+
+    it("doesn't retry a non-transient failure", async () => {
+        responses.push({ status: 404 });
+        await expect(getUserTitles("access")).rejects.toMatchObject({ status: 404 });
+        expect(requests).toHaveLength(1);
     });
 });

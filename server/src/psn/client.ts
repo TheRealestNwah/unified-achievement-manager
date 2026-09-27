@@ -137,20 +137,64 @@ export function exchangeRefreshTokenForTokens(refreshToken: string): Promise<Psn
     );
 }
 
+// Sony's trophy API has brief outages (503s a couple of minutes apart, see
+// #318), and one failed call on any single title would otherwise abort the
+// whole sync. Transient statuses and dropped connections are retried with
+// backoff, honoring Retry-After up to a cap.
+const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);
+const MAX_ATTEMPTS = 4;
+const MAX_RETRY_AFTER_MS = 30_000;
+// Mutable so tests don't have to wait out real backoff.
+export const psnRetry = { baseDelayMs: 2_000 };
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelayMs(attempt: number, retryAfter: string | string[] | undefined): number {
+    const seconds = Number(Array.isArray(retryAfter) ? retryAfter[0] : retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+    return psnRetry.baseDelayMs * 2 ** (attempt - 1);
+}
+
 async function apiGet<T>(accessToken: string, url: string): Promise<T> {
     const parsed = new URL(url);
-    const res = await request({
-        hostname: parsed.hostname,
-        path: parsed.pathname + parsed.search,
-        method: "GET",
-        headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    for (let attempt = 1; ; attempt++) {
+        let res: Awaited<ReturnType<typeof request>>;
+        try {
+            res = await request({
+                hostname: parsed.hostname,
+                path: parsed.pathname + parsed.search,
+                method: "GET",
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
+        } catch (err) {
+            if (attempt < MAX_ATTEMPTS) {
+                await sleep(retryDelayMs(attempt, undefined));
+                continue;
+            }
+            throw new PsnApiError(0, `Couldn't reach PlayStation Network (${err instanceof Error ? err.message : String(err)}). Check your connection and try again.`);
+        }
 
-    if (res.status === 401) throw new PsnApiError(401, "PSN access token was rejected");
-    if (res.status < 200 || res.status >= 300) {
-        throw new PsnApiError(res.status, `PSN API ${parsed.pathname} failed: ${res.status}`);
+        if (TRANSIENT_STATUSES.has(res.status) && attempt < MAX_ATTEMPTS) {
+            await sleep(retryDelayMs(attempt, res.headers["retry-after"]));
+            continue;
+        }
+        if (res.status === 401) throw new PsnApiError(401, "PSN access token was rejected");
+        if (TRANSIENT_STATUSES.has(res.status)) {
+            console.warn(`PSN API ${parsed.pathname} still failing after ${MAX_ATTEMPTS} attempts: ${res.status}`);
+            throw new PsnApiError(
+                res.status,
+                res.status === 429
+                    ? "PlayStation Network is rate-limiting requests right now. Try again in a few minutes."
+                    : `PlayStation Network is temporarily unavailable (${res.status}). Try again in a few minutes.`
+            );
+        }
+        if (res.status < 200 || res.status >= 300) {
+            throw new PsnApiError(res.status, `PSN API ${parsed.pathname} failed: ${res.status}`);
+        }
+        return JSON.parse(res.body) as T;
     }
-    return JSON.parse(res.body) as T;
 }
 
 
