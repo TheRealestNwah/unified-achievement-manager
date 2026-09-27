@@ -21,6 +21,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { csrfProtection } from "./middleware/csrf";
 import { nonceMiddleware } from "./middleware/nonce";
+import { hostCheck } from "./middleware/hostCheck";
 import { jsonErrorHandler } from "./middleware/errorHandler";
 import { sendPageWithNonce } from "./staticPages";
 import { Server } from "node:http";
@@ -28,6 +29,7 @@ import { Server } from "node:http";
 export const app = express();
 
 app.disable("x-powered-by");
+app.use(hostCheck(config.port));
 app.use(nonceMiddleware);
 app.use(
     helmet({
