@@ -1,4 +1,5 @@
 import { pool } from "../db";
+import { deleteIfUploaded } from "../games/uploads";
 import { normalize, isTitleSubsequenceMatch } from "./normalize";
 import { hasPlatformCollision } from "./platformCollision";
 
@@ -304,8 +305,45 @@ export async function mergeGames(winnerId: string, loserId: string): Promise<voi
         );
         await client.query("delete from game_absence_streaks where game_id = $1", [loserId]);
 
+        // Carry each user's own settings for the loser over to the winner
+        // (see #334) - the games row's on-delete-cascade FKs would otherwise
+        // silently drop a hidden/excluded choice (putting an excluded game's
+        // points back into the score) and a custom cover. Where the user
+        // already has a setting on the winner, that one stays.
+        await client.query(
+            `insert into user_game_visibility (user_id, game_id, mode)
+             select user_id, $1, mode from user_game_visibility where game_id = $2
+             on conflict (user_id, game_id) do nothing`,
+            [winnerId, loserId]
+        );
+        const droppedCovers = await client.query(
+            `select loser.cover_image_url from user_game_cover_overrides loser
+             where loser.game_id = $2
+               and exists (
+                   select 1 from user_game_cover_overrides x
+                   where x.user_id = loser.user_id and x.game_id = $1
+               )`,
+            [winnerId, loserId]
+        );
+        await client.query(
+            `insert into user_game_cover_overrides (user_id, game_id, cover_image_url)
+             select user_id, $1, cover_image_url from user_game_cover_overrides where game_id = $2
+             on conflict (user_id, game_id) do nothing`,
+            [winnerId, loserId]
+        );
+        // Same for the platform-provided cover, which otherwise stays missing
+        // until the loser's platform next syncs and backfills it.
+        await client.query(
+            `update games set cover_image_url = (select cover_image_url from games where id = $2)
+             where id = $1 and cover_image_url is null`,
+            [winnerId, loserId]
+        );
+
         await client.query("delete from games where id = $1", [loserId]);
         await client.query("commit");
+        // An uploaded cover that lost out to one already on the winner has
+        // nothing pointing at it any more.
+        for (const row of droppedCovers.rows) deleteIfUploaded(row.cover_image_url);
     } catch (err) {
         await client.query("rollback");
         throw err;
