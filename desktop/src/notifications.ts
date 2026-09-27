@@ -58,6 +58,18 @@ export function describeFeed(feed: NewUnlocksFeed, previousLevel: number | null)
     return messages;
 }
 
+// isFocused() alone let notifications through while the app was in front
+// (see #329), so any one of three focus signals counts as "in use". They're
+// returned too, so each notification that does fire logs what it saw.
+async function focusState(window: BrowserWindow | null) {
+    if (!window || window.isDestroyed()) return { inUse: false, visible: false };
+    const visible = window.isVisible() && !window.isMinimized();
+    const windowFocused = window.isFocused();
+    const focusedWindow = BrowserWindow.getFocusedWindow() === window;
+    const pageFocused = await window.webContents.executeJavaScript("document.hasFocus()").then(Boolean, () => false);
+    return { inUse: visible && (windowFocused || focusedWindow || pageFocused), visible, windowFocused, focusedWindow, pageFocused };
+}
+
 export function startUnlockNotifications(
     serverUrl: string,
     getWindow: () => BrowserWindow | null,
@@ -79,9 +91,11 @@ export function startUnlockNotifications(
             level = feed.level;
             if (feed.total === 0 || !isEnabled()) return;
             // Someone looking at the app already sees the new unlocks.
-            const window = getWindow();
-            if (window && window.isVisible() && window.isFocused() && !window.isMinimized()) return;
-            for (const { title, body } of describeFeed(feed, previousLevel)) notify(title, body, getWindow);
+            const focus = await focusState(getWindow());
+            if (focus.inUse) return;
+            const messages = describeFeed(feed, previousLevel);
+            console.log(`Unlock notification (${messages.map((m) => m.title).join("; ")}); focus: ${JSON.stringify(focus)}`);
+            for (const { title, body } of messages) notify(title, body, getWindow);
         } finally {
             polling = false;
         }
