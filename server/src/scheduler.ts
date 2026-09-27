@@ -31,7 +31,9 @@ export function startScheduler(fallbackIntervalMinutes: number): () => void {
 }
 
 // Re-reads the interval and reschedules. A change takes effect from now
-// rather than triggering an immediate sync; startup does sync straight away.
+// rather than triggering an immediate sync. Startup syncs straight away, but
+// only accounts not synced (or tried) within the interval, so relaunching the
+// app doesn't re-sync everything each time and burn rate limits (see #407).
 export async function applySchedulerInterval({ runNow = false } = {}): Promise<void> {
     if (!started) return;
     let minutes: number | null;
@@ -48,7 +50,7 @@ export async function applySchedulerInterval({ runNow = false } = {}): Promise<v
         return;
     }
     console.log(`Background sync scheduler enabled - running every ${minutes} minute(s).`);
-    if (runNow) runScheduledSyncOnce();
+    if (runNow) runScheduledSyncOnce(minutes);
     scheduleNext(minutes);
 }
 
@@ -71,22 +73,32 @@ function clearTimer(): void {
     nextRunAt = null;
 }
 
-// A slow run (a big first sync) mustn't overlap the next one.
-function runScheduledSyncOnce(): void {
+// A slow run (a big first sync) mustn't overlap the next one. With
+// onlyStaleForMinutes, accounts synced or tried more recently than that are
+// left for the next run.
+function runScheduledSyncOnce(onlyStaleForMinutes: number | null = null): void {
     if (running) return;
     running = true;
-    runScheduledSync()
+    runScheduledSync(onlyStaleForMinutes)
         .catch((err) => console.error("Scheduled sync failed:", err))
         .finally(() => {
             running = false;
         });
 }
 
-async function runScheduledSync(): Promise<void> {
+async function runScheduledSync(onlyStaleForMinutes: number | null): Promise<void> {
+    // greatest() ignores nulls, so a never-synced account is always due.
     const accounts = await pool.query(
-        "select id, user_id, platform_id, platform_account_id, access_token, refresh_token from user_platform_accounts"
+        `select id, user_id, platform_id, platform_account_id, access_token, refresh_token from user_platform_accounts
+         where $1::int is null
+            or greatest(last_synced_at, last_sync_error_at) is null
+            or greatest(last_synced_at, last_sync_error_at) < now() - make_interval(mins => $1::int)`,
+        [onlyStaleForMinutes]
     );
-    if (accounts.rows.length === 0) return;
+    if (accounts.rows.length === 0) {
+        if (onlyStaleForMinutes !== null) console.log("Scheduled sync: every linked account synced recently - nothing due yet.");
+        return;
+    }
 
     console.log(`Scheduled sync: syncing ${accounts.rows.length} linked account(s)...`);
     let succeeded = 0;
