@@ -318,6 +318,12 @@ export async function mergeAchievements(idA: string, idB: string): Promise<void>
     }
 }
 
+// A candidate that can't be merged as proposed (see #406). It's the user's
+// request that can't be done, not a server failure, so it answers 409.
+export class MatchConflictError extends Error {
+    readonly status = 409;
+}
+
 // Manual review actions for candidates left below AUTO_MERGE_THRESHOLD (see
 // matchAchievementsForGame above) - a human decides instead of a score.
 export async function confirmMatchCandidate(candidateId: string): Promise<void> {
@@ -325,7 +331,7 @@ export async function confirmMatchCandidate(candidateId: string): Promise<void> 
         "select achievement_platform_link_id, candidate_canonical_achievement_id from achievement_match_candidates where id = $1",
         [candidateId]
     );
-    if (!candidate.rows[0]) throw new Error("Match candidate not found");
+    if (!candidate.rows[0]) throw Object.assign(new Error("Match candidate not found"), { status: 404 });
 
     const link = await pool.query("select canonical_achievement_id from achievement_platform_links where id = $1", [
         candidate.rows[0].achievement_platform_link_id,
@@ -335,7 +341,7 @@ export async function confirmMatchCandidate(candidateId: string): Promise<void> 
     const games = await pool.query("select count(distinct game_id)::int as n from canonical_achievements where id = any($1)", [
         [sourceId, targetId],
     ]);
-    if (games.rows[0].n > 1) throw new Error("These achievements are in different games, so they can't be merged");
+    if (games.rows[0].n > 1) throw new MatchConflictError("These achievements are in different games, so they can't be merged");
     const sameList = await pool.query(
         `select 1 from achievement_platform_links source
          join achievement_platform_links other
@@ -346,7 +352,7 @@ export async function confirmMatchCandidate(candidateId: string): Promise<void> 
         [candidate.rows[0].achievement_platform_link_id, targetId]
     );
     if (sameList.rows.length > 0) {
-        throw new Error("That achievement already has a different one from the same list, so they can't be merged");
+        throw new MatchConflictError("That achievement already has a different one from the same list, so they can't be merged");
     }
 
     // mergeAchievements repoints any achievement_match_candidates row whose
@@ -386,9 +392,12 @@ export async function reopenMatchCandidate(candidateId: string): Promise<boolean
 export async function resolveMatchCandidates(
     candidateIds: string[],
     action: "confirm" | "reject"
-): Promise<{ resolved: number; skipped: number }> {
+): Promise<{ resolved: number; skipped: number; conflicted: number }> {
     let resolved = 0;
     let skipped = 0;
+    // Ones that can't be merged as proposed stay pending for the user to
+    // reject by hand, rather than one of them failing the whole batch.
+    let conflicted = 0;
     for (const id of candidateIds) {
         const current = await pool.query(
             `select amc.status, apl.canonical_achievement_id as source_id, amc.candidate_canonical_achievement_id as target_id,
@@ -408,10 +417,18 @@ export async function resolveMatchCandidates(
         if (action === "reject") await rejectMatchCandidate(id);
         else if (row.source_id === row.target_id) {
             await pool.query("update achievement_match_candidates set status = 'confirmed', reviewed_at = now() where id = $1", [id]);
-        } else await confirmMatchCandidate(id);
+        } else {
+            try {
+                await confirmMatchCandidate(id);
+            } catch (err) {
+                if (!(err instanceof MatchConflictError)) throw err;
+                conflicted++;
+                continue;
+            }
+        }
         resolved++;
     }
-    return { resolved, skipped };
+    return { resolved, skipped, conflicted };
 }
 
 export async function rejectMatchCandidate(candidateId: string): Promise<void> {

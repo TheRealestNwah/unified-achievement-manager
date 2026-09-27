@@ -3647,6 +3647,11 @@ function renderReviewPanel(candidates) {
             state.lastRejectedCandidate = null;
             renderReviewPanel(await refreshReviewCount());
             if (action === "confirm" && result.resolved > 0) await refreshGamesAndScore();
+            if (result.conflicted > 0) {
+                showMessage(
+                    `${result.conflicted === 1 ? "1 match couldn't be merged because its achievement is already merged with a different one from the same list. It's" : `${result.conflicted} matches couldn't be merged because their achievements are already merged with different ones from the same list. They're`} still in the list to reject.`
+                );
+            }
         } catch (err) {
             button.disabled = false;
             showMessage(`Couldn't finish that: ${err.message}`);

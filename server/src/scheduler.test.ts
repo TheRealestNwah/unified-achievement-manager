@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const queryMock = vi.fn(async () => ({ rows: [] }));
+const queryMock = vi.fn(async (_sql?: string, _params?: unknown[]) => ({ rows: [] }));
 const getSyncIntervalMinutes = vi.fn();
-vi.mock("./db", () => ({ pool: { query: () => queryMock() } }));
+vi.mock("./db", () => ({ pool: { query: (sql: string, params?: unknown[]) => queryMock(sql, params) } }));
 vi.mock("./settings/syncInterval", () => ({ getSyncIntervalMinutes: (fallback: number) => getSyncIntervalMinutes(fallback) }));
 const runAccountSync = vi.fn();
 vi.mock("./sync/runAccountSync", () => ({ runAccountSync: (...args: unknown[]) => runAccountSync(...args) }));
@@ -30,8 +30,10 @@ describe("scheduler interval (#289)", () => {
         expect(getSchedulerStatus().intervalMinutes).toBe(60);
         expect(getSyncIntervalMinutes).toHaveBeenCalledWith(360);
         expect(getSchedulerStatus().nextRunAt?.toISOString()).toBe("2026-09-27T13:00:00.000Z");
-        // Startup syncs straight away (one accounts query).
+        // Startup syncs straight away (one accounts query), but only accounts
+        // not synced within the interval (#407).
         expect(queryMock).toHaveBeenCalledTimes(1);
+        expect(queryMock.mock.calls[0][1]).toEqual([60]);
 
         getSyncIntervalMinutes.mockResolvedValue(720);
         await applySchedulerInterval();
@@ -40,11 +42,16 @@ describe("scheduler interval (#289)", () => {
         // Changing the interval doesn't trigger an extra sync.
         expect(queryMock).toHaveBeenCalledTimes(1);
 
+        // A timed run syncs every account.
+        await vi.advanceTimersByTimeAsync(720 * 60 * 1000);
+        expect(queryMock).toHaveBeenCalledTimes(2);
+        expect(queryMock.mock.calls[1][1]).toEqual([null]);
+
         getSyncIntervalMinutes.mockResolvedValue(null);
         await applySchedulerInterval();
         expect(getSchedulerStatus()).toMatchObject({ intervalMinutes: null, nextRunAt: null });
         await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
-        expect(queryMock).toHaveBeenCalledTimes(1);
+        expect(queryMock).toHaveBeenCalledTimes(2);
 
         stop();
         expect(getSchedulerStatus().enabled).toBe(false);
