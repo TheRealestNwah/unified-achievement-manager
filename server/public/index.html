@@ -136,6 +136,21 @@
         font-weight: 700;
         letter-spacing: -0.01em;
     }
+    .sidebar-toggle {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-dim);
+        cursor: pointer;
+    }
+    .sidebar-toggle:hover { background: var(--border); color: var(--text); }
     .sidebar-section { padding: 0 10px; margin-bottom: 16px; }
     .sidebar-label {
         display: block;
@@ -970,32 +985,37 @@
         font-family: inherit;
     }
 
-    /* Below this width the sidebar collapses to an icon-only rail (the same
-       "compact window" pattern as a resized native app) instead of eating
-       into the content area or forcing horizontal scroll. */
+    /* The icon-only rail. The "rail" class is set by applySidebarRail():
+       forced below 900px (the same "compact window" pattern as a resized
+       native app, instead of eating into the content area or forcing
+       horizontal scroll), or chosen with the sidebar toggle (see #370). */
+    .app-shell.rail .sidebar { width: 60px; align-items: center; overflow-x: hidden; }
+    .app-shell.rail .sidebar-brand span, .app-shell.rail .sidebar-label { display: none; }
+    /* Visually hidden, not display:none, so each icon button keeps its
+       accessible name in the compact rail (see #280). */
+    .app-shell.rail .nav-item-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+    .app-shell.rail .nav-item { position: relative; justify-content: center; padding: 0; width: 40px; height: 34px; margin: 0 auto 4px; }
+    /* On the icon's lower-right corner, inside its own button, so it
+       can't be mistaken for the item above's (see #348). */
+    .app-shell.rail .nav-item .nav-badge { position: absolute; bottom: -5px; right: -6px; min-width: 16px; height: 15px; font-size: 9.5px; padding: 0 4px; }
+    .app-shell.rail .sidebar-brand { flex-direction: column; justify-content: center; padding: 18px 0 16px; }
+    .app-shell.rail .sidebar-toggle { margin-left: 0; }
+    .app-shell.rail .sidebar-toggle svg { transform: scaleX(-1); }
+    .app-shell.rail .sidebar-section { padding: 0 8px; width: 100%; }
+    .app-shell.rail .sidebar-footer { flex-direction: column; padding: 12px 6px; }
+    .app-shell.rail .sidebar-footer a, .app-shell.rail .sidebar-footer span { display: none; }
+    .app-shell.rail .sidebar-footer button { font-size: 11px; padding: 8px 2px; width: 52px; white-space: nowrap; }
+
     @media (max-width: 900px) {
-        .sidebar { width: 60px; align-items: center; overflow-x: hidden; }
-        .sidebar-brand span, .sidebar-label { display: none; }
-        /* Visually hidden, not display:none, so each icon button keeps its
-           accessible name in the compact rail (see #280). */
-        .nav-item-label {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            overflow: hidden;
-            clip: rect(0 0 0 0);
-            white-space: nowrap;
-        }
-        .nav-item { position: relative; }
-        /* On the icon's lower-right corner, inside its own button, so it
-           can't be mistaken for the item above's (see #348). */
-        .nav-item .nav-badge { position: absolute; bottom: -5px; right: -6px; min-width: 16px; height: 15px; font-size: 9.5px; padding: 0 4px; }
-        .sidebar-brand { justify-content: center; padding: 18px 0 16px; }
-        .sidebar-section { padding: 0 8px; width: 100%; }
-        .nav-item { justify-content: center; padding: 0; width: 40px; height: 34px; margin: 0 auto 4px; }
-        .sidebar-footer { flex-direction: column; padding: 12px 6px; }
-        .sidebar-footer a, .sidebar-footer span { display: none; }
-        .sidebar-footer button { font-size: 11px; padding: 8px 2px; width: 52px; white-space: nowrap; }
+        /* The rail is forced here, so there's nothing to toggle. */
+        .sidebar-toggle { display: none; }
         main { padding: 20px; }
         .toolbar { flex-direction: column; align-items: flex-start; }
     }
@@ -1011,6 +1031,9 @@
                 <path d="M11 2.5A8.5 8.5 0 0 1 19.5 11" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round"/>
             </svg>
             <span>Achievements</span>
+            <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M6 2.5v11" stroke="currentColor" stroke-width="1.3"/><path d="M11 6 9 8l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
         </div>
         <div class="sidebar-section hidden" data-signed-in-only>
             <span class="sidebar-label">Library</span>
@@ -4779,7 +4802,44 @@ function openReviewPage(tab) {
     return selectReviewTab(tab || firstWaiting || state.reviewTab || "achievements");
 }
 
+// Whether the user collapsed the sidebar to its icon-only rail (see #370) -
+// a per-viewer preference, so like the ones above it lives in localStorage.
+// Below 900px the rail is forced regardless, and the toggle is hidden.
+const SIDEBAR_COLLAPSED_KEY = "unified-achievement-manager:sidebarCollapsed";
+const NARROW_WINDOW = window.matchMedia("(max-width: 900px)");
+
+let sidebarCollapsed = false;
+
+function applySidebarRail() {
+    document.querySelector(".app-shell").classList.toggle("rail", sidebarCollapsed || NARROW_WINDOW.matches);
+    const toggle = document.getElementById("sidebar-toggle");
+    const label = sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar";
+    toggle.setAttribute("aria-expanded", String(!sidebarCollapsed));
+    toggle.setAttribute("aria-label", label);
+    toggle.title = label;
+}
+
+function initSidebarToggle() {
+    try {
+        sidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+    } catch {
+        // Storage unavailable - start expanded.
+    }
+    applySidebarRail();
+    NARROW_WINDOW.addEventListener("change", applySidebarRail);
+    document.getElementById("sidebar-toggle").addEventListener("click", () => {
+        sidebarCollapsed = !sidebarCollapsed;
+        applySidebarRail();
+        try {
+            localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+        } catch {
+            // Still toggles for this session, just isn't remembered.
+        }
+    });
+}
+
 function initSidebarNav() {
+    initSidebarToggle();
     // Tooltips for the compact icon-only rail (see #280).
     document.querySelectorAll(".nav-item").forEach((btn) => {
         btn.title = btn.querySelector(".nav-item-label")?.textContent.trim() ?? "";
