@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
 import { runMatching } from "./index";
@@ -9,9 +9,10 @@ import {
     resolveMatchCandidates,
     matchAchievementsForGame,
 } from "./achievementMatcher";
-import { mergeGames, confirmGameMergeCandidate, rejectGameMergeCandidate } from "./gameMatcher";
+import { mergeGames, rejectGameMergeCandidate } from "./gameMatcher";
 import { splitPlatformLink, GameSplitError } from "./gameSplitter";
-import { confirmGameSplitCandidate, rejectGameSplitCandidate } from "./legacySignalSplitDetector";
+import { rejectGameSplitCandidate } from "./legacySignalSplitDetector";
+import { confirmGameMerge, confirmGameSplit, reopenGameReviewCandidate, rescoreOwnersOf, resolveGameReviewBatch, type GameReviewQueue } from "./gameReview";
 import { recomputeUserScore } from "../scoring";
 import { normalizeRarityTiersForAllGames, normalizeRarityTiersForGame } from "../scoring/rarityNormalization";
 
@@ -249,31 +250,52 @@ matchingRouter.get("/game-candidates", requireAuth, async (_req, res, next) => {
 
 matchingRouter.post("/game-candidates/:id/confirm", requireAuth, async (req, res, next) => {
     try {
-        const candidate = await pool.query("select game_a_id from game_merge_candidates where id = $1", [req.params.id]);
-        if (!candidate.rows[0]) return res.status(404).json({ error: "Game merge candidate not found" });
-        const keepGameId = candidate.rows[0].game_a_id;
-
-        await confirmGameMergeCandidate(req.params.id);
-
-        // Same follow-up as the manual game-merge route above: the merge
-        // only changes this one game's achievement set, so re-run matching
-        // and rarity-tiering scoped to it rather than the whole library.
-        await matchAchievementsForGame(keepGameId);
-        await normalizeRarityTiersForGame(keepGameId);
-
-        const affectedUsers = await pool.query(
-            `select distinct upa.user_id from user_owned_games uog
-             join user_platform_accounts upa on upa.id = uog.user_platform_account_id
-             where uog.game_id = $1`,
-            [keepGameId]
-        );
-        for (const user of affectedUsers.rows) await recomputeUserScore(user.user_id);
-
+        const exists = await pool.query("select 1 from game_merge_candidates where id = $1", [req.params.id]);
+        if (!exists.rows[0]) return res.status(404).json({ error: "Game merge candidate not found" });
+        // The merge only changes this one game's achievement set, so matching
+        // and rarity tiering are re-run scoped to it (see gameReview.ts).
+        await rescoreOwnersOf(await confirmGameMerge(req.params.id));
         res.status(204).end();
     } catch (err) {
         next(err);
     }
 });
+
+// Bulk confirm/reject and undo-a-rejection for the Game merges and Possible
+// bad merges queues (see #293), mirroring /candidates/bulk.
+const MAX_BULK_GAME_CANDIDATES = 500;
+function bulkGameReviewRoute(queue: GameReviewQueue) {
+    return async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { ids, action } = req.body ?? {};
+            if (action !== "confirm" && action !== "reject") {
+                return res.status(400).json({ error: "action must be 'confirm' or 'reject'" });
+            }
+            if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_BULK_GAME_CANDIDATES || !ids.every((id) => typeof id === "string")) {
+                return res.status(400).json({ error: `ids must be 1-${MAX_BULK_GAME_CANDIDATES} candidate ids` });
+            }
+            res.json(await resolveGameReviewBatch(queue, ids, action));
+        } catch (err) {
+            next(err);
+        }
+    };
+}
+function reopenGameReviewRoute(queue: GameReviewQueue) {
+    return async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            if (!(await reopenGameReviewCandidate(queue, String(req.params.id)))) {
+                return res.status(409).json({ error: "Only a rejected suggestion can be put back for review." });
+            }
+            res.status(204).end();
+        } catch (err) {
+            next(err);
+        }
+    };
+}
+matchingRouter.post("/game-candidates/bulk", requireAuth, bulkGameReviewRoute("merge"));
+matchingRouter.post("/game-candidates/:id/reopen", requireAuth, reopenGameReviewRoute("merge"));
+matchingRouter.post("/game-split-candidates/bulk", requireAuth, bulkGameReviewRoute("split"));
+matchingRouter.post("/game-split-candidates/:id/reopen", requireAuth, reopenGameReviewRoute("split"));
 
 matchingRouter.post("/game-candidates/:id/reject", requireAuth, async (req, res, next) => {
     try {
@@ -316,30 +338,18 @@ matchingRouter.get("/game-split-candidates", requireAuth, async (_req, res, next
 
 matchingRouter.post("/game-split-candidates/:id/confirm", requireAuth, async (req, res, next) => {
     try {
-        const candidate = await pool.query("select game_id from game_split_candidates where id = $1", [req.params.id]);
-        if (!candidate.rows[0]) return res.status(404).json({ error: "Game split candidate not found" });
-        const sourceGameId = candidate.rows[0].game_id;
+        const exists = await pool.query("select 1 from game_split_candidates where id = $1", [req.params.id]);
+        if (!exists.rows[0]) return res.status(404).json({ error: "Game split candidate not found" });
 
         let result;
         try {
-            result = await confirmGameSplitCandidate(req.params.id);
+            result = await confirmGameSplit(req.params.id);
         } catch (err) {
             if (err instanceof GameSplitError) return res.status(400).json({ error: err.message });
             throw err;
         }
-
-        await normalizeRarityTiersForGame(sourceGameId);
-        await normalizeRarityTiersForGame(result.newGameId);
-
-        const affectedUsers = await pool.query(
-            `select distinct upa.user_id from user_owned_games uog
-             join user_platform_accounts upa on upa.id = uog.user_platform_account_id
-             where uog.game_id in ($1, $2)`,
-            [sourceGameId, result.newGameId]
-        );
-        for (const user of affectedUsers.rows) await recomputeUserScore(user.user_id);
-
-        res.json({ ...result, usersRescored: affectedUsers.rows.length });
+        const usersRescored = await rescoreOwnersOf(result.changedGameIds);
+        res.json({ ...result, changedGameIds: undefined, usersRescored });
     } catch (err) {
         next(err);
     }
