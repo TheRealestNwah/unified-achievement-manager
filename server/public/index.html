@@ -2884,14 +2884,25 @@ function setHiddenDashboardSections(hidden) {
     }
 }
 
+// All Games and the smart views are the games list on its own (see #320);
+// Overview is the whole dashboard.
+function isGamesNav() {
+    return Boolean(state.activeNav) && state.activeNav !== "overview" && NAV_SECTIONS[state.activeNav] === "section-games";
+}
+
 function applyDashboardSectionVisibility() {
     const hidden = getHiddenDashboardSections();
+    const gamesView = isGamesNav();
     DASHBOARD_SECTIONS.forEach(({ key, elementId }) => {
-        // Customize only shapes the Overview: the games views in the sidebar
-        // (All Games, In Progress, ...) always show the games list (see #279).
-        const shownAnyway = key === "games" && state.activeNav && state.activeNav !== "overview" && NAV_SECTIONS[state.activeNav] === "section-games";
-        document.getElementById(elementId)?.classList.toggle("hidden", hidden.has(key) && !shownAnyway);
+        // Customize only shapes the Overview: the games views always show
+        // the games list and nothing else (see #279).
+        const shown = gamesView ? key === "games" : !hidden.has(key);
+        document.getElementById(elementId)?.classList.toggle("hidden", !shown);
     });
+    // Off the dashboard, showOnlyView() owns the Customize button.
+    if (!document.getElementById("dashboard-view").classList.contains("hidden")) {
+        document.getElementById("customize-dashboard-btn").classList.toggle("hidden", gamesView || !state.dashboardCustomizable);
+    }
 }
 
 // Small popover anchored to the "Customize dashboard" button, listing each
@@ -2949,7 +2960,7 @@ function initDashboardCustomization() {
     applyDashboardSectionVisibility();
     const btn = document.getElementById("customize-dashboard-btn");
     state.dashboardCustomizable = true;
-    btn.classList.remove("hidden");
+    btn.classList.toggle("hidden", isGamesNav());
     btn.addEventListener("click", (e) => {
         showDashboardCustomizeMenu(e.currentTarget);
     });
@@ -4563,10 +4574,10 @@ function initAccountDeletion() {
     });
 }
 
-// Sidebar nav: "Overview"/"Platforms"/"All Games" just scroll to the section
-// they name (everything already lives on one page - no separate views to
-// fetch); "In Progress"/"Completed" additionally set a completion preset
-// consumed by renderGames() above. Highlighting is click-driven, not
+// Sidebar nav: "Overview" shows the whole dashboard, while "All Games" and
+// the smart views show only the games list (see #320) - all from data
+// already on the page, nothing extra to fetch. "In Progress"/"Completed"
+// additionally set a completion preset consumed by renderGames() above. Highlighting is click-driven, not
 // scroll-spy, since a click always has one unambiguous target.
 const NAV_SECTIONS = {
     overview: "section-overview",
@@ -4592,7 +4603,10 @@ function setActiveNav(key) {
     document.querySelectorAll(".nav-item").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.nav === key);
     });
-    if (key !== null) document.getElementById("topbar-title").textContent = NAV_TITLES[key] || "Overview";
+    if (key !== null) {
+        document.getElementById("topbar-title").textContent = NAV_TITLES[key] || "Overview";
+        applyDashboardSectionVisibility();
+    }
 }
 
 // Settings (Platforms, API keys, Account - see #191) is its own page rather
@@ -4605,7 +4619,7 @@ function showOnlyView(id) {
     MAIN_VIEWS.forEach((view) => document.getElementById(view).classList.toggle("hidden", view !== id));
     if (id !== "game-view") state.gameViewId = null;
     // Customizing only means anything on the dashboard itself.
-    document.getElementById("customize-dashboard-btn").classList.toggle("hidden", id !== "dashboard-view" || !state.dashboardCustomizable);
+    document.getElementById("customize-dashboard-btn").classList.toggle("hidden", id !== "dashboard-view" || isGamesNav() || !state.dashboardCustomizable);
 }
 
 function showSettingsView() {
@@ -4694,7 +4708,8 @@ function initSidebarNav() {
             hideSettingsView();
             state.completionPreset = PRESET_LABELS[key] ? key : null;
             applyDashboardSectionVisibility();
-            document.getElementById(NAV_SECTIONS[key])?.scrollIntoView({ behavior: "smooth", block: "start" });
+            // Each is its own view now (see #320), so start at the top.
+            document.querySelector(".content-pane").scrollTop = 0;
             renderGames(state.games);
         });
     });
