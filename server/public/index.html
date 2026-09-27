@@ -251,7 +251,26 @@
         padding: 20px;
         width: min(480px, calc(100vw - 32px));
     }
-    #text-prompt::backdrop { background: rgba(0, 0, 0, 0.45); }
+    #text-prompt::backdrop, #scoring-help::backdrop { background: rgba(0, 0, 0, 0.45); }
+    #scoring-help {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--bg);
+        color: var(--text);
+        padding: 20px 24px;
+        width: min(560px, calc(100vw - 32px));
+        max-height: calc(100vh - 48px);
+        font-size: 13px;
+        line-height: 1.55;
+    }
+    #scoring-help h3 { margin: 0 0 8px; font-size: 16px; }
+    #scoring-help h4 { margin: 14px 0 4px; font-size: 13px; }
+    #scoring-help p, #scoring-help ul { margin: 0 0 8px; color: var(--text-dim); }
+    #scoring-help ul { padding-left: 20px; }
+    #scoring-help table { border-collapse: collapse; margin: 4px 0 8px; }
+    #scoring-help td { padding: 3px 14px 3px 0; }
+    .link-button { background: none; color: var(--accent); padding: 0; font-size: 12px; font-weight: 500; margin-top: 8px; }
+    .link-button:hover { text-decoration: underline; }
     #text-prompt-message { white-space: pre-line; margin: 0 0 12px; line-height: 1.5; }
     #text-prompt-input {
         width: 100%;
@@ -1052,6 +1071,7 @@
                     <div class="score-info">
                         <div class="points" id="points-text">-</div>
                         <div class="tier-pips" id="level-tier-counts"></div>
+                        <button type="button" class="link-button" id="scoring-help-btn">How is this worked out?</button>
                         <div class="sync-freshness">
                             <span id="sync-freshness-text"></span>
                             <button type="button" class="secondary" id="dashboard-sync-all-btn">Sync all</button>
@@ -1290,6 +1310,14 @@
 
 <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
 
+<dialog id="scoring-help" aria-labelledby="scoring-help-title">
+    <h3 id="scoring-help-title">How scoring works</h3>
+    <div id="scoring-help-body"><p class="loading-note">Loading...</p></div>
+    <div class="sgdb-actions">
+        <button type="button" id="scoring-help-close">Close</button>
+    </div>
+</dialog>
+
 <dialog id="text-prompt">
     <form id="text-prompt-form">
         <p id="text-prompt-message"></p>
@@ -1504,6 +1532,52 @@ function tierDots(game) {
         .filter(([, count]) => Number(count) > 0)
         .map(([tier, count]) => `<span class="pip"><span class="dot ${tier}"></span>${count}</span>`)
         .join("");
+}
+
+// "How scoring works" (see #287), with the real numbers from the server.
+async function openScoringHelp() {
+    const dialog = document.getElementById("scoring-help");
+    const body = document.getElementById("scoring-help-body");
+    dialog.showModal();
+    document.getElementById("scoring-help-close").focus();
+    try {
+        const rules = await api("/api/me/scoring-rules");
+        const xp = rules.tierPoints;
+        body.innerHTML = `
+            <p>Every achievement from every platform gets a PlayStation-style tier, each tier is worth a fixed amount of XP, and your XP decides your level.</p>
+            <h4>XP per tier</h4>
+            <table>
+                ${["platinum", "gold", "silver", "bronze"].map((t) => `<tr><td><span class="tier-tag ${t}">${t}</span></td><td>${xp[t]} XP</td></tr>`).join("")}
+            </table>
+            <h4>Where a tier comes from</h4>
+            <ul>
+                <li><strong>PlayStation's own tier</strong> when the game has a PSN release, even for the Steam or Xbox copy of the same achievement once they're matched.</li>
+                <li>Otherwise <strong>how rare it is</strong>: under ${rules.goldRarityBelow}% of players is Gold, under ${rules.silverRarityBelow}% is Silver, anything more common is Bronze.</li>
+                <li>If more than ${Math.round(rules.skewedGoldShare * 100)}% of a game's achievements would come out Gold that way (some games are just hard), it's tiered by rank within that game instead.</li>
+                <li>Rarity never makes a <strong>Platinum</strong>. That only comes from a real PSN platinum, or from finishing 100% of a game that doesn't have one.</li>
+            </ul>
+            <h4>What counts</h4>
+            <ul>
+                <li>Earning the same achievement on two platforms counts twice. Finishing a game on PS4 and PS5 is two platinums.</li>
+                <li>Hidden games still count. Excluded games (right-click a game) don't.</li>
+            </ul>
+            <h4>Levels</h4>
+            <p>The level curve follows PlayStation's: early levels come quickly, later ones need more XP each.</p>`;
+    } catch (err) {
+        body.textContent = `Couldn't load the scoring rules: ${err.message}`;
+    }
+}
+
+document.getElementById("scoring-help-btn").addEventListener("click", openScoringHelp);
+document.getElementById("scoring-help-close").addEventListener("click", () => document.getElementById("scoring-help").close());
+
+// A tier tag's tooltip: where that achievement's tier came from (see #287).
+function tierTooltip(a) {
+    const tier = a.tier ? a.tier[0].toUpperCase() + a.tier.slice(1) : "";
+    if (a.tier_source === "psn_native") return `${tier}: PlayStation's own trophy tier`;
+    if (a.tier_source === "cross_platform_match") return `${tier}: taken from the matching PlayStation trophy`;
+    if (a.global_unlock_rarity != null) return `${tier}: ${Number(a.global_unlock_rarity).toFixed(1)}% of players have it`;
+    return `${tier}: based on how rare it is`;
 }
 
 // Level ring's circumference (r=46): 2 * PI * 46 = 289.03.
@@ -3097,7 +3171,7 @@ function renderAchievementsPanel(panel, gameId, achievements, platformLinks, rel
                                 : `<div class="achievement-icon"></div>`
                         }
                     </div>
-                    <span class="tier-tag ${a.tier}">${a.tier}</span>
+                    <span class="tier-tag ${a.tier}" title="${escapeHtml(tierTooltip(a))}">${a.tier}</span>
                     <div class="achievement-body">
                         <div class="achievement-name">${escapeHtml(a.name)}${
                             a.unlocked && a.points != null ? ` <span class="achievement-points">+${a.points} XP</span>` : ""
