@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
-import { exportFileName } from "./exportFile";
+import { exportFileName, toCsv } from "./exportFile";
 import { getSchedulerStatus } from "../scheduler";
 import { syncingAccountIds } from "../sync/runAccountSync";
 import { getGamesForUser, getAchievementsForGame, getRecentActivity, getFunStats, getFullExportData } from "./queries";
@@ -151,16 +151,6 @@ gamesRouter.get("/stats", requireAuth, async (req, res, next) => {
         next(err);
     }
 });
-
-function toCsv(rows: Record<string, unknown>[]): string {
-    if (rows.length === 0) return "";
-    const headers = Object.keys(rows[0]);
-    const escape = (value: unknown) => {
-        const str = value === null || value === undefined ? "" : String(value);
-        return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-    };
-    return [headers.join(","), ...rows.map((row) => headers.map((h) => escape(row[h])).join(","))].join("\n");
-}
 
 // Scoped to the requesting user's own data only - req.user!.id, no way to
 // pass a different user, no admin/global export (see #26).
