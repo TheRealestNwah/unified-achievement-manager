@@ -43,7 +43,7 @@ export async function getOrCreateCanonicalGame(
     try {
         await client.query("begin");
         const game = await client.query("insert into games (title, cover_image_url) values ($1, $2) returning id", [
-            title,
+            title.trim(), // some platforms pad titles and names (see #364)
             coverImageUrl ?? null,
         ]);
         await client.query(
@@ -110,7 +110,7 @@ export async function getOrCreateAchievementLink(
         const canonical = await client.query(
             `insert into canonical_achievements (game_id, name, description, tier, tier_source, points, icon_url)
              values ($1, $2, $3, $4, $5, $6, $7) returning id`,
-            [gameId, name, description ?? null, tier, tierSource, points, iconUrl ?? null]
+            [gameId, name.trim(), description ?? null, tier, tierSource, points, iconUrl ?? null]
         );
         const link = await client.query(
             `insert into achievement_platform_links

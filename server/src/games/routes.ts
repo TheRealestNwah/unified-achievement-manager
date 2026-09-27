@@ -239,7 +239,7 @@ gamesRouter.put("/games/:gameId/title", requireAuth, async (req, res, next) => {
             return res.status(404).json({ error: "Game not found in your library" });
         }
         const result = await pool.query(
-            `update games g set title = gpl.platform_title
+            `update games g set title = btrim(gpl.platform_title, E' \\t\\r\\n' || chr(160))
              from game_platform_links gpl
              where g.id = $1 and gpl.id = $2 and gpl.game_id = g.id
              returning g.title`,

@@ -42,7 +42,7 @@ export async function splitPlatformLink(gameId: string, gamePlatformLinkId: stri
         }
         const platformStaysOnSource = remaining.rows.some((r) => r.platform_id === platformId);
 
-        const created = await client.query("insert into games (title) values ($1) returning id", [platformTitle]);
+        const created = await client.query("insert into games (title) values ($1) returning id", [platformTitle.trim()]);
         const newGameId: string = created.rows[0].id;
         await client.query("update game_platform_links set game_id = $1 where id = $2", [newGameId, gamePlatformLinkId]);
 

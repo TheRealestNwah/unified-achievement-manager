@@ -431,7 +431,6 @@ insert into platforms (id, name, has_native_tiers) values
     ('gog', 'GOG', false)
 on conflict (id) do nothing;
 
-
 -- ---------------------------------------------------------------------------
 -- Data repairs
 -- ---------------------------------------------------------------------------
@@ -496,3 +495,11 @@ begin
           and source.game_id <> target.game_id;
     end if;
 end $$;
+
+-- Whitespace some platforms pad titles and names with (see #364), trimmed
+-- as they're stored now (chr(160) is a no-break space). The raw
+-- platform_title/platform_name stay as the platform reported them.
+update games set title = btrim(title, E' \t\r\n' || chr(160))
+where title <> btrim(title, E' \t\r\n' || chr(160));
+update canonical_achievements set name = btrim(name, E' \t\r\n' || chr(160))
+where name <> btrim(name, E' \t\r\n' || chr(160));
