@@ -4,6 +4,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { randomBytes } from "crypto";
 import { Client } from "pg";
+import { acquireDataDirLock } from "./dataDirLock";
 
 const DB_NAME = "uam";
 const DB_USER = "uam";
@@ -144,6 +145,18 @@ async function ensureDatabase(port: number, password: string): Promise<void> {
 
 export async function startEmbeddedDatabase(dataDir: string): Promise<EmbeddedDatabase> {
     const bins = loadBinaries();
+    // Taken before anything below can stop a PostgreSQL that's in use, and
+    // held until this database is stopped (see #405).
+    const lock = await acquireDataDirLock(dataDir);
+    try {
+        return await startCluster(bins, dataDir, lock);
+    } catch (err) {
+        await lock.release();
+        throw err;
+    }
+}
+
+async function startCluster(bins: Binaries, dataDir: string, lock: { release(): Promise<void> }): Promise<EmbeddedDatabase> {
     const pgData = path.join(dataDir, "postgres");
     const logFile = path.join(dataDir, "postgres.log");
     const password = loadOrCreatePassword(dataDir);
@@ -172,6 +185,6 @@ export async function startEmbeddedDatabase(dataDir: string): Promise<EmbeddedDa
 
     return {
         url: `postgres://${DB_USER}:${encodeURIComponent(password)}@127.0.0.1:${port}/${DB_NAME}`,
-        stop: () => stopCluster(bins, pgData),
+        stop: () => stopCluster(bins, pgData).finally(() => lock.release()),
     };
 }
