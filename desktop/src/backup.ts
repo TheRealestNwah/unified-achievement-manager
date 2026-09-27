@@ -15,9 +15,16 @@ export const BACKUP_ITEMS = ["secrets.json", "database.json", "app.json", "windo
 // useless (or someone else's archive).
 const REQUIRED = ["secrets.json", "database.json", path.join("postgres", "PG_VERSION")];
 
+// On Windows, a "tar" found on PATH may be Git's GNU tar, which reads the
+// "C:" in an archive path as a remote host; Windows' own bsdtar doesn't.
+function tarCommand(): string {
+    if (process.platform !== "win32") return "tar";
+    return path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
+}
+
 function tar(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-        execFile("tar", args, { windowsHide: true, maxBuffer: 16 * 1024 * 1024 }, (err, _stdout, stderr) => {
+        execFile(tarCommand(), args, { windowsHide: true, maxBuffer: 16 * 1024 * 1024 }, (err, _stdout, stderr) => {
             if (err) reject(new Error(`tar failed: ${stderr?.trim() || err.message}`));
             else resolve();
         });
