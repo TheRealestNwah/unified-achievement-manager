@@ -98,6 +98,29 @@ integration("bulk achievement-candidate review (#252)", () => {
         expect(await platformsByName("Sphere Hunter")).toEqual([["steam"], ["steam"]]);
     });
 
+    it("never proposes a target that already has an achievement from the same list (#362)", async () => {
+        const game = await canonicalStore.getOrCreateCanonicalGame("steam", "sith-app", "Sith Game");
+        await canonicalStore.getOrCreateAchievementLink(game, "steam", "sith-app", "s1", "Sith Frenzy", undefined, undefined);
+        const warrior = await canonicalStore.getOrCreateAchievementLink(game, "psn", "sith-list", "p1", "Sith Warrior", undefined, undefined);
+        await canonicalStore.getOrCreateAchievementLink(game, "psn", "sith-list", "p2", "Sith Frenzy", undefined, undefined);
+
+        await matcher.matchAchievementsForGame(game);
+        await matcher.matchAchievementsForGame(game);
+        const rows = await pool.query("select status from achievement_match_candidates where achievement_platform_link_id = $1", [warrior]);
+        expect(rows.rows).toEqual([]);
+
+        // A queued one from before the fix can't be confirmed either.
+        const frenzy = await pool.query(
+            "select canonical_achievement_id from achievement_platform_links where platform_id = 'psn' and platform_achievement_id = 'p2'"
+        );
+        const stale = await pool.query(
+            `insert into achievement_match_candidates (achievement_platform_link_id, candidate_canonical_achievement_id, confidence)
+             values ($1, $2, 0.5) returning id`,
+            [warrior, frenzy.rows[0].canonical_achievement_id]
+        );
+        await expect(matcher.confirmMatchCandidate(stale.rows[0].id)).rejects.toThrow(/same list/);
+    });
+
     it("keeps an ordinary exact name match auto-merging", async () => {
         const game = await canonicalStore.getOrCreateCanonicalGame("steam", "plain-app", "Plain Game");
         await canonicalStore.getOrCreateAchievementLink(game, "steam", "plain-app", "s1", "First Blood", undefined, undefined);
