@@ -743,7 +743,13 @@
     .tier-pips { display: flex; gap: 6px; font-size: 12px; }
     .pip { display: flex; align-items: center; gap: 3px; }
     .dot { width: 8px; height: 8px; border-radius: 50%; }
-    .dot.platinum { background: var(--platinum); }
+    /* A diamond, so platinum doesn't rely on its small colour difference
+       from silver (see #347). */
+    .dot.platinum { background: var(--platinum); border-radius: 1px; transform: rotate(45deg) scale(0.85); }
+    .visually-hidden {
+        position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
     .dot.gold { background: var(--gold); }
     .dot.silver { background: var(--silver); }
     .dot.bronze { background: var(--bronze); }
@@ -1557,6 +1563,13 @@ async function api(path, options = {}) {
     return res.json();
 }
 
+// One tier count (see #347): the dot is decoration, so the tier's name is in
+// the tooltip and in text a screen reader reads ("2 platinum").
+function tierPip(tier, count) {
+    const text = Number(count).toLocaleString();
+    return `<span class="pip" title="${text} ${tier}"><span class="dot ${tier}" aria-hidden="true"></span>${text}<span class="visually-hidden"> ${tier}</span></span>`;
+}
+
 function tierDots(game) {
     const tiers = [
         ["platinum", game.platinum_unlocked],
@@ -1566,7 +1579,7 @@ function tierDots(game) {
     ];
     return tiers
         .filter(([, count]) => Number(count) > 0)
-        .map(([tier, count]) => `<span class="pip"><span class="dot ${tier}"></span>${count}</span>`)
+        .map(([tier, count]) => tierPip(tier, count))
         .join("");
 }
 
@@ -1986,7 +1999,7 @@ function renderStats(stats) {
                 ["silver", stats.totalSilver],
                 ["bronze", stats.totalBronze],
             ]
-                .map(([tier, count]) => `<span class="pip" title="${tier}"><span class="dot ${tier}"></span>${count.toLocaleString()}</span>`)
+                .map(([tier, count]) => tierPip(tier, count))
                 .join("")}</span>`
         )
     );
@@ -3447,7 +3460,7 @@ function renderLevelTierCounts(stats) {
     ];
     document.getElementById("level-tier-counts").innerHTML = pips
         .filter(([, count]) => count > 0)
-        .map(([tier, count]) => `<span class="pip"><span class="dot ${tier}"></span>${count}</span>`)
+        .map(([tier, count]) => tierPip(tier, count))
         .join("");
 }
 
