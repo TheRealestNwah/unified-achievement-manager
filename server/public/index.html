@@ -3314,6 +3314,7 @@ function renderGameReviewPanel(candidates) {
     const panel = document.getElementById("review-games-panel");
     if (candidates.length === 0) {
         panel.innerHTML = `<div class="loading-note">No game merges waiting for review.</div>`;
+        wireGameReviewQueue(panel, [], { queue: "game-candidates", confirmLabel: "Merge", rejectLabel: "Keep separate", confident: [], refresh: async () => renderGameReviewPanel(await refreshGameReviewCount()) });
         return;
     }
 
@@ -3339,10 +3340,14 @@ function renderGameReviewPanel(candidates) {
         )
         .join("");
 
-    panel.querySelectorAll(".review-row").forEach((row) => {
-        const id = row.dataset.id;
-        row.querySelector(".confirm").addEventListener("click", () => runRowAction(row, () => resolveGameCandidate(id, "confirm")));
-        row.querySelector(".reject").addEventListener("click", () => runRowAction(row, () => resolveGameCandidate(id, "reject")));
+    wireGameReviewQueue(panel, candidates, {
+        queue: "game-candidates",
+        confirmLabel: "Merge",
+        rejectLabel: "Keep separate",
+        confident: candidates.filter((c) => Number(c.confidence) >= BULK_CONFIRM_THRESHOLD),
+        describe: (c) => `${c.game_a_title} / ${c.game_b_title}`,
+        resolve: resolveGameCandidate,
+        refresh: async () => renderGameReviewPanel(await refreshGameReviewCount()),
     });
 }
 
@@ -3351,6 +3356,89 @@ async function resolveGameCandidate(id, action) {
     const candidates = await refreshGameReviewCount();
     renderGameReviewPanel(candidates);
     if (action === "confirm") await refreshGamesAndScore();
+}
+
+// Bulk actions, Y/N keys, and undo-last-rejection for the Game merges and
+// Possible bad merges tabs (see #293), matching the Achievement matches tab
+// (#252). `confident` is the subset "Confirm all" applies to - the whole list
+// when the queue has no confidence score.
+function wireGameReviewQueue(panel, candidates, { queue, confirmLabel, rejectLabel, confident, describe, resolve, refresh }) {
+    const undoKey = `lastRejected:${queue}`;
+    const last = state[undoKey];
+    const header = document.createElement("div");
+    header.innerHTML = `
+        ${last ? `<div class="review-undo" role="status">${escapeHtml(rejectLabel)}: "${escapeHtml(last.name)}". <a href="#" class="review-undo-link">Undo</a></div>` : ""}
+        ${candidates.length === 0 ? "" : `<div class="review-bulk">
+            <span class="review-bulk-hint">Tip: focus a row and press <kbd>Y</kbd> to ${escapeHtml(confirmLabel.toLowerCase())} or <kbd>N</kbd> to ${escapeHtml(rejectLabel.toLowerCase())}.</span>
+            <button type="button" class="secondary" data-bulk="confirm" ${confident.length === 0 ? "disabled" : ""}>${escapeHtml(confirmLabel)} all${confident.length !== candidates.length ? ` ≥ ${Math.round(BULK_CONFIRM_THRESHOLD * 100)}%` : ""} (${confident.length})</button>
+            <button type="button" class="secondary" data-bulk="reject">${escapeHtml(rejectLabel)} all (${candidates.length})</button>
+        </div>`}`;
+    panel.prepend(...header.children);
+
+    panel.querySelector(".review-undo-link")?.addEventListener("click", async (e) => {
+        e.preventDefault();
+        state[undoKey] = null;
+        try {
+            await api(`/api/matching/${queue}/${last.id}/reopen`, { method: "POST" });
+        } catch (err) {
+            showMessage(`Couldn't undo that: ${err.message}`);
+        }
+        await refresh();
+    });
+
+    const bulk = async (button, ids, action) => {
+        const verb = action === "confirm" ? confirmLabel : rejectLabel;
+        if (!(await askConfirm(`${verb} all ${ids.length} suggestion${ids.length === 1 ? "" : "s"}?`, { okLabel: verb }))) return;
+        button.disabled = true;
+        try {
+            const result = await api(`/api/matching/${queue}/bulk`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids, action }),
+            });
+            state[undoKey] = null;
+            await refresh();
+            if (action === "confirm" && result.resolved > 0) await refreshGamesAndScore();
+            if (result.failed > 0) showMessage(`${result.failed} of them couldn't be applied and are still waiting for review.`);
+        } catch (err) {
+            button.disabled = false;
+            showMessage(`Couldn't finish that: ${err.message}`);
+        }
+    };
+    panel.querySelector('[data-bulk="confirm"]')?.addEventListener("click", (e) => bulk(e.currentTarget, confident.map((c) => c.id), "confirm"));
+    panel.querySelector('[data-bulk="reject"]')?.addEventListener("click", (e) => bulk(e.currentTarget, candidates.map((c) => c.id), "reject"));
+
+    const rows = [...panel.querySelectorAll(".review-row")];
+    rows.forEach((row, index) => {
+        const id = row.dataset.id;
+        const candidate = candidates.find((c) => c.id === id);
+        row.tabIndex = 0;
+        row.setAttribute("aria-keyshortcuts", "Y N");
+        const decide = (action) =>
+            runRowAction(row, async () => {
+                state[`${undoKey}:focus`] = index;
+                state[undoKey] = action === "reject" ? { id, name: describe(candidate) } : null;
+                await resolve(id, action);
+            });
+        row.querySelector(".confirm").addEventListener("click", () => decide("confirm"));
+        row.querySelector(".reject").addEventListener("click", () => decide("reject"));
+        row.addEventListener("keydown", (e) => {
+            if (e.target !== row || e.ctrlKey || e.metaKey || e.altKey) return;
+            const key = e.key.toLowerCase();
+            if (key === "y" || key === "n") {
+                e.preventDefault();
+                decide(key === "y" ? "confirm" : "reject");
+            } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                rows[index + (e.key === "ArrowDown" ? 1 : -1)]?.focus();
+            }
+        });
+    });
+    const focusIndex = state[`${undoKey}:focus`];
+    if (focusIndex != null) {
+        (rows[focusIndex] || rows[rows.length - 1])?.focus();
+        state[`${undoKey}:focus`] = null;
+    }
 }
 
 async function refreshSplitReviewCount() {
@@ -3363,6 +3451,7 @@ function renderSplitReviewPanel(candidates) {
     const panel = document.getElementById("review-splits-panel");
     if (candidates.length === 0) {
         panel.innerHTML = `<div class="loading-note">No possible bad merges waiting for review.</div>`;
+        wireGameReviewQueue(panel, [], { queue: "game-split-candidates", confirmLabel: "Split apart", rejectLabel: "Keep merged", confident: [], refresh: async () => renderSplitReviewPanel(await refreshSplitReviewCount()) });
         return;
     }
 
@@ -3387,10 +3476,14 @@ function renderSplitReviewPanel(candidates) {
         )
         .join("");
 
-    panel.querySelectorAll(".review-row").forEach((row) => {
-        const id = row.dataset.id;
-        row.querySelector(".confirm").addEventListener("click", () => runRowAction(row, () => resolveSplitCandidate(id, "confirm")));
-        row.querySelector(".reject").addEventListener("click", () => runRowAction(row, () => resolveSplitCandidate(id, "reject")));
+    wireGameReviewQueue(panel, candidates, {
+        queue: "game-split-candidates",
+        confirmLabel: "Split apart",
+        rejectLabel: "Keep merged",
+        confident: candidates,
+        describe: (c) => `${c.candidate_platform_title} in ${c.game_title}`,
+        resolve: resolveSplitCandidate,
+        refresh: async () => renderSplitReviewPanel(await refreshSplitReviewCount()),
     });
 }
 
