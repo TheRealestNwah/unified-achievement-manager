@@ -2,6 +2,7 @@ import os from "os";
 import path from "path";
 import { startEmbeddedDatabase } from "./runtime/embeddedDatabase";
 import { resolveAppPort } from "./runtime/appPort";
+import { watchDatabase } from "./runtime/databaseWatchdog";
 
 // Entry point for the self-contained app: no .env, no external PostgreSQL.
 // Everything lives in one per-user data folder.
@@ -18,7 +19,15 @@ export interface RunningApp {
     stop(): Promise<void>;
 }
 
-export async function startApp({ dataDir = defaultDataDir(), port }: { dataDir?: string; port?: number } = {}): Promise<RunningApp> {
+export interface StartAppOptions {
+    dataDir?: string;
+    port?: number;
+    // Called once if the database stops answering while the app runs (see
+    // #415). Without it the app only logs that it happened.
+    onDatabaseLost?: (err: unknown) => void;
+}
+
+export async function startApp({ dataDir = defaultDataDir(), port, onDatabaseLost }: StartAppOptions = {}): Promise<RunningApp> {
     const resolvedDataDir = path.resolve(dataDir);
     process.env.UAM_APP = "1";
     process.env.UAM_DATA_DIR = resolvedDataDir;
@@ -36,13 +45,25 @@ export async function startApp({ dataDir = defaultDataDir(), port }: { dataDir?:
         await recomputeAllUserScores();
         const { startServer } = await import("./index");
         const { config } = await import("./config");
+        const { checkDatabaseConnection } = await import("./db");
         const server = await startServer();
+        const stopWatchdog = watchDatabase({
+            check: checkDatabaseConnection,
+            onLost: (err) => {
+                console.error("The database stopped responding:", err);
+                onDatabaseLost?.(err);
+            },
+        });
 
         let stopping: Promise<void> | undefined;
         return {
             url: config.baseUrl,
             dataDir: resolvedDataDir,
-            stop: () => (stopping ??= server.stop().finally(() => database.stop())),
+            // Stopped first so closing the pool doesn't look like losing the database.
+            stop: () => {
+                stopWatchdog();
+                return (stopping ??= server.stop().finally(() => database.stop()));
+            },
         };
     } catch (err) {
         await database.stop().catch(() => undefined);

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { DatabaseError } from "pg";
 import type { NextFunction, Request, Response } from "express";
-import { errorResponse, jsonErrorHandler } from "./errorHandler";
+import { errorResponse, jsonErrorHandler, logServerError } from "./errorHandler";
 
 function dbError(code: string, message: string): DatabaseError {
     const err = new DatabaseError(message, message.length, "error");
@@ -39,5 +39,18 @@ describe("jsonErrorHandler", () => {
         jsonErrorHandler(err, {} as Request, res as unknown as Response, next as NextFunction);
         expect(next).toHaveBeenCalledWith(err);
         expect(res.status).not.toHaveBeenCalled();
+    });
+});
+
+describe("logServerError", () => {
+    it("logs a run of identical errors once, then how many more there were (#415)", () => {
+        const log = vi.fn();
+        const refused = () => new Error("connect ECONNREFUSED 127.0.0.1:5432");
+        for (let i = 0; i < 20; i++) logServerError(refused(), log);
+        expect(log).toHaveBeenCalledOnce();
+
+        const other = new Error("Xbox token expired");
+        logServerError(other, log);
+        expect(log.mock.calls.slice(1)).toEqual([["(previous error repeated 19 more times)"], [other]]);
     });
 });

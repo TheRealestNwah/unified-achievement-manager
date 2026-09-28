@@ -20,6 +20,24 @@ export function errorResponse(err: unknown): { status: number; error: string } {
     return { status: 500, error: err instanceof Error ? err.message : "Internal server error" };
 }
 
+// Once the database is gone every request fails the same way; the dashboard's
+// polling alone logged ~20 identical ECONNREFUSED stacks a minute (see #415).
+// A run of identical errors is logged once, then summarised when it ends.
+let lastMessage: string | undefined;
+let repeats = 0;
+
+export function logServerError(err: unknown, log: (...args: unknown[]) => void = console.error): void {
+    const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    if (message === lastMessage) {
+        repeats++;
+        return;
+    }
+    if (repeats > 0) log(`(previous error repeated ${repeats} more time${repeats === 1 ? "" : "s"})`);
+    lastMessage = message;
+    repeats = 0;
+    log(err);
+}
+
 // Every route hands failures to next(err); without this, Express's default
 // handler sends an HTML error page, which breaks every fetch()-based call in
 // the dashboard (JSON.parse on "<!DOCTYPE ...").
@@ -29,6 +47,6 @@ export const jsonErrorHandler: ErrorRequestHandler = (err, _req, res, next) => {
     // handler just closes the connection.
     if (res.headersSent) return next(err);
     const { status, error } = errorResponse(err);
-    if (status >= 500) console.error(err);
+    if (status >= 500) logServerError(err);
     res.status(status).json({ error });
 };
