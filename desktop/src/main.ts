@@ -216,6 +216,40 @@ async function withServerStopped(message: string, task: () => Promise<void>): Pr
     app.exit(0);
 }
 
+let databaseLostShown = false;
+
+// The bundled PostgreSQL stopped under the running app - ended in Task
+// Manager, or crashed (see #415). Nothing works without it, so rather than
+// leave the dashboard failing request after request, say so and offer the
+// restart that brings it back.
+async function handleDatabaseLost(): Promise<void> {
+    if (databaseLostShown || maintenanceRunning) return;
+    databaseLostShown = true;
+    stopTray();
+    stopUnlockNotifications();
+    // Also stops the dashboard polling the dead server.
+    await mainWindow?.loadURL(BUSY_PAGE("The database stopped unexpectedly.")).catch(() => undefined);
+    showWindow(mainWindow);
+    const options: Electron.MessageBoxOptions = {
+        type: "error",
+        title: "Unified Achievement Manager",
+        message: "The app's database stopped unexpectedly.",
+        detail: `This can happen if its process (postgres.exe) was ended or crashed. Restarting the app starts it again; your data is safe.
+
+Details are in the log file:
+${logFile}`,
+        buttons: ["Restart", "Quit"],
+        defaultId: 0,
+        cancelId: 1,
+    };
+    const { response } = mainWindow ? await dialog.showMessageBox(mainWindow, options) : await dialog.showMessageBox(options);
+    markQuitting();
+    stopAutoUpdates();
+    await stopServer();
+    if (response === 0) app.relaunch({ args: process.argv.slice(1).filter((arg) => arg !== HIDDEN_LAUNCH_ARG) });
+    app.exit(0);
+}
+
 async function backUp(): Promise<void> {
     const options: Electron.SaveDialogOptions = {
         title: "Back Up Unified Achievement Manager",
@@ -281,8 +315,10 @@ async function start(): Promise<void> {
     // Tells the in-process server it's inside the desktop app, so the
     // dashboard offers the desktop-only settings (see #249).
     process.env.UAM_DESKTOP = "1";
-    const { startApp } = require(serverEntry()) as { startApp(options: { dataDir: string }): Promise<RunningApp> };
-    running = await startApp({ dataDir });
+    const { startApp } = require(serverEntry()) as {
+        startApp(options: { dataDir: string; onDatabaseLost(): void }): Promise<RunningApp>;
+    };
+    running = await startApp({ dataDir, onDatabaseLost: () => void handleDatabaseLost() });
     appOrigin = new URL(running.url).origin;
     console.log(`Server ready at ${running.url}`);
     await mainWindow?.loadURL(running.url);
