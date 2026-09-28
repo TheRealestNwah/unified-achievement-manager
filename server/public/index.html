@@ -2661,7 +2661,9 @@ function presetMatches(game) {
     // Compared as numbers - as strings "9" < "10" is false (see #270).
     const total = Number(game.total_achievements);
     const unlocked = Number(game.unlocked_achievements);
-    if (state.completionPreset === "in-progress") return total > 0 && unlocked < total;
+    // Started but not finished: counting games with no unlocks yet made this
+    // nearly the same list as All Games (see #425).
+    if (state.completionPreset === "in-progress") return unlocked > 0 && unlocked < total;
     if (state.completionPreset === "completed") return total > 0 && unlocked === total;
     if (state.completionPreset === "almost-there") return total > 0 && unlocked < total && unlocked / total >= 0.8;
     return true;
