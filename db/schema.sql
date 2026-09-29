@@ -283,6 +283,10 @@ create table if not exists user_achievement_unlocks (
 alter table user_achievement_unlocks add column if not exists recorded_at timestamptz not null default now();
 create index if not exists user_achievement_unlocks_recorded_at_idx on user_achievement_unlocks (recorded_at);
 
+-- Null when the platform gave no trustworthy unlock time (see #423), rather
+-- than the sync time, which made old unlocks look brand new.
+alter table user_achievement_unlocks alter column unlocked_at drop not null;
+
 -- games/canonical_achievements are shared, deduplicated tables across every
 -- user of the app (that's the point of the canonical model) - so "does this
 -- user own this game" can't be inferred from a game merely existing in the

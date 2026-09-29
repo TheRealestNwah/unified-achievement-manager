@@ -3405,7 +3405,10 @@ function renderAchievementsPanel(panel, gameId, achievements, platformLinks, rel
                         ${
                             a.unlocked && a.unlocked_at && new Date(a.unlocked_at).getFullYear() >= 2000
                                 ? `<div class="achievement-unlocked-at" title="${escapeHtml(new Date(a.unlocked_at).toLocaleString())}">Unlocked ${escapeHtml(new Date(a.unlocked_at).toLocaleDateString())}</div>`
-                                : ""
+                                : a.unlocked
+                                  ? // The platform gave no date for this one (see #423).
+                                    `<div class="achievement-unlocked-at">Unlocked, date unknown</div>`
+                                  : ""
                         }
                     </div>
                     <div class="achievement-rarity">${a.global_unlock_rarity != null ? Number(a.global_unlock_rarity).toFixed(1) + "%" : ""}</div>

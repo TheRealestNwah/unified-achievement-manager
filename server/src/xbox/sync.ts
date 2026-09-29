@@ -98,7 +98,7 @@ export async function syncXboxAccount(userPlatformAccountId: string, apiKey: str
             const isNew = await recordUnlock(
                 userPlatformAccountId,
                 linkId,
-                achievement.timeUnlocked ? new Date(achievement.timeUnlocked) : new Date()
+                achievement.timeUnlocked ? new Date(achievement.timeUnlocked) : null
             );
             if (isNew) achievementsUnlocked++;
         }

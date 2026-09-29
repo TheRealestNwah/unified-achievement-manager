@@ -60,7 +60,7 @@ export async function syncPsnAccount(userPlatformAccountId: string, accessToken:
             const isNew = await recordUnlock(
                 userPlatformAccountId,
                 linkId,
-                status.earnedDateTime ? new Date(status.earnedDateTime) : new Date()
+                status.earnedDateTime ? new Date(status.earnedDateTime) : null
             );
             if (isNew) achievementsUnlocked++;
         }

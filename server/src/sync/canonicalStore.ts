@@ -138,19 +138,24 @@ export async function recordOwnership(userPlatformAccountId: string, gameId: str
 }
 
 // Returns true if this was a newly recorded unlock (false if already existed).
+// unlockedAt is null when the platform gives no trustworthy time: stamping
+// the sync time instead made years-old unlocks look brand new (see #423). An
+// unknown date is filled in if a later sync does get one.
 export async function recordUnlock(
     userPlatformAccountId: string,
     achievementLinkId: string,
-    unlockedAt: Date
+    unlockedAt: Date | null
 ): Promise<boolean> {
     const result = await pool.query(
         `insert into user_achievement_unlocks (user_platform_account_id, achievement_platform_link_id, unlocked_at)
          values ($1, $2, $3)
-         on conflict (user_platform_account_id, achievement_platform_link_id) do nothing
-         returning id`,
+         on conflict (user_platform_account_id, achievement_platform_link_id) do update
+            set unlocked_at = excluded.unlocked_at
+            where user_achievement_unlocks.unlocked_at is null and excluded.unlocked_at is not null
+         returning (xmax = 0) as inserted`,
         [userPlatformAccountId, achievementLinkId, unlockedAt]
     );
-    return result.rows.length > 0;
+    return result.rows[0]?.inserted === true;
 }
 
 // recordUnlock's own ON CONFLICT DO NOTHING means an unlock, once recorded,

@@ -71,7 +71,7 @@ export async function syncRetroAccount(
             // no timezone marker - reformat to a real ISO instant.
             const unlockedAt = achievement.unlockedAt
                 ? new Date(`${achievement.unlockedAt.replace(" ", "T")}Z`)
-                : new Date();
+                : null;
 
             const isNew = await recordUnlock(userPlatformAccountId, linkId, unlockedAt);
             if (isNew) achievementsUnlocked++;

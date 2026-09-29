@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { pool } from "../db";
 import { generateLevelThresholds } from "../scoring/levelCurve";
+import { repairUnknownUnlockDates } from "./repairUnlockDates";
 
 export async function seedLevelThresholds() {
     const thresholds = generateLevelThresholds();
@@ -21,6 +22,7 @@ export async function applySchema() {
     await pool.query(sql);
     console.log("Schema applied.");
     await seedLevelThresholds();
+    await repairUnknownUnlockDates();
 }
 
 if (require.main === module) {
