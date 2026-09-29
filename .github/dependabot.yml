@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: npm
     directory: /server
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       # Minor and patch bumps arrive as one PR per week instead of many.
       minor-and-patch:
@@ -18,7 +18,7 @@ updates:
   - package-ecosystem: npm
     directory: /desktop
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       minor-and-patch:
         update-types: [minor, patch]
@@ -31,5 +31,5 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     labels: [dependencies, ci]
