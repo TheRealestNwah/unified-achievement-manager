@@ -168,7 +168,7 @@ async function startCluster(bins: Binaries, dataDir: string, lock: { release(): 
     await stopCluster(bins, pgData);
     trimLog(logFile);
 
-    let port = 0;
+    let port: number;
     for (let attempt = 1; ; attempt++) {
         port = await findFreePort();
         const { code } = await run(
