@@ -74,7 +74,9 @@ export interface PsnTokens {
     idToken: string;
 }
 
-async function exchangeForTokens(body: URLSearchParams): Promise<PsnTokens> {
+// Sony answers a refresh token that has expired or been revoked with 400/401:
+// the user's saved login has run out, which isn't a PSN fault (see #424).
+async function exchangeForTokens(body: URLSearchParams, { refreshing = false } = {}): Promise<PsnTokens> {
     const url = new URL(`${AUTH_BASE_URL}/token`);
     const payload = body.toString();
     const res = await request(
@@ -91,6 +93,9 @@ async function exchangeForTokens(body: URLSearchParams): Promise<PsnTokens> {
         payload
     );
 
+    if (refreshing && (res.status === 400 || res.status === 401)) {
+        throw new PsnApiError(401, `PlayStation Network login expired (token refresh refused with ${res.status})`);
+    }
     if (res.status !== 200) {
         throw new PsnApiError(res.status, `PSN token exchange failed: ${res.status}`);
     }
@@ -133,7 +138,8 @@ export function exchangeRefreshTokenForTokens(refreshToken: string): Promise<Psn
             grant_type: "refresh_token",
             token_format: "jwt",
             scope: "psn:mobile.v2.core psn:clientapp",
-        })
+        }),
+        { refreshing: true }
     );
 }
 

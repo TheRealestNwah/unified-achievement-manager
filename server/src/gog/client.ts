@@ -57,7 +57,9 @@ export interface GogTokens {
     userId: string;
 }
 
-async function exchangeForTokens(params: Record<string, string>): Promise<GogTokens> {
+// Shared by the pasted login code and the saved refresh token, which fail for
+// different reasons, so each caller says what a refusal means (see #424).
+async function exchangeForTokens(params: Record<string, string>, refused: string): Promise<GogTokens> {
     const query = new URLSearchParams({
         client_id: CLIENT_ID,
         client_secret: CLIENT_SECRET,
@@ -66,7 +68,8 @@ async function exchangeForTokens(params: Record<string, string>): Promise<GogTok
 
     const res = await fetch(`${AUTH_BASE_URL}/token?${query}`);
     if (!res.ok) {
-        throw new GogApiError(res.status === 400 ? 401 : res.status, "GOG rejected that login code - it may have expired (they're single-use and short-lived).");
+        if (res.status === 400 || res.status === 401) throw new GogApiError(401, refused);
+        throw new GogApiError(res.status, `GOG token request failed: ${res.status}`);
     }
     const json = (await res.json()) as {
         access_token: string;
@@ -85,13 +88,16 @@ async function exchangeForTokens(params: Record<string, string>): Promise<GogTok
 // The one-time "code" pasted from the redirect URL after logging in at
 // GOG_LOGIN_URL - see REDIRECT_URI above for why there's no direct callback.
 export function exchangeCodeForTokens(code: string): Promise<GogTokens> {
-    return exchangeForTokens({ grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI });
+    return exchangeForTokens(
+        { grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI },
+        "GOG rejected that login code - it may have expired (they're single-use and short-lived)."
+    );
 }
 
 // GOG access tokens last about an hour (per the auth response's expires_in),
 // so sync always refreshes first rather than tracking expiry, same as PSN.
 export function exchangeRefreshTokenForTokens(refreshToken: string): Promise<GogTokens> {
-    return exchangeForTokens({ grant_type: "refresh_token", refresh_token: refreshToken });
+    return exchangeForTokens({ grant_type: "refresh_token", refresh_token: refreshToken }, "GOG login expired (token refresh refused)");
 }
 
 export async function getOwnedGameIds(accessToken: string): Promise<string[]> {

@@ -4088,13 +4088,10 @@ function formatSyncSummary(summary) {
     }`;
 }
 
-// Names the platform that actually hit the limit (see #238) - every platform's
-// sync can come back rate limited, not just Xbox's.
+// The server already words sync failures the way Settings shows them later,
+// naming the platform (see #238, #424), so this only adds the prefix.
 function syncErrorMessage(label, err) {
-    const message = err?.message || "";
-    return message.includes("429") || message.toLowerCase().includes("rate limit")
-        ? `Rate limited by ${label} — wait a bit and try again.`
-        : `Sync failed: ${message}`;
+    return `Sync failed: ${err?.message || `${label} couldn't be synced.`}`;
 }
 
 async function syncPlatform(platformId, label, button, noteEl) {

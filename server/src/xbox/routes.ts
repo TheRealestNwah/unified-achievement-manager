@@ -3,6 +3,7 @@ import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
 import { getAccount, XboxApiError } from "./client";
 import { runAccountSync, PlatformAccountRow } from "../sync/runAccountSync";
+import { sendSyncFailure } from "../sync/syncFailureResponse";
 import { runMatchingAndGetScore } from "../matching";
 import { config } from "../config";
 import { encryptCredential } from "../security/credentials";
@@ -64,12 +65,6 @@ xboxRouter.post("/sync", requireAuth, async (req, res, next) => {
         const score = await runMatchingAndGetScore(req.user!.id);
         res.json({ ...summary, score });
     } catch (err) {
-        if (err instanceof XboxApiError && err.status === 401) {
-            return res.status(400).json({ error: "Your OpenXBL API key was rejected - reconnect your Xbox account." });
-        }
-        if (err instanceof XboxApiError && err.status === 429) {
-            return res.status(429).json({ error: "OpenXBL rate limit reached (429) - wait a bit and try again." });
-        }
-        next(err);
+        sendSyncFailure("xbox", err, res, next);
     }
 });

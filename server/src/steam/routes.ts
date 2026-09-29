@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
 import { runAccountSync, PlatformAccountRow } from "../sync/runAccountSync";
+import { sendSyncFailure } from "../sync/syncFailureResponse";
 import { runMatchingAndGetScore } from "../matching";
 
 export const steamRouter = Router();
@@ -19,6 +20,6 @@ steamRouter.post("/sync", requireAuth, async (req, res, next) => {
         const score = await runMatchingAndGetScore(req.user!.id);
         res.json({ ...summary, score });
     } catch (err) {
-        next(err);
+        sendSyncFailure("steam", err, res, next);
     }
 });
