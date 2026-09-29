@@ -1,7 +1,7 @@
 {
   "name": "unified-achievement-manager-desktop",
   "productName": "Unified Achievement Manager",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Unified Achievement Manager desktop app: every platform's achievements in one place, running entirely on your computer.",
   "main": "dist/main.js",
