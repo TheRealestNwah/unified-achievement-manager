@@ -11,6 +11,7 @@ import { getNewUnlocksSince } from "./newUnlocks";
 import { isValidSyncInterval, setSyncIntervalMinutes, SYNC_INTERVAL_CHOICES } from "./syncInterval";
 import { applySchedulerInterval, getSchedulerStatus } from "../scheduler";
 import { createLocalProfile, MAX_DISPLAY_NAME_LENGTH, ProfileExistsError } from "../auth/localProfile";
+import { APP_VERSION } from "../appVersion";
 
 export const setupRouter = Router();
 export const settingsRouter = Router();
@@ -158,6 +159,7 @@ setupRouter.get("/status", (req, res) => {
         profileExists: req.isAuthenticated(),
         steamApiKeyConfigured: hasSteamApiKey(),
         desktopApp: isDesktopApp(),
+        version: APP_VERSION,
         csrfToken: getCsrfToken(req),
     });
 });
