@@ -7,6 +7,7 @@ import { enrichGamesWithXboxCatalog } from "./xboxCatalogEnrichment";
 import { enrichGamesWithRetroCatalog } from "./retroCatalogEnrichment";
 import { recomputeUserScore, getUserScore, UserScore } from "../scoring";
 import { normalizeRarityTiersForAllGames } from "../scoring/rarityNormalization";
+import { oneAtATime } from "./oneAtATime";
 
 export interface MatchingSummary {
     gameGroupsMerged: number;
@@ -25,7 +26,13 @@ export interface MatchingSummary {
 // canonical tables, so it runs across every user's data at once. Merging
 // achievements changes how many distinct canonical achievements exist, so
 // every user's cached score is recomputed afterward.
-export async function runMatching(): Promise<MatchingSummary> {
+//
+// Every platform's Sync, Link games and the scheduler all start it, and two
+// passes at once race each other's merges and deletes (see #422), so only
+// one runs at a time.
+export const runMatching = oneAtATime(runMatchingPass);
+
+async function runMatchingPass(): Promise<MatchingSummary> {
     const gameResult = await matchGames();
 
     // Flags existing games that already combine a legacy-signal platform
