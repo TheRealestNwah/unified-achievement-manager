@@ -8,6 +8,11 @@ updates:
       # Minor and patch bumps arrive as one PR per week instead of many.
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # @types/node tracks the Node version we run on (Node 20), so its
+      # major version moves only when the runtime does.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     labels: [dependencies]
 
   - package-ecosystem: npm
@@ -17,6 +22,10 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Matches the Node bundled with Electron; bump it with Electron.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     labels: [dependencies]
 
   - package-ecosystem: github-actions
