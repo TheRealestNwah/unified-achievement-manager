@@ -4095,18 +4095,34 @@ async function syncPlatform(platformId, label, button, noteEl) {
     noteEl.textContent = platformId === "steam"
         ? "Syncing... this can take a few minutes for a large library."
         : "Syncing...";
+    let outcome;
+    let failed = false;
     try {
         const summary = await api(`/api/${platformId}/sync`, { method: "POST" });
-        noteEl.textContent = `Synced ${formatSyncSummary(summary)}.`;
+        outcome = `Synced ${formatSyncSummary(summary)}.`;
+        noteEl.textContent = outcome;
         renderScore(summary.score);
         await refreshGamesAndScore();
         await refreshActivity();
     } catch (err) {
-        noteEl.textContent = syncErrorMessage(label, err);
+        failed = true;
+        outcome = syncErrorMessage(label, err);
+        noteEl.textContent = outcome;
         console.error(err);
     } finally {
         button.disabled = false;
     }
+    // Rebuild the row from what's stored now (see #432), which drops the
+    // dimmed "Syncing again" error, or shows the new failure in its place.
+    try {
+        await refreshPlatforms();
+    } catch (err) {
+        console.error(err);
+        return;
+    }
+    const note = document.getElementById(noteEl.id);
+    // A failure the row now shows as its stored error isn't repeated here.
+    if (note && !(failed && note.closest(".platform-row")?.querySelector(".platform-sync-error"))) note.textContent = outcome;
 }
 
 async function disconnectPlatform(platformId, label) {
