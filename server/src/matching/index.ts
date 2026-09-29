@@ -40,9 +40,9 @@ export async function runMatching(): Promise<MatchingSummary> {
     // achievement matching below so anything added gets a chance to be
     // merged (and inherit a real tier) in the same pass, rather than
     // sitting unmatched until the next run.
-    const catalogResult = await enrichGamesWithSteamCatalog();
-    const xboxCatalogResult = await enrichGamesWithXboxCatalog();
-    const retroCatalogResult = await enrichGamesWithRetroCatalog();
+    const catalogResult = await enrichBestEffort("Steam", enrichGamesWithSteamCatalog);
+    const xboxCatalogResult = await enrichBestEffort("Xbox", enrichGamesWithXboxCatalog);
+    const retroCatalogResult = await enrichBestEffort("RetroAchievements", enrichGamesWithRetroCatalog);
 
     const achievementResult = await matchAchievementsForAllGames();
 
@@ -69,6 +69,18 @@ export async function runMatching(): Promise<MatchingSummary> {
         gameSplitCandidatesRecorded: splitDetectResult.candidatesRecorded,
         usersRescored: users.rows.length,
     };
+}
+
+// Catalog enrichment only adds extra data, using whichever key happens to be
+// linked. A rejected key or an outage there stops enrichment for this run but
+// mustn't fail matching, and with it every platform's sync (see #435).
+export async function enrichBestEffort(catalog: string, enrich: () => Promise<{ gamesEnriched: number }>): Promise<{ gamesEnriched: number }> {
+    try {
+        return await enrich();
+    } catch (err) {
+        console.error(`${catalog} catalog enrichment stopped for this run:`, err);
+        return { gamesEnriched: 0 };
+    }
 }
 
 // Called from every platform's on-demand /sync route (not from
