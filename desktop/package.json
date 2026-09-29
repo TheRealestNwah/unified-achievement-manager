@@ -17,7 +17,7 @@
     "@types/node": "24.13.6",
     "electron": "44.4.5",
     "electron-builder": "26.15.3",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   },
   "author": "TheRealestNwah",
   "build": {
