@@ -42,7 +42,7 @@ Links like these open in your normal web browser. Only Steam's sign-in page open
 - **Discord:** while Discord is running, your level and XP show on your Discord profile. It's on by default; turn it off under **Settings → Discord**.
 - **Updates:** the app checks for new versions in the background and asks before restarting to install one. **Help → Check for Updates** checks right away, and **Settings → Desktop app → Automatic updates** turns the background checks off.
 - **Compact sidebar:** the button next to the app name collapses the sidebar to icons only. It collapses on its own when the window is narrow.
-- **Export:** download your full unlock history as JSON or CSV from **Settings → Export**.
+- **Export:** download every achievement in your library, with whether and when you unlocked it, as JSON or CSV from **Settings → Export**.
 - **Disconnect:** any platform can be unlinked, which removes its synced games and achievements.
 - **Delete profile:** permanently removes your profile and everything linked to it after you type `DELETE` to confirm. The app then starts over at first run.
 

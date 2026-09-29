@@ -26,7 +26,7 @@ To move to another PC: back up on the old one, install Unified Achievement Manag
 
 You can also back up by hand: quit the app (closing the window quits it, unless **Keep running in the tray** is on in Settings; then right-click the tray icon and choose **Quit**), and copy the files listed above. Restore by quitting the app and putting them back. `secrets.json` and `postgres\` only work together, and a copy taken while the app is running may not be consistent.
 
-**Settings → Export** gives you a portable JSON or CSV of your unlock history too, but it isn't something the app can import back.
+**Settings → Export** gives you a portable JSON or CSV of every achievement in your library and your unlocks too, but it isn't something the app can import back.
 
 ## Removing everything
 
