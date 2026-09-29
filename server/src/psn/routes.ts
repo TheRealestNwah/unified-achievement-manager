@@ -3,6 +3,7 @@ import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
 import { exchangeNpssoForAccessCode, exchangeAccessCodeForTokens, decodeIdToken, PsnApiError } from "./client";
 import { runAccountSync, PlatformAccountRow } from "../sync/runAccountSync";
+import { sendSyncFailure } from "../sync/syncFailureResponse";
 import { runMatchingAndGetScore } from "../matching";
 import { config } from "../config";
 import { encryptCredential } from "../security/credentials";
@@ -72,9 +73,6 @@ psnRouter.post("/sync", requireAuth, async (req, res, next) => {
         const score = await runMatchingAndGetScore(req.user!.id);
         res.json({ ...summary, score });
     } catch (err) {
-        if (err instanceof PsnApiError && err.status === 401) {
-            return res.status(400).json({ error: "Your PlayStation session expired - reconnect with a fresh NPSSO token." });
-        }
-        next(err);
+        sendSyncFailure("psn", err, res, next);
     }
 });

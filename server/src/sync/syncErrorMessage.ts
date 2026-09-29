@@ -35,6 +35,10 @@ export function explainSyncError(platformId: string, raw: string): ExplainedSync
     const platform = PLATFORM_NAMES[platformId] ?? platformId;
     const explained = (message: string, actionable: boolean): ExplainedSyncError => ({ message, detail: raw, actionable });
 
+    // The PSN and GOG clients say this when a saved refresh token is refused (see #424).
+    if (/\blogin expired\b/i.test(raw)) {
+        return explained(`Your ${platform} login has expired. Use Update login… in Settings to reconnect.`, true);
+    }
     if (status === 429) {
         return platformId === "xbox"
             ? explained(

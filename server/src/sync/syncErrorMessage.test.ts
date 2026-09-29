@@ -28,6 +28,16 @@ describe("explainSyncError (#389)", () => {
         expect(explainSyncError("gog", "getaddrinfo ENOTFOUND api.gog.com").message).toMatch(/^Couldn't reach GOG/);
     });
 
+    it("says a refused refresh token means the login expired (#424)", () => {
+        expect(explainSyncError("psn", "PlayStation Network login expired (token refresh refused with 400)")).toMatchObject({
+            message: "Your PlayStation Network login has expired. Use Update login… in Settings to reconnect.",
+            actionable: true,
+        });
+        expect(explainSyncError("gog", "GOG login expired (token refresh refused)").message).toBe(
+            "Your GOG login has expired. Use Update login… in Settings to reconnect."
+        );
+    });
+
     it("leaves errors it doesn't recognise as they are", () => {
         expect(explainSyncError("xbox", "Invalid OpenXBL API key")).toEqual({ message: "Invalid OpenXBL API key", detail: null, actionable: true });
         // A status-looking number that isn't an HTTP failure isn't read as one.

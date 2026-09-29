@@ -3,6 +3,7 @@ import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
 import { verifyAccount, RetroApiError } from "./client";
 import { runAccountSync, PlatformAccountRow } from "../sync/runAccountSync";
+import { sendSyncFailure } from "../sync/syncFailureResponse";
 import { runMatchingAndGetScore } from "../matching";
 import { config } from "../config";
 import { encryptCredential } from "../security/credentials";
@@ -65,9 +66,6 @@ retroRouter.post("/sync", requireAuth, async (req, res, next) => {
         const score = await runMatchingAndGetScore(req.user!.id);
         res.json({ ...summary, score });
     } catch (err) {
-        if (err instanceof RetroApiError && err.status === 401) {
-            return res.status(400).json({ error: "Your RetroAchievements API key was rejected - reconnect your account." });
-        }
-        next(err);
+        sendSyncFailure("retroachievements", err, res, next);
     }
 });

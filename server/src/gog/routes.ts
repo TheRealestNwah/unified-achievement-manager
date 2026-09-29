@@ -3,6 +3,7 @@ import { pool } from "../db";
 import { requireAuth } from "../middleware/requireAuth";
 import { GOG_LOGIN_URL, exchangeCodeForTokens, getUsername, GogApiError } from "./client";
 import { runAccountSync, PlatformAccountRow } from "../sync/runAccountSync";
+import { sendSyncFailure } from "../sync/syncFailureResponse";
 import { runMatchingAndGetScore } from "../matching";
 import { config } from "../config";
 import { encryptCredential } from "../security/credentials";
@@ -75,9 +76,6 @@ gogRouter.post("/sync", requireAuth, async (req, res, next) => {
         const score = await runMatchingAndGetScore(req.user!.id);
         res.json({ ...summary, score });
     } catch (err) {
-        if (err instanceof GogApiError && err.status === 401) {
-            return res.status(400).json({ error: "Your GOG session expired - reconnect with a fresh login code." });
-        }
-        next(err);
+        sendSyncFailure("gog", err, res, next);
     }
 });
