@@ -252,6 +252,7 @@
         font-weight: 700;
     }
     .profile-name { color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .app-version { margin-left: auto; font-size: 11.5px; font-variant-numeric: tabular-nums; }
     .sidebar-footer a:hover { color: var(--text); }
 
     /* Scrolling belongs to content-pane (the full-width column), not main
@@ -5175,7 +5176,13 @@ async function init() {
     const name = document.createElement("span");
     name.className = "profile-name";
     name.textContent = user.username;
-    footer.replaceChildren(avatar, name);
+    // Always on screen, so nobody has to open Help or check for updates to
+    // see which version they're on (see #474).
+    const version = document.createElement("span");
+    version.className = "app-version";
+    version.textContent = `v${setup.version}`;
+    version.title = `Unified Achievement Manager ${setup.version}`;
+    footer.replaceChildren(avatar, name, version);
     showSteamConnectResult();
     initSteamKeyRow();
     initSteamGridDbKeyRow();
