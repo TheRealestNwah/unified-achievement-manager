@@ -1,4 +1,4 @@
-# 1.0 release checklist
+# Release checklist
 
 A green CI run is required, but it doesn't replace the live checks below. **Do not create or push a release tag, or publish a GitHub Release, until the release owner explicitly approves it.**
 

@@ -34,9 +34,11 @@ Delete your profile from **Settings → Profile → Delete profile**, or simply 
 
 ## Troubleshooting
 
-- **"Windows protected your PC" when installing:** the 1.0 installer isn't code-signed yet. Click **More info → Run anyway**.
+- **"Windows protected your PC" when installing:** the installer isn't code-signed yet. Click **More info → Run anyway**.
 - **The app won't start:** it shows an error with the log file's location. `logs\main.log` has the details and `postgres.log` has database errors. Include both when reporting a problem, after checking them for anything personal.
 - **It says it's already running:** only one copy runs at a time, and starting it again brings the existing window forward. If no window is visible, end any leftover `Unified Achievement Manager.exe` in Task Manager.
 - **After a crash:** a database left running by a crash is stopped cleanly the next time the app starts. The installer and uninstaller also stop it, so updates and uninstalling aren't blocked by locked files.
+- **"The app's database stopped unexpectedly":** the app's own PostgreSQL (`postgres.exe`) was ended, for example from Task Manager, or crashed. Choose **Restart** to start it again. Your data is safe. If it keeps happening, `postgres.log` in the data folder says why.
 - **Connecting Steam or its sync fails:** check the Steam Web API key under **Settings → API keys → Steam Web API**. Steam rejects mistyped keys, and a key revoked on Steam's site stops working here too.
-- **PSN or GOG stops syncing:** their tokens expire. Disconnect and reconnect that platform with a fresh token or code.
+- **PSN or GOG stops syncing:** their logins expire after a while, and Settings says so. Use **Update login…** on that platform with a fresh NPSSO token or GOG login code. Your library stays as it is.
+- **An achievement says "Unlocked, date unknown":** the platform didn't say when it was earned, which is common for older Xbox 360 achievements. It still counts toward your score, but it's left out of Recent activity and the date-based stats rather than showing up as brand new.
