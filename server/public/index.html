@@ -1612,11 +1612,21 @@ async function getCsrfToken() {
     return csrfTokenPromise;
 }
 
-async function api(path, options = {}) {
+async function api(path, options = {}, { retriedCsrf = false } = {}) {
     const method = (options.method || "GET").toUpperCase();
     const headers = new Headers(options.headers || {});
-    if (!["GET", "HEAD", "OPTIONS"].includes(method)) headers.set("X-CSRF-Token", await getCsrfToken());
+    const unsafe = !["GET", "HEAD", "OPTIONS"].includes(method);
+    if (unsafe) headers.set("X-CSRF-Token", await getCsrfToken());
     const res = await fetch(path, { credentials: "same-origin", ...options, headers });
+    // Signing a session in (first run, or after the cookie expires) starts a
+    // new session with a new token, so the cached one goes stale (see #438).
+    if (unsafe && res.status === 403 && !retriedCsrf) {
+        const body = await res.clone().json().catch(() => null);
+        if (body?.error === "Invalid CSRF token") {
+            csrfTokenPromise = undefined;
+            return api(path, options, { retriedCsrf: true });
+        }
+    }
     if (res.status === 401) throw new Error("unauthenticated");
     if (!res.ok) {
         const body = await res.json().catch(() => null);
