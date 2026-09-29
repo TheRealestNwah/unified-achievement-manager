@@ -94,7 +94,7 @@ jobs:
           $installer = (Get-ChildItem desktop/release/Unified-Achievement-Manager-Setup-*.exe).FullName
           ./desktop/scripts/smoke-test.ps1 -Installer $installer
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Unified-Achievement-Manager-Setup
           # latest.yml and the .blockmap are what auto-update reads (see #314);
