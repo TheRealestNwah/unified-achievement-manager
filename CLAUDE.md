@@ -47,3 +47,4 @@ Integration tests **truncate tables**, so never point them at real data. Use the
 - The app is local and single-user by design (public profiles, leaderboards, and the multi-user server mode were removed in #392). Don't add features that need a shared server or other users without asking.
 - The installer is unsigned for now (`CSC_IDENTITY_AUTO_DISCOVERY=false` in CI).
 - Releases follow `docs/release-checklist.md`, and every release or tag needs explicit permission.
+- There is intentionally no Dependabot (removed in #472): the owner prefers updating dependencies by hand for this solo project. Don't re-add it without asking.
