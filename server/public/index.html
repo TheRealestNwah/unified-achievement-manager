@@ -2133,18 +2133,25 @@ function completionPct(game) {
     return game.total_achievements > 0 ? game.unlocked_achievements / game.total_achievements : 0;
 }
 
+// Natural order, so "7 Days to Die" comes before "11-11 Memories Retold"
+// rather than after it (see #426), and case doesn't matter.
+const titleCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+function byTitle(a, b) {
+    return titleCollator.compare(a.title, b.title);
+}
+
 const gameSorters = {
-    "unlocked-desc": (a, b) => b.unlocked_achievements - a.unlocked_achievements || a.title.localeCompare(b.title),
+    "unlocked-desc": (a, b) => b.unlocked_achievements - a.unlocked_achievements || byTitle(a, b),
     recent: (a, b) =>
         (b.last_unlocked_at ? Date.parse(b.last_unlocked_at) : 0) - (a.last_unlocked_at ? Date.parse(a.last_unlocked_at) : 0) ||
-        a.title.localeCompare(b.title),
-    "xp-desc": (a, b) => Number(b.points_earned) - Number(a.points_earned) || a.title.localeCompare(b.title),
-    "completion-desc": (a, b) => completionPct(b) - completionPct(a) || a.title.localeCompare(b.title),
-    "completion-asc": (a, b) => completionPct(a) - completionPct(b) || a.title.localeCompare(b.title),
-    alpha: (a, b) => a.title.localeCompare(b.title),
-    "total-desc": (a, b) => b.total_achievements - a.total_achievements || a.title.localeCompare(b.title),
-    "total-asc": (a, b) => a.total_achievements - b.total_achievements || a.title.localeCompare(b.title),
-    platform: (a, b) => (a.platforms || []).join(",").localeCompare((b.platforms || []).join(",")) || a.title.localeCompare(b.title),
+        byTitle(a, b),
+    "xp-desc": (a, b) => Number(b.points_earned) - Number(a.points_earned) || byTitle(a, b),
+    "completion-desc": (a, b) => completionPct(b) - completionPct(a) || byTitle(a, b),
+    "completion-asc": (a, b) => completionPct(a) - completionPct(b) || byTitle(a, b),
+    alpha: (a, b) => byTitle(a, b),
+    "total-desc": (a, b) => b.total_achievements - a.total_achievements || byTitle(a, b),
+    "total-asc": (a, b) => a.total_achievements - b.total_achievements || byTitle(a, b),
+    platform: (a, b) => (a.platforms || []).join(",").localeCompare((b.platforms || []).join(",")) || byTitle(a, b),
 };
 
 // Makes a non-button element (a game row, an icon, a section header) usable
