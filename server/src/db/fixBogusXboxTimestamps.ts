@@ -12,7 +12,7 @@ const XBOX_360_LAUNCH = "2005-11-22";
 async function fixBogusXboxTimestamps() {
     const result = await pool.query(
         `update user_achievement_unlocks uau
-         set unlocked_at = now()
+         set unlocked_at = null
          from achievement_platform_links apl
          where apl.id = uau.achievement_platform_link_id
            and apl.platform_id = 'xbox'

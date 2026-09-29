@@ -140,7 +140,7 @@ export async function syncSteamAccount(userPlatformAccountId: string, steamId: s
                 continue;
             }
 
-            const isNew = await recordUnlock(userPlatformAccountId, linkId, new Date(unlock.unlocktime * 1000));
+            const isNew = await recordUnlock(userPlatformAccountId, linkId, unlock.unlocktime ? new Date(unlock.unlocktime * 1000) : null);
             if (isNew) achievementsUnlocked++;
         }
 

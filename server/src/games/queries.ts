@@ -217,6 +217,8 @@ export async function getRecentActivity(userId: string, limit = 20, offset = 0) 
            and not exists (
                select 1 from user_game_visibility ugv where ugv.user_id = $1 and ugv.game_id = g.id
            )
+           -- An unlock with no known date has no place in a timeline (see #423).
+           and uau.unlocked_at is not null
          -- apl.id breaks ties so pages don't overlap or skip rows that
          -- share an unlock time.
          order by uau.unlocked_at desc, apl.id
@@ -317,10 +319,12 @@ export async function getFunStats(userId: string) {
          order by uau.unlocked_at asc`,
         [userId]
     );
+    // Every platinum counts, but only dated ones can measure a gap (see #423).
+    const datedPlatinums = platinums.rows.filter((r) => r.unlocked_at && new Date(r.unlocked_at) > new Date(UNLOCK_TIMESTAMP_FLOOR));
     let longestPlatinumGapDays: number | null = null;
-    for (let i = 1; i < platinums.rows.length; i++) {
+    for (let i = 1; i < datedPlatinums.length; i++) {
         const gapDays =
-            (new Date(platinums.rows[i].unlocked_at).getTime() - new Date(platinums.rows[i - 1].unlocked_at).getTime()) /
+            (new Date(datedPlatinums[i].unlocked_at).getTime() - new Date(datedPlatinums[i - 1].unlocked_at).getTime()) /
             (1000 * 60 * 60 * 24);
         if (longestPlatinumGapDays === null || gapDays > longestPlatinumGapDays) longestPlatinumGapDays = gapDays;
     }

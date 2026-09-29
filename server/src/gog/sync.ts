@@ -55,7 +55,7 @@ export async function syncGogAccount(userPlatformAccountId: string, accessToken:
             const isNew = await recordUnlock(
                 userPlatformAccountId,
                 linkId,
-                achievement.unlockedAt ? new Date(achievement.unlockedAt) : new Date()
+                achievement.unlockedAt ? new Date(achievement.unlockedAt) : null
             );
             if (isNew) achievementsUnlocked++;
         }
