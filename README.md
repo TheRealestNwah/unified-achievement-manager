@@ -10,7 +10,7 @@ A Windows desktop app that pulls your Steam, Xbox, PlayStation, RetroAchievement
 
 1. Download `Unified-Achievement-Manager-Setup-<version>.exe` from the [Releases page](https://github.com/TheRealestNwah/unified-achievement-manager/releases).
 2. Run it. It installs for your Windows user only and doesn't need administrator rights.
-3. The 1.0 installer isn't code-signed yet, so Windows SmartScreen may say it "protected your PC" from an unrecognized app. Click **More info**, then **Run anyway**.
+3. The installer isn't code-signed yet, so Windows SmartScreen may say it "protected your PC" from an unrecognized app. Click **More info**, then **Run anyway**.
 
 Windows 10/11, 64-bit. The installer is about 135 MB because it bundles its own private copy of PostgreSQL, which only the app uses.
 

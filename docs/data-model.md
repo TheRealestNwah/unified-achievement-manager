@@ -58,6 +58,10 @@ Title differences too large for either pass (`Skyrim` on PSN vs `The Elder Scrol
 
 The achievement-detail view (`/api/me/games/:gameId/achievements`) returns one row per `(canonical_achievement, platform_link)` pair for the same reason — grouped by platform in the UI, so a matched achievement's separate PSN and Steam completions both show up, each with that platform's own unlock status.
 
+## An unlock's date can be unknown
+
+`user_achievement_unlocks.unlocked_at` is the time the platform says the achievement was earned, or null when it gives none worth trusting: legacy Xbox 360 unlocks often come back with a 1752 sentinel, and Steam reports 0 for some old unlocks. Null unlocks count toward scores and completion like any other, but they're left out of Recent activity and the date-based fun stats. A later sync that does get a date fills it in ([#423](https://github.com/TheRealestNwah/unified-achievement-manager/issues/423)). Before 1.0.1 such unlocks were stamped with the sync's own time; a one-off repair at startup clears those.
+
 ## Scoring is cached, not computed live
 
 `user_scores` holds each user's current `total_points` and `level`, recomputed by a job whenever new unlocks come in (and for everyone when the desktop app starts). The dashboard reads the cache, not a live join, so showing the score stays cheap.
