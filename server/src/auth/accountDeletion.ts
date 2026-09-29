@@ -10,7 +10,7 @@ export interface AccountDeletionResult {
 // shared by other users and do not belong to one account.
 export async function deleteUserAccount(userId: string): Promise<AccountDeletionResult> {
     const client = await pool.connect();
-    let uploadedUrls: string[] = [];
+    let uploadedUrls: string[];
 
     try {
         await client.query("begin");
