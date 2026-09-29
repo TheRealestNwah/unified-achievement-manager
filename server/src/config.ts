@@ -7,7 +7,7 @@ import { loadOrCreateSecrets } from "./runtime/secrets";
 // passed in, so a stray .env in the working directory can't point it at some
 // other database. Outside the app - the tests and db:* scripts - a .env can
 // supply DATABASE_URL (see .env.example).
-if (process.env.UAM_APP !== "1") dotenv.config();
+if (process.env.UAM_APP !== "1") dotenv.config({ quiet: true });
 
 // The one server mode is the single-user app (see #392): it only ever
 // listens on this machine.
