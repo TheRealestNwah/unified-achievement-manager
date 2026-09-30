@@ -6,6 +6,10 @@ A Windows desktop app that pulls your Steam, Xbox, PlayStation, RetroAchievement
 - One combined score and level across all connected platforms, following a PSN-like leveling curve.
 - A dashboard grouped per game and per platform, so multiple platinums or 100%s on the same game each show up.
 
+> **Built with AI.** Unified Achievement Manager's code, tests and documentation were written by
+> Claude, an AI model from Anthropic, directed and tested by the maintainer.
+> See [AI disclosure](#ai-disclosure).
+
 ## Install
 
 1. Download `Unified-Achievement-Manager-Setup-<version>.exe` from the [Releases page](https://github.com/TheRealestNwah/unified-achievement-manager/releases).
@@ -57,3 +61,19 @@ See [ROADMAP.md](ROADMAP.md). Steam, Xbox, PSN, RetroAchievements, and GOG all w
 ## Development
 
 See [docs/development.md](docs/development.md) for running from source, building the installer, the tests, and the HTTP API. How tiers, matching, and scoring work is in [docs/data-model.md](docs/data-model.md).
+
+## AI disclosure
+
+Unified Achievement Manager was built with [Claude Code](https://claude.com/claude-code), Anthropic's
+AI coding assistant. Claude wrote the code, tests and documentation. The
+maintainer ([@TheRealestNwah](https://github.com/TheRealestNwah)) decided what
+it should do, tested it, and made the release decisions. Commits written with
+Claude carry a `Co-Authored-By: Claude` trailer, so the git history shows which
+changes were AI-written.
+
+## Support
+
+Everything on my GitHub is free of charge and open source. If you find it
+useful and want to leave a tip or buy me a coffee, you can do that at
+[ko-fi.com/morrowheat23](https://ko-fi.com/morrowheat23). It's appreciated,
+never expected.
