@@ -153,6 +153,7 @@ export async function matchGames(): Promise<GameMatchResult> {
         let winner: GameRow;
         if (safeGames.length > 0) {
             winner = safeGames[0];
+            let mergedAny = false;
             for (const loser of safeGames.slice(1)) {
                 // An exact title match isn't always the same game even
                 // without a legacy platform involved - a human can already
@@ -165,8 +166,10 @@ export async function matchGames(): Promise<GameMatchResult> {
                 if (await wasRejectedPair(winner.id, loser.id)) continue;
                 await mergeGames(winner.id, loser.id);
                 gamesRemoved++;
+                mergedAny = true;
             }
-            if (safeGames.length > 1) groupsMerged++;
+            // Not when every pair was one the user rejected (see #484).
+            if (mergedAny) groupsMerged++;
         } else {
             winner = legacyGames[0];
         }
