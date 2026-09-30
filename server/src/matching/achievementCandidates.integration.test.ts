@@ -78,21 +78,22 @@ integration("bulk achievement-candidate review (#252)", () => {
         await expect(matcher.confirmMatchCandidate(conflict)).rejects.toMatchObject({ status: 409 });
     });
 
-    it("records a near-match once however many times matching runs, and keeps it rejected (#345)", async () => {
+    it("records a near-match once however many times matching runs, and keeps it rejected (#345, #480)", async () => {
         const game = await canonicalStore.getOrCreateCanonicalGame("steam", "rerun-app", "Rerun Game");
         await canonicalStore.getOrCreateAchievementLink(game, "steam", "rerun-app", "s1", "TR1 | Codex of Peru", undefined, undefined);
         const xboxLink = await canonicalStore.getOrCreateAchievementLink(game, "xbox", "rerun-title", "x1", "TR Codex of Peru", undefined, undefined);
         const rows = async () =>
             (await pool.query("select id, status from achievement_match_candidates where achievement_platform_link_id = $1", [xboxLink])).rows;
 
-        await matcher.matchAchievementsForGame(game);
-        await matcher.matchAchievementsForGame(game);
+        expect(await matcher.matchAchievementsForGame(game)).toEqual({ merged: 0, candidates: 1 });
+        expect(await matcher.matchAchievementsForGame(game)).toEqual({ merged: 0, candidates: 1 });
         const [only, ...rest] = await rows();
         expect(rest).toEqual([]);
         expect(only.status).toBe("pending");
 
         await matcher.rejectMatchCandidate(only.id);
-        await matcher.matchAchievementsForGame(game);
+        // Not waiting for review any more, so not counted as such (#480).
+        expect(await matcher.matchAchievementsForGame(game)).toEqual({ merged: 0, candidates: 0 });
         expect(await rows()).toEqual([{ id: only.id, status: "rejected" }]);
     });
 

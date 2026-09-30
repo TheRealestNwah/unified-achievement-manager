@@ -176,8 +176,11 @@ export async function matchAchievementsForGame(gameId: string): Promise<{ merged
                 listsByCanonical.get(best.row.canonicalId)!.add(listKey(candidate));
                 merged++;
             } else if (best && best.score >= CANDIDATE_THRESHOLD) {
-                await recordCandidate(candidate.linkId, best.row.canonicalId, best.score, "pending");
-                proposed.add(candidate.linkId);
+                // A pair the user already rejected stays rejected, so it isn't
+                // waiting for review and mustn't be counted as such (see #480).
+                if (await recordCandidate(candidate.linkId, best.row.canonicalId, best.score, "pending")) {
+                    proposed.add(candidate.linkId);
+                }
             }
         }
 
@@ -203,10 +206,11 @@ async function recordCandidate(
     candidateCanonicalAchievementId: string,
     confidence: number,
     status: "confirmed" | "pending"
-): Promise<void> {
+): Promise<boolean> {
     // A pair already on record keeps its row (see #345): re-proposing it as
     // pending does nothing, so a rejected pair stays rejected and a pending
     // one isn't queued twice. Only an auto-merge upgrades it to confirmed.
+    // Returns whether the pair is now waiting for review.
     await pool.query(
         `insert into achievement_match_candidates
             (achievement_platform_link_id, candidate_canonical_achievement_id, confidence, status, reviewed_at)
@@ -222,6 +226,11 @@ async function recordCandidate(
             status === "confirmed" ? new Date() : null,
         ]
     );
+    const recorded = await pool.query(
+        "select status from achievement_match_candidates where achievement_platform_link_id = $1 and candidate_canonical_achievement_id = $2",
+        [achievementPlatformLinkId, candidateCanonicalAchievementId]
+    );
+    return recorded.rows[0]?.status === "pending";
 }
 
 export async function mergeAchievements(idA: string, idB: string): Promise<void> {
