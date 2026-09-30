@@ -77,3 +77,7 @@ Everything on my GitHub is free of charge and open source. If you find it
 useful and want to leave a tip or buy me a coffee, you can do that at
 [ko-fi.com/morrowheat23](https://ko-fi.com/morrowheat23). It's appreciated,
 never expected.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
