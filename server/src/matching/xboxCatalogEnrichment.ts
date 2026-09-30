@@ -9,6 +9,20 @@ export interface XboxCatalogEnrichmentResult {
     gamesEnriched: number;
 }
 
+// Enrichment shares the user's own OpenXBL key, whose free tier allows only
+// so many requests an hour. Left unbounded, every matching pass (after any
+// platform's sync) spent the whole window on catalog lookups, three or so
+// calls per game, and the user's own Xbox sync then failed with a 429 on its
+// first request (see #478). So a pass looks up a small batch at most once an
+// hour, and a 429 counts as that hour's pass.
+export const XBOX_ENRICHMENT_GAMES_PER_RUN = 10;
+export const XBOX_ENRICHMENT_INTERVAL_MS = 60 * 60 * 1000;
+let nextRunAllowedAt = 0;
+
+export function resetXboxEnrichmentThrottle(): void {
+    nextRunAllowedAt = 0;
+}
+
 // Same shape as matching/steamCatalogEnrichment.ts, for Xbox - see #50's
 // research. OpenXBL's achievements/title endpoint returns a title's full
 // catalog (definitions + real rarity) even for an account that's never
@@ -22,6 +36,7 @@ export async function enrichGamesWithXboxCatalog(): Promise<XboxCatalogEnrichmen
     // No one has linked Xbox at all - no key available to search with, and
     // nothing to do until someone does.
     if (!anyXboxAccount.rows[0]) return { gamesEnriched: 0 };
+    if (Date.now() < nextRunAllowedAt) return { gamesEnriched: 0 };
     const apiKey = decryptCredential(anyXboxAccount.rows[0].access_token as string, config.credentialEncryptionKey);
 
     const candidates = await pool.query(`
@@ -35,7 +50,10 @@ export async function enrichGamesWithXboxCatalog(): Promise<XboxCatalogEnrichmen
         and not exists (
             select 1 from xbox_catalog_enrichment_attempts a where a.game_id = g.id
         )
-    `);
+        limit $1
+    `, [XBOX_ENRICHMENT_GAMES_PER_RUN]);
+    if (candidates.rows.length === 0) return { gamesEnriched: 0 };
+    nextRunAllowedAt = Date.now() + XBOX_ENRICHMENT_INTERVAL_MS;
 
     let gamesEnriched = 0;
     for (const game of candidates.rows) {
