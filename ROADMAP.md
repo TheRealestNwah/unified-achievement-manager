@@ -8,6 +8,8 @@
 
 **1.0.2 is out.** [v1.0.2](https://github.com/TheRealestNwah/unified-achievement-manager/releases/tag/v1.0.2) was released on 2026-09-29. The sidebar shows which version you're running ([#474](https://github.com/TheRealestNwah/unified-achievement-manager/issues/474)), and dependencies are updated (ESLint 10, dotenv 18, GitHub Actions v7).
 
+**1.0.3 is out.** [v1.0.3](https://github.com/TheRealestNwah/unified-achievement-manager/releases/tag/v1.0.3) was released on 2026-09-29 with fixes from a QA pass on a real library. Confirming a Review match or running Find matches takes seconds instead of minutes, thanks to indexes on foreign keys ([#482](https://github.com/TheRealestNwah/unified-achievement-manager/issues/482)). Xbox catalog lookups no longer use up the OpenXBL quota that your own Xbox sync needs ([#478](https://github.com/TheRealestNwah/unified-achievement-manager/issues/478)). Find matches stops counting matches you already rejected as waiting for review ([#480](https://github.com/TheRealestNwah/unified-achievement-manager/issues/480)) and stops reporting a merge that didn't happen ([#484](https://github.com/TheRealestNwah/unified-achievement-manager/issues/484)).
+
 After 1.0: code-sign the installer (removes the SmartScreen warning) and macOS/Linux builds. Auto-update from GitHub Releases ([#314](https://github.com/TheRealestNwah/unified-achievement-manager/issues/314)) is live from 1.0.1; the hands-on auto-update check in the [release checklist](docs/release-checklist.md) is still to be run by hand. The code is already cross-platform apart from the installer.
 
 ~~Add a Content-Security-Policy.~~ Done in [#123](https://github.com/TheRealestNwah/unified-achievement-manager/pull/123) (nonce-based).
