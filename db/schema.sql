@@ -519,3 +519,20 @@ update games set title = btrim(title, E' \t\r\n' || chr(160))
 where title <> btrim(title, E' \t\r\n' || chr(160));
 update canonical_achievements set name = btrim(name, E' \t\r\n' || chr(160))
 where name <> btrim(name, E' \t\r\n' || chr(160));
+
+-- Foreign keys Postgres doesn't index on its own (see #482). Matching, rarity
+-- normalization, scoring and merge cascades all look rows up by these, and
+-- without an index each lookup scanned the whole table: confirming one
+-- review match took minutes with a real library.
+create index if not exists canonical_achievements_game_id_idx on canonical_achievements (game_id);
+create index if not exists achievement_platform_links_canonical_achievement_id_idx on achievement_platform_links (canonical_achievement_id);
+create index if not exists achievement_match_candidates_candidate_idx on achievement_match_candidates (candidate_canonical_achievement_id);
+create index if not exists user_achievement_unlocks_link_idx on user_achievement_unlocks (achievement_platform_link_id);
+create index if not exists game_platform_links_game_id_idx on game_platform_links (game_id);
+create index if not exists user_owned_games_game_id_idx on user_owned_games (game_id);
+create index if not exists user_game_cover_overrides_game_id_idx on user_game_cover_overrides (game_id);
+create index if not exists user_game_visibility_game_id_idx on user_game_visibility (game_id);
+create index if not exists user_achievement_icon_overrides_achievement_idx on user_achievement_icon_overrides (canonical_achievement_id);
+create index if not exists game_merge_candidates_game_b_id_idx on game_merge_candidates (game_b_id);
+create index if not exists game_split_candidates_game_id_idx on game_split_candidates (game_id);
+create index if not exists game_absence_streaks_game_id_idx on game_absence_streaks (game_id);
