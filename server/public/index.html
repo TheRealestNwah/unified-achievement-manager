@@ -119,7 +119,11 @@
     .hidden { display: none !important; }
 
     /* ---------- App shell: sidebar + topbar + scrolling content ---------- */
-    .app-shell { display: flex; height: 100vh; overflow: hidden; }
+    /* position: relative so absolutely positioned descendants (the
+       .visually-hidden tier labels in every game row) are clipped by the
+       shell instead of stretching the page itself - otherwise scrolling past
+       the end of a long list scrolls the whole app off-screen (see #494). */
+    .app-shell { position: relative; display: flex; height: 100vh; overflow: hidden; }
 
     .sidebar {
         width: 228px;
