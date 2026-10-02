@@ -1,0 +1,8 @@
+import { contextBridge, ipcRenderer } from "electron";
+
+// The few desktop-only actions the dashboard can start itself (see #496).
+// Everything else the dashboard and the main process share goes through the
+// local server, but an update check has to run in the main process.
+contextBridge.exposeInMainWorld("uamDesktop", {
+    checkForUpdates: (): Promise<void> => ipcRenderer.invoke("uam:check-for-updates"),
+});

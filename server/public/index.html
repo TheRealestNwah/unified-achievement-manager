@@ -1368,8 +1368,9 @@
                         </div>
                         <div class="platform-row">
                             <span class="platform-name">Automatic updates</span>
-                            <span class="platform-note">Checks for a new version every few hours and downloads it in the background, then asks before restarting. Help &rarr; Check for Updates works either way.</span>
+                            <span class="platform-note">Checks for a new version every few hours and downloads it in the background, then asks before restarting. Check now works either way.</span>
                             <div class="platform-actions">
+                                <button type="button" id="desktop-check-updates-btn" class="hidden">Check now</button>
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
                                     <input type="checkbox" role="switch" aria-label="Automatic updates" id="desktop-automatic-updates-toggle" data-desktop-setting="automaticUpdates" /> <span class="toggle-state" aria-hidden="true"></span>
                                 </label>
@@ -4729,6 +4730,22 @@ async function initDiscordPresenceRow() {
 async function initDesktopSettingsRows(setup) {
     if (!setup.desktopApp) return;
     document.getElementById("desktop-settings-section").classList.remove("hidden");
+    // Runs in the Electron main process, which shows its own result dialogs
+    // (see #496). Missing in an app older than the preload that provides it.
+    const checkUpdatesBtn = document.getElementById("desktop-check-updates-btn");
+    if (window.uamDesktop?.checkForUpdates) {
+        checkUpdatesBtn.classList.remove("hidden");
+        checkUpdatesBtn.addEventListener("click", async () => {
+            checkUpdatesBtn.disabled = true;
+            try {
+                await window.uamDesktop.checkForUpdates();
+            } catch (err) {
+                showMessage(err.message || "Couldn't check for updates.");
+            } finally {
+                checkUpdatesBtn.disabled = false;
+            }
+        });
+    }
     const toggles = document.querySelectorAll("[data-desktop-setting]");
     try {
         const settings = await api("/api/settings/desktop");

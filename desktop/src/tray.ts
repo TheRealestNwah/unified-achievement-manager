@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, Tray } from "electron";
+import { checkForUpdatesNow } from "./updater";
 
 // "Keep running in the system tray" and "Start with Windows" (see #249).
 // Both are saved server-side (Settings → Desktop app) and read here through
@@ -81,6 +82,7 @@ async function ensureTray(getWindow: () => BrowserWindow | null): Promise<void> 
                 // and CSRF token, exactly like pressing Sync all.
                 click: () => void getWindow()?.webContents.executeJavaScript("window.uamSyncAll?.()").catch(() => undefined),
             },
+            { label: "Check for updates", click: () => void checkForUpdatesNow() },
             { type: "separator" },
             { label: "Quit", click: () => app.quit() },
         ])

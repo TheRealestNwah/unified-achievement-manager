@@ -25,7 +25,7 @@ A green CI run is required, but it doesn't replace the live checks below. **Do n
 - [ ] **Crash recovery:** end `Unified Achievement Manager.exe` in Task Manager, then relaunch. It starts normally.
 - [ ] **Uninstall/reinstall:** uninstall. The program folder is gone and `%APPDATA%\Unified Achievement Manager` remains. Reinstall, and the data is still there.
 - [ ] **Upgrade** (from 1.0.1 onward): install the previous release, add data, then install the candidate over it. Data and the profile survive, with no first-run screen.
-- [ ] **Auto-update** (from 1.0.1 onward): with the previous release installed and the candidate published, Help → Check for Updates finds it, downloads it, and "Restart now" relaunches on the new version with data and the profile intact. Repeat with "Later" and confirm it installs on quit.
+- [ ] **Auto-update** (from 1.0.1 onward): with the previous release installed and the candidate published, Settings → Desktop app → Check now finds it, downloads it, and "Restart now" relaunches on the new version with data and the profile intact. Repeat with "Later" and confirm it installs on quit.
 - [ ] **Your own PostgreSQL untouched:** on a machine that also runs a separately installed PostgreSQL, install, crash-recover, and uninstall without affecting it.
 
 ## Publishing (only after explicit approval)

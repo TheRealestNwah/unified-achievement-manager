@@ -135,7 +135,8 @@ export function stopAutoUpdates(): void {
     firstCheck = interval = null;
 }
 
-// Help → Check for Updates. Works even with automatic updates turned off.
+// Help → Check for Updates, the tray menu, and Settings → Desktop app → Check
+// now (see #496). Works even with automatic updates turned off.
 export async function checkForUpdatesNow(): Promise<void> {
     if (!options) {
         await dialog.showMessageBox({ title: "Check for Updates", message: "Updates are only available in the installed app." });

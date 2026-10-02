@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { format } from "util";
-import { app, BrowserWindow, dialog, Menu, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from "electron";
 import { startDiscordPresence, stopDiscordPresence } from "./discordPresence";
 import { automaticUpdatesEnabled, handleWindowClose, HIDDEN_LAUNCH_ARG, launchedHidden, markQuitting, showWindow, startTray, stopTray, unlockNotificationsEnabled } from "./tray";
 import { startUnlockNotifications, stopUnlockNotifications } from "./notifications";
@@ -101,6 +101,7 @@ function createWindow(): BrowserWindow {
         show: false,
         autoHideMenuBar: true,
         webPreferences: {
+            preload: path.join(__dirname, "preload.js"),
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: true,
@@ -124,6 +125,14 @@ function createWindow(): BrowserWindow {
     void window.loadURL(LOADING_PAGE);
     return window;
 }
+
+// Settings → Desktop app → Check now (see #496). Only the dashboard itself
+// may ask, not a page that ended up in the window some other way (Steam's
+// sign-in page, say).
+ipcMain.handle("uam:check-for-updates", (event) => {
+    if (!isAppUrl(event.senderFrame?.url ?? "")) return;
+    return checkForUpdatesNow();
+});
 
 function buildMenu(): void {
     Menu.setApplicationMenu(
