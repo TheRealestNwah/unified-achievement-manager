@@ -10,6 +10,18 @@ A Windows desktop app that pulls your Steam, Xbox, PlayStation, RetroAchievement
 > Claude, an AI model from Anthropic, directed and tested by the maintainer.
 > See [AI disclosure](#ai-disclosure).
 
+## Screenshots
+
+The screenshots use made-up sample data.
+
+![The overview: level, XP, tier counts, fun stats and recent activity](docs/images/dashboard.png)
+
+![The library, with games from several platforms merged into single entries](docs/images/library.png)
+
+![A game's own page, with achievements from each linked platform](docs/images/game.png)
+
+![The Review page, where uncertain cross-platform matches wait for you](docs/images/review.png)
+
 ## Install
 
 1. Download `Unified-Achievement-Manager-Setup-<version>.exe` from the [Releases page](https://github.com/TheRealestNwah/unified-achievement-manager/releases).
