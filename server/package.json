@@ -15,13 +15,7 @@
     "db:health": "ts-node src/db/checkHealth.ts",
     "db:seed-levels": "ts-node src/db/seedLevels.ts",
     "db:rescore-all": "ts-node src/db/rescoreAll.ts",
-    "match": "ts-node src/db/runMatching.ts",
-    "fix:platinum-inflation": "ts-node src/db/fixPlatinumInflation.ts",
-    "fix:rarity-tiering": "ts-node src/db/fixRarityTiering.ts",
-    "fix:xbox-timestamps": "ts-node src/db/fixBogusXboxTimestamps.ts",
-    "fix:xbox-console-overclaim": "ts-node src/db/fixXboxConsoleOverclaim.ts",
-    "fix:steam-landscape-covers": "ts-node src/db/fixSteamLandscapeCovers.ts",
-    "fix:skyrim-special-edition-psn": "ts-node src/db/splitSkyrimSpecialEditionPsn.ts"
+    "match": "ts-node src/db/runMatching.ts"
   },
   "dependencies": {
     "connect-pg-simple": "^10.0.0",
