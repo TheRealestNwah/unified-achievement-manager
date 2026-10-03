@@ -1485,7 +1485,7 @@
 <script src="/image-controls.js"></script>
 <script src="/search-text.js"></script>
 <script>
-const state = { games: [], linkMode: false, linkSelection: null, completionPreset: null, searchAcronyms: SearchText.DEFAULT_ACRONYMS };
+const state = { games: [], linkMode: false, linkSelection: null, completionPreset: null, searchAcronyms: SearchText.DEFAULT_ACRONYMS, steamGridDbConfigured: false };
 
 // In-page replacements for window.prompt/confirm/alert. The desktop app's
 // Electron shell doesn't implement prompt(), and after a native confirm() or
@@ -2291,7 +2291,7 @@ function showGameContextMenu(x, y, game, anchorEl = null) {
     menu.className = "image-action-menu";
     menu.innerHTML = `
         <button type="button" data-action="rename">Change display name&hellip;</button>
-        <button type="button" data-action="rename-sgdb">Rename from SteamGridDB&hellip;</button>
+        ${state.steamGridDbConfigured ? `<button type="button" data-action="rename-sgdb">Rename from SteamGridDB&hellip;</button>` : ""}
         <button type="button" data-action="link">Link games&hellip;</button>
         <button type="button" data-action="hide">Hide (keep in score)</button>
         <button type="button" data-action="exclude">Exclude (remove from score)</button>
@@ -2318,7 +2318,7 @@ function showGameContextMenu(x, y, game, anchorEl = null) {
         close();
         changeGameDisplayName(game);
     });
-    menu.querySelector('[data-action="rename-sgdb"]').addEventListener("click", (e) => {
+    menu.querySelector('[data-action="rename-sgdb"]')?.addEventListener("click", (e) => {
         e.stopPropagation();
         close();
         openSteamGridDbRename(game);
@@ -4778,7 +4778,9 @@ function steamConnectRow() {
 async function initSteamGridDbKeyRow() {
     const setBtn = document.getElementById("steamgriddb-key-set-btn");
     const removeBtn = document.getElementById("steamgriddb-key-remove-btn");
+    // Also gates the game menu's Rename from SteamGridDB item (#506).
     const showConfigured = (configured) => {
+        state.steamGridDbConfigured = configured;
         setBtn.textContent = configured ? "Change" : "Add";
         removeBtn.classList.toggle("hidden", !configured);
     };
