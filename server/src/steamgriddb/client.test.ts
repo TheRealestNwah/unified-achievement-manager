@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../db", () => ({ pool: { query: vi.fn() } }));
 
-import { SteamGridDbError, downloadGridImage, getGame, gridsForSteamApp, isSteamGridDbImageUrl, searchGames } from "./client";
+import { SteamGridDbError, downloadGridImage, getGame, getGameBySteamAppId, gridsForSteamApp, isSteamGridDbImageUrl, searchGames } from "./client";
 
 const fetchMock = vi.fn();
 
@@ -94,6 +94,12 @@ describe("SteamGridDB game lookup by ID", () => {
     it("returns null for an unknown game", async () => {
         fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
         await expect(getGame(999, "key")).resolves.toBeNull();
+    });
+
+    it("looks a game up by Steam app ID", async () => {
+        fetchMock.mockResolvedValueOnce(Response.json({ success: true, data: { id: 42, name: "Resident Evil 5", verified: true } }));
+        await expect(getGameBySteamAppId("21690", "key")).resolves.toEqual({ id: 42, name: "Resident Evil 5" });
+        expect(requested().url.pathname).toMatch(/\/games\/steam\/21690$/);
     });
 });
 

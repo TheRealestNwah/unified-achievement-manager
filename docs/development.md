@@ -91,7 +91,7 @@ The dashboard is a thin client over these routes. Everything needs the profile t
 
 - `GET /api/me/games`: the combined library; `GET /api/me/games/:gameId`: one game's header data, including hidden and excluded games
 - `GET /api/me/games/:gameId/achievements`: one game's achievements per platform; `GET /api/me/games/:gameId/platforms`: the platform entries it's made of, for the split control
-- `PUT /api/me/games/:gameId/title` (body: `{ gamePlatformLinkId }` or `{ title }`): pick one platform's title or type your own; `PUT /api/me/games/:gameId/title/steamgriddb` (body: `{ sgdbGameId }`): use a SteamGridDB game's name
+- `PUT /api/me/games/:gameId/title` (body: `{ gamePlatformLinkId }` or `{ title }`): pick one platform's title or type your own; `PUT /api/me/games/:gameId/title/steamgriddb` (body: `{ sgdbGameId }`): use a SteamGridDB game's name; `GET /api/me/games/:gameId/title/steamgriddb/search` (query: `term`): candidate SteamGridDB names, with a Steam game's own SteamGridDB entry as `steamMatch`
 - `PUT /api/me/games/:gameId/visibility` (body: `{ mode: "hidden" | "excluded" }`), `DELETE` to undo; `GET /api/me/games/hidden`: hidden and excluded games
 - `PUT /api/me/games/:gameId/cover` (body: `{ url }`), `POST /api/me/games/:gameId/cover/upload` (multipart `file`), `DELETE /api/me/games/:gameId/cover`: cover overrides. The same three routes exist under `/api/me/achievements/:achievementId/icon`
 - `GET /api/me/games/:gameId/cover/steamgriddb/search` (query: `term`, `sgdbGameId`, `styles`, `animated`): SteamGridDB portrait covers for a game, by Steam app ID or title search; `POST /api/me/games/:gameId/cover/steamgriddb/select` (body: `{ url }`) downloads a picked `cdn2.steamgriddb.com/grid/` image and sets it as the cover
