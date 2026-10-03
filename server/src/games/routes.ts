@@ -24,6 +24,7 @@ import {
     SteamGridDbError,
     downloadGridImage,
     getGame,
+    getGameBySteamAppId,
     gridsForGame,
     gridsForSteamApp,
     isSteamGridDbImageUrl,
@@ -262,8 +263,37 @@ gamesRouter.put("/games/:gameId/title", requireAuth, async (req, res, next) => {
     }
 });
 
+// Candidate SteamGridDB names for the "Rename from SteamGridDB" action (#504).
+// A Steam game's own SteamGridDB entry - the one its covers come from - is
+// listed first, then title search matches.
+gamesRouter.get("/games/:gameId/title/steamgriddb/search", requireAuth, async (req, res, next) => {
+    try {
+        const apiKey = await getSteamGridDbApiKey();
+        if (!apiKey) return res.status(409).json({ error: "Add a SteamGridDB API key in settings first." });
+        const { gameId } = req.params;
+        if (!(await userOwnsGame(req.user!.id, gameId))) {
+            return res.status(404).json({ error: "Game not found in your library" });
+        }
+
+        const term =
+            (typeof req.query.term === "string" ? req.query.term.trim().slice(0, 200) : "") ||
+            ((await pool.query("select title from games where id = $1", [gameId])).rows[0]?.title as string);
+        const steam = await pool.query(
+            "select platform_game_id from game_platform_links where game_id = $1 and platform_id = 'steam' order by platform_game_id limit 1",
+            [gameId]
+        );
+        const appId = steam.rows[0]?.platform_game_id as string | undefined;
+        const [steamMatch, searchMatches] = await Promise.all([appId ? getGameBySteamAppId(appId, apiKey) : null, searchGames(term, apiKey)]);
+        const matches = searchMatches.filter((m) => m.id !== steamMatch?.id).slice(0, 10);
+        res.json({ term, steamMatch, matches });
+    } catch (err) {
+        if (err instanceof SteamGridDbError) return res.status(err.status === 401 || err.status === 403 ? 400 : 502).json({ error: err.message });
+        next(err);
+    }
+});
+
 // Renames a game to a SteamGridDB game's name, offered after picking that
-// game's cover (see #214). The client sends the SteamGridDB game ID, not the
+// game's cover (see #214) or from the game menu (#504). The client sends the SteamGridDB game ID, not the
 // name, so the title still comes from a known source rather than free text.
 gamesRouter.put("/games/:gameId/title/steamgriddb", requireAuth, async (req, res, next) => {
     try {

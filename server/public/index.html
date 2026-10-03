@@ -336,7 +336,7 @@
         font: inherit;
     }
     #text-prompt-actions, .sgdb-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-    #sgdb-picker {
+    #sgdb-picker, #sgdb-rename {
         border: 1px solid var(--border);
         border-radius: 12px;
         background: var(--bg);
@@ -345,8 +345,8 @@
         width: min(820px, calc(100vw - 32px));
         max-height: calc(100vh - 48px);
     }
-    #sgdb-picker::backdrop { background: rgba(0, 0, 0, 0.45); }
-    #sgdb-picker h3 { margin: 0 0 12px; font-size: 16px; }
+    #sgdb-picker::backdrop, #sgdb-rename::backdrop { background: rgba(0, 0, 0, 0.45); }
+    #sgdb-picker h3, #sgdb-rename h3 { margin: 0 0 12px; font-size: 16px; }
     .sgdb-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
     .sgdb-controls input[type="text"], .sgdb-controls select {
         background: var(--input-bg);
@@ -383,6 +383,12 @@
     .sgdb-result img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 6px; background: var(--placeholder-bg); }
     .sgdb-result span { padding: 0 2px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #sgdb-results[aria-busy="true"] { opacity: 0.5; pointer-events: none; }
+    #sgdb-rename { width: min(520px, calc(100vw - 32px)); }
+    #sgdb-rename-status { font-size: 13px; color: var(--text-dim); min-height: 18px; margin: 0 0 8px; }
+    #sgdb-rename-results { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+    #sgdb-rename-results[aria-busy="true"] { opacity: 0.5; pointer-events: none; }
+    .sgdb-name-result { text-align: left; display: flex; justify-content: space-between; gap: 12px; }
+    .sgdb-name-result small { color: var(--text-dim); white-space: nowrap; }
     button.secondary {
         background: var(--card);
         color: var(--text);
@@ -1463,6 +1469,19 @@
     </div>
 </dialog>
 
+<dialog id="sgdb-rename" aria-labelledby="sgdb-rename-title">
+    <h3 id="sgdb-rename-title">Rename from SteamGridDB</h3>
+    <form class="sgdb-controls" id="sgdb-rename-form">
+        <input type="text" id="sgdb-rename-term" placeholder="Search by game title" autocomplete="off" spellcheck="false" />
+        <button type="submit">Search</button>
+    </form>
+    <p id="sgdb-rename-status" role="status"></p>
+    <div id="sgdb-rename-results"></div>
+    <div class="sgdb-actions">
+        <button type="button" class="secondary" id="sgdb-rename-cancel">Cancel</button>
+    </div>
+</dialog>
+
 <script src="/image-controls.js"></script>
 <script src="/search-text.js"></script>
 <script>
@@ -2272,6 +2291,7 @@ function showGameContextMenu(x, y, game, anchorEl = null) {
     menu.className = "image-action-menu";
     menu.innerHTML = `
         <button type="button" data-action="rename">Change display name&hellip;</button>
+        <button type="button" data-action="rename-sgdb">Rename from SteamGridDB&hellip;</button>
         <button type="button" data-action="link">Link games&hellip;</button>
         <button type="button" data-action="hide">Hide (keep in score)</button>
         <button type="button" data-action="exclude">Exclude (remove from score)</button>
@@ -2297,6 +2317,11 @@ function showGameContextMenu(x, y, game, anchorEl = null) {
         e.stopPropagation();
         close();
         changeGameDisplayName(game);
+    });
+    menu.querySelector('[data-action="rename-sgdb"]').addEventListener("click", (e) => {
+        e.stopPropagation();
+        close();
+        openSteamGridDbRename(game);
     });
     menu.querySelector('[data-action="link"]')?.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -2448,6 +2473,102 @@ New name: ${sgdbGame.name}`,
     } catch (err) {
         await showMessage(`Couldn't rename the game: ${err.message}`);
     }
+}
+
+// Renames a game to a SteamGridDB game's name without touching its cover
+// (#504) - often the cover imports fine but the name doesn't. Like the cover
+// picker, searches run on submit only and names are set with textContent.
+function openSteamGridDbRename(game) {
+    const dialog = document.getElementById("sgdb-rename");
+    const form = document.getElementById("sgdb-rename-form");
+    const termInput = document.getElementById("sgdb-rename-term");
+    const status = document.getElementById("sgdb-rename-status");
+    const results = document.getElementById("sgdb-rename-results");
+    const cancelBtn = document.getElementById("sgdb-rename-cancel");
+
+    let requestId = 0;
+    termInput.value = "";
+    results.replaceChildren();
+    document.getElementById("sgdb-rename-title").textContent = `Rename ${game.title} from SteamGridDB`;
+
+    async function load() {
+        const thisRequest = ++requestId;
+        const params = new URLSearchParams();
+        const term = termInput.value.trim();
+        if (term) params.set("term", term);
+        status.textContent = "Searching SteamGridDB…";
+        results.setAttribute("aria-busy", "true");
+        try {
+            const data = await api(`/api/me/games/${game.id}/title/steamgriddb/search?${params}`);
+            if (thisRequest !== requestId) return;
+            termInput.value = data.term;
+            const options = [...(data.steamMatch ? [{ ...data.steamMatch, note: "Steam app match" }] : []), ...data.matches];
+            results.replaceChildren(
+                ...options.map((m) => {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "secondary sgdb-name-result";
+                    const name = document.createElement("span");
+                    name.textContent = m.name;
+                    button.append(name);
+                    if (m.note) {
+                        const note = document.createElement("small");
+                        note.textContent = m.note;
+                        button.append(note);
+                    }
+                    button.addEventListener("click", () => select(m));
+                    return button;
+                })
+            );
+            status.textContent = options.length ? "Click a name to use it." : "No SteamGridDB game matches that title. Try a different search.";
+        } catch (err) {
+            if (thisRequest !== requestId) return;
+            results.replaceChildren();
+            status.textContent = err.message;
+        } finally {
+            if (thisRequest === requestId) results.removeAttribute("aria-busy");
+        }
+    }
+
+    async function select(sgdbGame) {
+        requestId++;
+        status.textContent = "Renaming…";
+        results.setAttribute("aria-busy", "true");
+        try {
+            await api(`/api/me/games/${game.id}/title/steamgriddb`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sgdbGameId: sgdbGame.id }),
+            });
+            finish();
+            await refreshGamesAndScore();
+        } catch (err) {
+            status.textContent = `Couldn't rename the game: ${err.message}`;
+            results.removeAttribute("aria-busy");
+        }
+    }
+
+    const onSubmit = (e) => {
+        e.preventDefault();
+        load();
+    };
+    const onCancel = (e) => {
+        e.preventDefault();
+        finish();
+    };
+    function finish() {
+        requestId++;
+        form.removeEventListener("submit", onSubmit);
+        cancelBtn.removeEventListener("click", onCancel);
+        dialog.removeEventListener("cancel", onCancel);
+        dialog.close();
+    }
+
+    form.addEventListener("submit", onSubmit);
+    cancelBtn.addEventListener("click", onCancel);
+    dialog.addEventListener("cancel", onCancel);
+    dialog.showModal();
+    load();
 }
 
 // Searches run on submit or filter change, never per keystroke, since
