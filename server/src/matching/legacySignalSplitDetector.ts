@@ -1,5 +1,5 @@
 import { pool } from "../db";
-import { RETRO_PLATFORM_ID, isLegacyOnlyLink } from "./gameMatcher";
+import { RETRO_PLATFORM_ID, RPCS3_PLATFORM_ID, isLegacyOnlyLink } from "./gameMatcher";
 import { splitPlatformLink, GameSplitResult } from "./gameSplitter";
 
 export interface LegacySignalSplitDetectResult {
@@ -13,7 +13,11 @@ interface LinkRow {
     consoleVariant: string | null;
 }
 
+// RPCS3 (see #523) arrived after matchGames stopped auto-merging legacy
+// links, so an RPCS3 game sharing a game with a modern platform is one the
+// user linked themselves, not an old merge worth questioning.
 function isLegacySignalLink(link: LinkRow): boolean {
+    if (link.platformId === RPCS3_PLATFORM_ID) return false;
     return link.platformId === RETRO_PLATFORM_ID || isLegacyOnlyLink(link.platformId, link.consoleVariant);
 }
 

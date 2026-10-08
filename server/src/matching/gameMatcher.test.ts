@@ -7,6 +7,10 @@ describe("isLegacyOnlyLink", () => {
         expect(isLegacyOnlyLink("xbox", null)).toBe(false);
     });
 
+    it("rpcs3 is always legacy: every RPCS3 game is a PS3 release (see #523)", () => {
+        expect(isLegacyOnlyLink("rpcs3", null)).toBe(true);
+    });
+
     it("steam is never legacy regardless of variant", () => {
         expect(isLegacyOnlyLink("steam", "PS3")).toBe(false);
     });
