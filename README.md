@@ -33,7 +33,7 @@ Windows 10/11, 64-bit. The installer is about 135 MB because it bundles its own 
 ## First run
 
 1. **Name your profile.** The app asks what to call you. That's your profile: there's no account to create and nothing to sign in to.
-2. **Connect your platforms** under **Settings → Platforms**, as many or as few as you like. You don't need Steam.
+2. **Connect your platforms** under **Settings â†’ Platforms**, as many or as few as you like. You don't need Steam.
 3. Each platform syncs as soon as it's connected.
 
 ## Connecting platforms
@@ -48,23 +48,23 @@ Links like these open in your normal web browser. Only Steam's sign-in page open
 
 ## Using it
 
-- **Sync:** pulls each platform's library and unlocks and recomputes your score. While the app is open it also re-syncs every linked platform automatically, every 6 hours by default (change it or turn it off in **Settings → Background sync**). Turn on **Settings → Desktop app → Keep running in the tray** to keep that going after you close the window, and **Start with Windows** to have it start in the tray when you sign in. When a sync finds new achievements while the app isn't in front, a Windows notification says so (turn it off under **Settings → Desktop app → Unlock notifications**).
+- **Sync:** pulls each platform's library and unlocks and recomputes your score. While the app is open it also re-syncs every linked platform automatically, every 6 hours by default (change it or turn it off in **Settings â†’ Background sync**). Turn on **Settings â†’ Desktop app â†’ Keep running in the tray** to keep that going after you close the window, and **Start with Windows** to have it start in the tray when you sign in. When a sync finds new achievements while the app isn't in front, a Windows notification says so (turn it off under **Settings â†’ Desktop app â†’ Unlock notifications**).
 - **Find matches:** links the same real-world game and achievement across platforms so they share one tier, with PSN's own tier always winning. Your score isn't collapsed: unlocking the same achievement on two platforms still counts both.
 - **Review:** high-confidence matches merge automatically. Anything uncertain (achievement matches, game merges, and possible bad merges) waits on the **Review** page in the sidebar, with a count of what's waiting, for you to confirm or reject.
 - **Link games:** automatic matching only merges exact titles, so it misses cases like "Skyrim" on PSN vs "The Elder Scrolls V: Skyrim" on Steam. Click **Link games**, click the game whose title you want to keep, then click the duplicate.
-- **Cover art and icons:** click a game's cover or an achievement's icon to paste an image URL or upload your own (PNG, JPEG, WebP, or GIF, up to 5 MB). Add a free SteamGridDB key under **Settings → API keys** to pick covers from SteamGridDB instead.
-- **Rename, hide, or exclude a game:** right-click a game to change its display name, hide it from your library (it still counts toward your score), or exclude it (removed from your score too). Bring hidden and excluded games back from **Settings → Hidden games**.
-- **Search acronyms:** typing an acronym in the games filter also finds its franchise ("GTA" finds Grand Theft Auto). Add your own under **Settings → Search acronyms**.
-- **Discord:** while Discord is running, your level and XP show on your Discord profile. It's on by default; turn it off under **Settings → Discord**.
-- **Updates:** the app checks for new versions in the background and asks before restarting to install one. **Check now** under **Settings → Desktop app** (or the tray menu) checks right away, and **Settings → Desktop app → Automatic updates** turns the background checks off.
+- **Cover art and icons:** click a game's cover or an achievement's icon to paste an image URL or upload your own (PNG, JPEG, WebP, or GIF, up to 5 MB). Add a free SteamGridDB key under **Settings â†’ API keys** to pick covers from SteamGridDB instead.
+- **Rename, hide, or exclude a game:** right-click a game to change its display name, hide it from your library (it still counts toward your score), or exclude it (removed from your score too). Bring hidden and excluded games back from **Settings â†’ Hidden games**.
+- **Search acronyms:** typing an acronym in the games filter also finds its franchise ("GTA" finds Grand Theft Auto). Add your own under **Settings â†’ Search acronyms**.
+- **Discord:** while Discord is running, your level and XP show on your Discord profile. It's on by default; turn it off under **Settings â†’ Discord**.
+- **Updates:** the app checks for new versions in the background and asks before restarting to install one. **Check now** under **Settings â†’ Desktop app** (or the tray menu) checks right away, and **Settings â†’ Desktop app â†’ Automatic updates** turns the background checks off.
 - **Compact sidebar:** the button next to the app name collapses the sidebar to icons only. It collapses on its own when the window is narrow.
-- **Export:** download every achievement in your library, with whether and when you unlocked it, as JSON or CSV from **Settings → Export**.
+- **Export:** download every achievement in your library, with whether and when you unlocked it, as JSON or CSV from **Settings â†’ Export**.
 - **Disconnect:** any platform can be unlinked, which removes its synced games and achievements.
 - **Delete profile:** permanently removes your profile and everything linked to it after you type `DELETE` to confirm. The app then starts over at first run.
 
 ## Your data
 
-Everything is stored in `%APPDATA%\Unified Achievement Manager` (open it from **File → Open Data Folder**). Uninstalling keeps it, so reinstalling picks up where you left off. **File → Back Up…** and **File → Restore from Backup…** save it to, and restore it from, a single file. See [docs/operations.md](docs/operations.md) for backups, moving to a new PC, removing everything, and troubleshooting, and [docs/privacy.md](docs/privacy.md) for exactly what is stored and sent where.
+Everything is stored in `%APPDATA%\Unified Achievement Manager` (open it from **File â†’ Open Data Folder**). Uninstalling keeps it, so reinstalling picks up where you left off. **File â†’ Back Upâ€¦** and **File â†’ Restore from Backupâ€¦** save it to, and restore it from, a single file. See [docs/operations.md](docs/operations.md) for backups, moving to a new PC, removing everything, and troubleshooting, and [docs/privacy.md](docs/privacy.md) for exactly what is stored and sent where.
 
 ## Status
 
@@ -92,4 +92,8 @@ never expected.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT â€” see [LICENSE](LICENSE).
+
+## macOS development preview
+
+See [macOS build instructions and release gates](docs/macos.md). PR CI builds and smoke-tests Apple Silicon and Intel packages; no Mac release has been published.

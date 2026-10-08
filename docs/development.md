@@ -27,7 +27,7 @@ npm install
 npm run dev        # restarts on code changes; or `npm run app` to run once
 ```
 
-It serves the dashboard at http://127.0.0.1:3000 (use `127.0.0.1`, not `localhost`, or Steam sign-in loses its session). Data goes in `server/.dev-data`, never the installed app's folder, so it can run while the installed app is open. It starts empty, so either set it up from scratch or restore a backup into it: quit it, then extract a **File → Back Up…** file into `server/.dev-data`. `UAM_DATA_DIR` and `PORT` override the folder and port. The dashboard page is cached in memory, so restart after editing `server/public/index.html`.
+It serves the dashboard at http://127.0.0.1:3000 (use `127.0.0.1`, not `localhost`, or Steam sign-in loses its session). Data goes in `server/.dev-data`, never the installed app's folder, so it can run while the installed app is open. It starts empty, so either set it up from scratch or restore a backup into it: quit it, then extract a **File â†’ Back Upâ€¦** file into `server/.dev-data`. `UAM_DATA_DIR` and `PORT` override the folder and port. The dashboard page is cached in memory, so restart after editing `server/public/index.html`.
 
 There used to be a multi-user "classic server" mode with an external PostgreSQL and a `.env`. It was removed in [#392](https://github.com/TheRealestNwah/unified-achievement-manager/issues/392).
 
@@ -125,3 +125,7 @@ The dashboard is a thin client over these routes. Everything needs the profile t
 An achievement's tier is inherited from PSN (`tier_source = 'psn_native'`) or inferred from global unlock rarity (`'rarity_fallback'`), capped at gold. Games with a skewed rarity distribution are ranked within their own list instead. See [data-model.md](data-model.md). The level curve lives in `server/src/scoring/levelCurve.ts`. After retuning it, run `npm run db:seed-levels` and `npm run db:rescore-all`.
 
 Platform credentials and the Steam Web API key are encrypted at rest with AES-256-GCM. Sessions use `HttpOnly`, `SameSite=Lax` cookies. The server only listens on `127.0.0.1`, and the dashboard is served with a nonce-based Content-Security-Policy.
+
+## macOS development preview
+
+See [macOS build instructions and release gates](macos.md). PR CI builds and smoke-tests Apple Silicon and Intel packages; no Mac release has been published.
