@@ -82,6 +82,22 @@ integration("getFunStats tier totals", () => {
         expect([...first, ...second].map((a) => a.name)).toEqual(all.slice(0, 4).map((a) => a.name));
     });
 
+    it("includes each unlock's description in the activity feed (#516)", async () => {
+        const { getRecentActivity } = await import("./queries");
+        const linkId = await canonicalStore.getOrCreateAchievementLink(
+            gameId,
+            "steam",
+            "fun-stats-app",
+            "fun-stats-described",
+            "Described Achievement",
+            "Beat the game on hard",
+            undefined
+        );
+        await canonicalStore.recordUnlock(accountId, linkId, new Date("2026-03-01T00:00:00Z"));
+        const [latest] = await getRecentActivity(userId, 1, 0);
+        expect(latest).toMatchObject({ name: "Described Achievement", description: "Beat the game on hard" });
+    });
+
     it("keeps a hidden game in the totals, drops an excluded one, and leaves both out of the activity feed (#236)", async () => {
         const { getRecentActivity } = await import("./queries");
         const otherGameId = await canonicalStore.getOrCreateCanonicalGame("steam", "fun-stats-other-app", "Other Game");
