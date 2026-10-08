@@ -20,6 +20,7 @@ interface GameRow {
 // elsewhere in comments/prose, which isn't the real stored value. Exported
 // for legacySignalSplitDetector.ts, which needs the same legacy-signal check.
 export const RETRO_PLATFORM_ID = "retroachievements";
+export const RPCS3_PLATFORM_ID = "rpcs3";
 
 // A platform link that's known to be an older-hardware-only release of a
 // title, same risk category as RetroAchievements (see #225): a modern
@@ -36,7 +37,9 @@ export const RETRO_PLATFORM_ID = "retroachievements";
 //   xbox/sync.ts) when the modern achievements endpoint had nothing and the
 //   legacy 360 endpoint did - already an unambiguous legacy-only signal.
 // - steam: no generation concept - a Steam listing is never treated as legacy.
+// - rpcs3: a PS3 emulator, so every RPCS3 game is a PS3 release (see #523).
 export function isLegacyOnlyLink(platformId: string, consoleVariant: string | null): boolean {
+    if (platformId === RPCS3_PLATFORM_ID) return true;
     if (!consoleVariant) return false;
     if (platformId === "xbox") return consoleVariant === "Xbox 360";
     if (platformId === "psn") {
@@ -104,6 +107,7 @@ async function fetchGamesWithPlatforms(): Promise<GameRow[]> {
 //    franchise's games sharing their first few words) when tried against
 //    this app's real data.
 export async function matchGames(): Promise<GameMatchResult> {
+    const sameListCandidates = await recordSameTrophyListCandidates();
     const initialGames = await fetchGamesWithPlatforms();
 
     const groups = new Map<string, GameRow[]>();
@@ -116,7 +120,7 @@ export async function matchGames(): Promise<GameMatchResult> {
 
     let groupsMerged = 0;
     let gamesRemoved = 0;
-    let candidatesRecorded = 0;
+    let candidatesRecorded = sameListCandidates;
 
     for (const group of groups.values()) {
         if (group.length < 2) continue;
@@ -221,6 +225,26 @@ export async function matchGames(): Promise<GameMatchResult> {
     }
 
     return { groupsMerged, gamesRemoved, candidatesRecorded };
+}
+
+// An RPCS3 game and a PSN game with the same NP communication ID are the same
+// PS3 trophy list (see #523), whatever their titles say. They're suggested
+// for review rather than merged, so RPCS3 stays its own entry until the user
+// links them; a pair already decided on isn't suggested again.
+async function recordSameTrophyListCandidates(): Promise<number> {
+    const pairs = await pool.query(
+        `select distinct rpcs3.game_id as rpcs3_game_id, psn.game_id as psn_game_id
+         from game_platform_links rpcs3
+         join game_platform_links psn
+           on psn.platform_id = 'psn' and psn.platform_game_id = rpcs3.platform_game_id
+         where rpcs3.platform_id = $1 and psn.game_id <> rpcs3.game_id`,
+        [RPCS3_PLATFORM_ID]
+    );
+    let recorded = 0;
+    for (const pair of pairs.rows) {
+        if (await recordGameCandidate(pair.rpcs3_game_id, pair.psn_game_id, 1, "same-trophy-list")) recorded++;
+    }
+    return recorded;
 }
 
 async function wasRejectedPair(gameAId: string, gameBId: string): Promise<boolean> {

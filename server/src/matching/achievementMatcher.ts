@@ -3,6 +3,7 @@ import { normalize, wordOverlapScore } from "./normalize";
 import { countStrippedNames, stripListTags } from "./achievementTags";
 import { resolveTierFromRarity } from "../scoring/tier";
 import { deleteIfUploaded } from "../games/uploads";
+import { RPCS3_PLATFORM_ID } from "./gameMatcher";
 
 // A pending match whose two achievements are in different games (see #360) -
 // left behind when a split moves one side to a new game. Confirming it would
@@ -38,6 +39,7 @@ interface AchievementRow {
     linkId: string;
     platformId: string;
     platformGameId: string;
+    platformAchievementId: string;
     name: string;
 }
 
@@ -87,7 +89,7 @@ function strippedNamesByLink(achievements: AchievementRow[]): Map<string, string
 
 async function getAchievements(gameId: string): Promise<AchievementRow[]> {
     const result = await pool.query(
-        `select ca.id as canonical_id, apl.id as link_id, apl.platform_id, apl.platform_game_id, ca.name
+        `select ca.id as canonical_id, apl.id as link_id, apl.platform_id, apl.platform_game_id, apl.platform_achievement_id, ca.name
          from canonical_achievements ca
          join achievement_platform_links apl on apl.canonical_achievement_id = ca.id
          where ca.game_id = $1`,
@@ -98,8 +100,29 @@ async function getAchievements(gameId: string): Promise<AchievementRow[]> {
         linkId: r.link_id,
         platformId: r.platform_id,
         platformGameId: r.platform_game_id,
+        platformAchievementId: r.platform_achievement_id,
         name: r.name,
     }));
+}
+
+// RPCS3 and PSN copies of the same PS3 trophy list (same communication ID)
+// share trophy IDs, so those pair up by ID before any name matching (see
+// #523) - their names can differ when RPCS3 and PSN use different languages.
+async function mergeSameTrophyListById(achievements: AchievementRow[]): Promise<number> {
+    const psnByKey = new Map<string, AchievementRow>();
+    for (const a of achievements) {
+        if (a.platformId === "psn") psnByKey.set(`${a.platformGameId}:${a.platformAchievementId}`, a);
+    }
+    let merged = 0;
+    for (const a of achievements) {
+        if (a.platformId !== RPCS3_PLATFORM_ID) continue;
+        const psn = psnByKey.get(`${a.platformGameId}:${a.platformAchievementId}`);
+        if (!psn || psn.canonicalId === a.canonicalId) continue;
+        await recordCandidate(a.linkId, psn.canonicalId, 1, "confirmed");
+        await mergeAchievements(psn.canonicalId, a.canonicalId);
+        merged++;
+    }
+    return merged;
 }
 
 // Exported for the manual game-merge route (matching/routes.ts) - a merge
@@ -109,7 +132,8 @@ export async function matchAchievementsForGame(gameId: string): Promise<{ merged
     let achievements = await getAchievements(gameId);
     const platforms = [...new Set(achievements.map((a) => a.platformId))];
 
-    let merged = 0;
+    let merged = await mergeSameTrophyListById(achievements);
+    if (merged > 0) achievements = await getAchievements(gameId);
     const proposed = new Set<string>();
 
     // Fold each platform's achievements into a running pool one at a time,
