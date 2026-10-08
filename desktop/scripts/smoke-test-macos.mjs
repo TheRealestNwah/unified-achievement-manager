@@ -65,7 +65,10 @@ try {
     if (fs.existsSync(pgCtl) && fs.existsSync(path.join(data, "postgres", "PG_VERSION"))) {
         try { execFileSync(pgCtl, ["stop", `--pgdata=${path.join(data, "postgres")}`, "--mode=fast", "--wait"], { stdio: "inherit" }); } catch { /* Already stopped. */ }
     }
-    if (fs.existsSync(data)) fs.cpSync(data, path.join(logs, "data"), { recursive: true });
+    // Keep diagnostics, not database contents or generated encryption keys.
+    for (const [source, name] of [[path.join(data, "logs", "main.log"), "main.log"], [path.join(data, "postgres.log"), "postgres.log"]]) {
+        if (fs.existsSync(source)) fs.copyFileSync(source, path.join(logs, name));
+    }
     if (mounted) execFileSync("hdiutil", ["detach", mount], { stdio: "inherit" });
     fs.rmSync(work, { recursive: true, force: true });
 }
