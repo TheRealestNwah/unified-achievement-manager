@@ -1144,7 +1144,7 @@
         <main>
             <section id="setup-view" class="hidden">
                 <h2>Welcome!</h2>
-                <p>Unified Achievement Manager brings your Steam, Xbox, PlayStation, RetroAchievements, and GOG achievements together in one place. Everything stays on this computer, and there's no account to create.</p>
+                <p>Unified Achievement Manager brings your Steam, Xbox, PlayStation, RetroAchievements, GOG, and RPCS3 achievements together in one place. Everything stays on this computer, and there's no account to create.</p>
                 <p>What should your profile be called? You'll connect your platforms next.</p>
                 <form class="platform-row" id="setup-form">
                     <label for="setup-name-input" class="visually-hidden">Profile name</label>
@@ -1893,7 +1893,7 @@ function renderEmptyLibrary(list) {
         // A new profile with nothing connected yet (see #393).
         box.innerHTML = `
             <h3>Connect your first platform</h3>
-            <p>Connect Steam, Xbox, PlayStation, RetroAchievements, or GOG in Settings to pull in your games and achievements. Connect as many as you like; they all add up to one score.</p>
+            <p>Connect Steam, Xbox, PlayStation, RetroAchievements, GOG, or RPCS3 in Settings to pull in your games and achievements. Connect as many as you like; they all add up to one score.</p>
             <div class="empty-library-actions">
                 <button type="button" id="empty-settings-btn">Connect a platform</button>
             </div>`;
@@ -2126,8 +2126,8 @@ async function refreshStats() {
 // Badge text people recognise (see #285): the console where there is one
 // ("PS5", "Xbox 360"), otherwise the platform's short name. The full name is
 // in the tooltip.
-const PLATFORM_SHORT_NAMES = { steam: "Steam", xbox: "Xbox", psn: "PlayStation", retroachievements: "RA", gog: "GOG" };
-const PLATFORM_FULL_NAMES = { steam: "Steam", xbox: "Xbox", psn: "PlayStation", retroachievements: "RetroAchievements", gog: "GOG" };
+const PLATFORM_SHORT_NAMES = { steam: "Steam", xbox: "Xbox", psn: "PlayStation", retroachievements: "RA", gog: "GOG", rpcs3: "RPCS3" };
+const PLATFORM_FULL_NAMES = { steam: "Steam", xbox: "Xbox", psn: "PlayStation", retroachievements: "RetroAchievements", gog: "GOG", rpcs3: "RPCS3" };
 
 // PSN sends one trophy list's consoles comma-joined ("PS3,PSVITA,PS4"), and
 // a couple of its console codes aren't what people call them (see #346).
@@ -4156,6 +4156,7 @@ const PLATFORM_SYNC_SLUGS = {
     psn: "psn",
     retroachievements: "retro",
     gog: "gog",
+    rpcs3: "rpcs3",
 };
 
 async function syncAllPlatforms(button, statusEl) {
@@ -4354,6 +4355,19 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
         updateBtn.addEventListener("click", () => showUpdateLoginForm(row, platformId));
         actions.appendChild(updateBtn);
     }
+    if (platformId === "rpcs3") {
+        // Point at a moved RPCS3 folder without disconnecting (see #522).
+        const changeBtn = document.createElement("button");
+        changeBtn.type = "button";
+        changeBtn.className = "secondary slot-0";
+        changeBtn.textContent = "Change folder…";
+        changeBtn.addEventListener("click", () => {
+            const form = rpcs3ConnectForm({ submitLabel: "Save", initialFolder: account?.local_folder ?? "", onCancel: () => refreshPlatforms() });
+            row.replaceWith(form);
+            form.querySelector("input")?.focus();
+        });
+        actions.appendChild(changeBtn);
+    }
 
     row.append(name, note, actions);
     if (account?.last_sync_error) {
@@ -4380,7 +4394,7 @@ function connectedPlatformRow(platformId, label, account, { canDisconnect = true
 }
 
 // Element ids predate this helper ("retro-note", not "retroachievements-note").
-const PLATFORM_NOTE_PREFIXES = { steam: "steam", xbox: "xbox", psn: "psn", retroachievements: "retro", gog: "gog" };
+const PLATFORM_NOTE_PREFIXES = { steam: "steam", xbox: "xbox", psn: "psn", retroachievements: "retro", gog: "gog", rpcs3: "rpcs3" };
 
 // Setup help lives on the platform's own connect row, and only while it's
 // not connected - it used to sit in loose paragraphs below the whole list.
@@ -4591,6 +4605,112 @@ function renderPlatforms(accounts) {
             byPlatform[platformId] ? connectedPlatformRow(platformId, options.label, byPlatform[platformId]) : connectPlatformForm({ ...options, platformId })
         );
     }
+
+    list.appendChild(byPlatform.rpcs3 ? connectedPlatformRow("rpcs3", "RPCS3", byPlatform.rpcs3) : rpcs3ConnectForm());
+}
+
+// RPCS3 is a folder on this computer, not an online account (see #522): pick
+// the folder, then which of its RPCS3 users to read when there's more than one.
+function rpcs3ConnectForm({ submitLabel = "Connect", initialFolder = "", onCancel } = {}) {
+    const form = document.createElement("form");
+    form.className = "platform-row";
+    const name = document.createElement("span");
+    name.className = "platform-name";
+    name.textContent = "RPCS3";
+    const folderInput = plainInput("rpcs3-folder-input", "Your RPCS3 folder");
+    folderInput.value = initialFolder;
+    const userSelect = document.createElement("select");
+    userSelect.id = "rpcs3-user-select";
+    userSelect.className = "hidden";
+    userSelect.setAttribute("aria-label", "RPCS3 user");
+    form.append(name, folderInput);
+    if (window.uamDesktop?.pickFolder) {
+        const browse = document.createElement("button");
+        browse.type = "button";
+        browse.className = "secondary";
+        browse.textContent = "Browse…";
+        browse.addEventListener("click", async () => {
+            const picked = await window.uamDesktop.pickFolder("Choose your RPCS3 folder");
+            if (!picked) return;
+            folderInput.value = picked;
+            folderInput.dispatchEvent(new Event("input"));
+        });
+        form.appendChild(browse);
+    }
+    form.appendChild(userSelect);
+
+    const actions = document.createElement("div");
+    actions.className = "platform-actions";
+    const btn = document.createElement("button");
+    btn.type = "submit";
+    btn.className = "slot-2";
+    btn.textContent = submitLabel;
+    actions.appendChild(btn);
+    if (onCancel) {
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "secondary slot-1";
+        cancel.textContent = "Cancel";
+        cancel.addEventListener("click", onCancel);
+        actions.appendChild(cancel);
+        form.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") onCancel();
+        });
+    }
+    form.appendChild(actions);
+    appendPlatformHelp(
+        form,
+        "Pick the folder <code>rpcs3.exe</code> is in. The app only reads RPCS3's trophy files and never changes them. Trophies synced to RPCN from another PC show up once you start that game in RPCS3 here."
+    );
+
+    const updateEnabled = () => (btn.disabled = !folderInput.value.trim());
+    folderInput.addEventListener("input", () => {
+        // A different folder has different users.
+        userSelect.classList.add("hidden");
+        userSelect.replaceChildren();
+        updateEnabled();
+    });
+    updateEnabled();
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (btn.disabled) return;
+        btn.disabled = true;
+        const folder = folderInput.value.trim();
+        try {
+            let userId = userSelect.classList.contains("hidden") ? null : userSelect.value;
+            if (!userId) {
+                const { users } = await api("/api/rpcs3/users", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ folder }),
+                });
+                if (users.length === 0) throw new Error("That RPCS3 folder has no users yet. Start RPCS3 once, then try again.");
+                if (users.length > 1) {
+                    userSelect.replaceChildren(...users.map((u) => new Option(`${u.name} (${u.games} game${u.games === 1 ? "" : "s"})`, u.id)));
+                    userSelect.value = (users.find((u) => u.games > 0) ?? users[0]).id;
+                    userSelect.classList.remove("hidden");
+                    userSelect.focus();
+                    updateEnabled();
+                    return;
+                }
+                userId = users[0].id;
+            }
+            await api("/api/rpcs3/connect", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ folder, userId }),
+            });
+            await refreshPlatforms();
+            // Sync straight away, like the other platforms (see #284).
+            document.getElementById("rpcs3-sync-btn")?.click();
+        } catch (err) {
+            showMessage(err.message || "Couldn't connect RPCS3.");
+            console.error(err);
+            updateEnabled();
+        }
+    });
+    return form;
 }
 
 async function refreshPlatforms() {
@@ -4658,7 +4778,7 @@ function renderSyncProblems(accounts) {
     banner.replaceChildren(text, link, dismiss);
 }
 
-const PLATFORM_LABELS = { steam: "Steam", xbox: "Xbox", psn: "PSN", retroachievements: "RetroAchievements", gog: "GOG" };
+const PLATFORM_LABELS = { steam: "Steam", xbox: "Xbox", psn: "PSN", retroachievements: "RetroAchievements", gog: "GOG", rpcs3: "RPCS3" };
 
 async function saveSteamApiKey(apiKey) {
     await api("/api/setup/steam-api-key", {

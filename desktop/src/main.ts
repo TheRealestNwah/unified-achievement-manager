@@ -138,6 +138,16 @@ ipcMain.handle("uam:check-for-updates", (event) => {
     return checkForUpdatesNow();
 });
 
+// A native folder picker for the dashboard (see #522), so a folder path
+// doesn't have to be typed in.
+ipcMain.handle("uam:pick-folder", async (event, title: unknown) => {
+    if (!isAppUrl(event.senderFrame?.url ?? "")) return null;
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const options: Electron.OpenDialogOptions = { title: typeof title === "string" ? title.slice(0, 100) : "Choose a folder", properties: ["openDirectory"] };
+    const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
+    return result.canceled ? null : (result.filePaths[0] ?? null);
+});
+
 function buildMenu(): void {
     Menu.setApplicationMenu(
         Menu.buildFromTemplate([

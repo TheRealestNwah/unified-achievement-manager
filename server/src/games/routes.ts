@@ -63,7 +63,7 @@ gamesRouter.delete("/account", requireAuth, async (req, res, next) => {
 gamesRouter.get("/accounts", requireAuth, async (req, res, next) => {
     try {
         const result = await pool.query(
-            "select id, platform_id, display_name, linked_at, last_synced_at, last_sync_error, last_sync_error_at from user_platform_accounts where user_id = $1 order by platform_id",
+            "select id, platform_id, display_name, local_folder, linked_at, last_synced_at, last_sync_error, last_sync_error_at from user_platform_accounts where user_id = $1 order by platform_id",
             [req.user!.id]
         );
         // `syncing`: a sync of this account is running right now, manual or
