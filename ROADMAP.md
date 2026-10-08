@@ -15,7 +15,7 @@
 ## Next up
 
 - Code-sign the installer, which removes the SmartScreen warning.
-- macOS and Linux builds. The code is already cross-platform apart from the installer.
+- macOS preview builds and native packaged-app CI ([#510](https://github.com/TheRealestNwah/unified-achievement-manager/issues/510)); signing, notarization and real-Mac acceptance remain before release. See [macOS preview](docs/macos.md). Linux packaging remains future work.
 - Run the hands-on auto-update check in the [release checklist](docs/release-checklist.md) by hand. Auto-update from GitHub Releases ([#314](https://github.com/TheRealestNwah/unified-achievement-manager/issues/314)) is live from 1.0.1.
 
 New work that comes up along the way gets its own issue rather than being built unlisted.

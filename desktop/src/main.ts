@@ -141,6 +141,7 @@ ipcMain.handle("uam:check-for-updates", (event) => {
 function buildMenu(): void {
     Menu.setApplicationMenu(
         Menu.buildFromTemplate([
+            ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
             {
                 label: "File",
                 submenu: [
@@ -150,7 +151,7 @@ function buildMenu(): void {
                     { label: "Back Up…", click: () => void backUp() },
                     { label: "Restore from Backup…", click: () => void restoreFromBackup() },
                     { type: "separator" },
-                    { role: "quit" },
+                    { role: process.platform === "darwin" ? "close" : "quit" },
                 ],
             },
             { role: "editMenu" },
@@ -167,6 +168,7 @@ function buildMenu(): void {
                     { role: "togglefullscreen" },
                 ],
             },
+            ...(process.platform === "darwin" ? [{ role: "windowMenu" as const }] : []),
             {
                 label: "Help",
                 submenu: [
@@ -247,7 +249,7 @@ async function handleDatabaseLost(): Promise<void> {
         type: "error",
         title: "Unified Achievement Manager",
         message: "The app's database stopped unexpectedly.",
-        detail: `This can happen if its process (postgres.exe) was ended or crashed. Restarting the app starts it again; your data is safe.
+        detail: `This can happen if its PostgreSQL process was ended or crashed. Restarting the app starts it again; your data is safe.
 
 Details are in the log file:
 ${logFile}`,
@@ -350,6 +352,19 @@ async function start(): Promise<void> {
         const ready = await fetch(`${running.url}/readyz`);
         const title = await mainWindow?.webContents.executeJavaScript("document.title");
         if (!ready.ok || !title) throw new Error(`Smoke test failed: readyz ${ready.status}, title ${JSON.stringify(title)}`);
+        if (process.platform === "darwin" && mainWindow) {
+            mainWindow.close();
+            if (mainWindow.isDestroyed() || mainWindow.isVisible()) throw new Error("Mac close did not hide the window");
+            app.emit("activate");
+            if (!mainWindow.isVisible()) throw new Error("Dock activation did not restore the window");
+            const platform = await mainWindow.webContents.executeJavaScript("window.uamDesktop.platform");
+            if (platform !== "darwin") throw new Error("Mac preload bridge is missing");
+            console.log("Mac window lifecycle passed: close, Dock activate, preload");
+        }
+        if (process.env.UAM_SMOKE_SCREENSHOT && mainWindow) {
+            const screenshot = await mainWindow.webContents.capturePage();
+            fs.writeFileSync(process.env.UAM_SMOKE_SCREENSHOT, screenshot.toPNG());
+        }
         console.log(`Smoke test passed: readyz ${ready.status}, dashboard "${title}"`);
         app.quit();
     }
@@ -380,7 +395,10 @@ if (!app.requestSingleInstanceLock()) {
     // Also brings the window back from the tray.
     app.on("second-instance", () => showWindow(mainWindow));
 
-    app.on("window-all-closed", () => app.quit());
+    app.on("activate", () => showWindow(mainWindow));
+    app.on("window-all-closed", () => {
+        if (process.platform !== "darwin") app.quit();
+    });
 
     let readyToQuit = false;
     app.on("before-quit", (event) => {

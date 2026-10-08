@@ -37,3 +37,7 @@ A green CI run is required, but it doesn't replace the live checks below. **Do n
 ## Rollback
 
 Users keep their data folder across uninstalls, so a bad release is rolled back by pointing people at the previous installer: uninstall, then install the older version. Changes to `db/schema.sql` must stay backward compatible within 1.x so an older version can still open a newer data folder. Never ship anything that regenerates `secrets.json`.
+
+## macOS development preview
+
+See [macOS build instructions and release gates](macos.md). PR CI builds and smoke-tests Apple Silicon and Intel packages; no Mac release has been published.

@@ -125,3 +125,7 @@ The dashboard is a thin client over these routes. Everything needs the profile t
 An achievement's tier is inherited from PSN (`tier_source = 'psn_native'`) or inferred from global unlock rarity (`'rarity_fallback'`), capped at gold. Games with a skewed rarity distribution are ranked within their own list instead. See [data-model.md](data-model.md). The level curve lives in `server/src/scoring/levelCurve.ts`. After retuning it, run `npm run db:seed-levels` and `npm run db:rescore-all`.
 
 Platform credentials and the Steam Web API key are encrypted at rest with AES-256-GCM. Sessions use `HttpOnly`, `SameSite=Lax` cookies. The server only listens on `127.0.0.1`, and the dashboard is served with a nonce-based Content-Security-Policy.
+
+## macOS development preview
+
+See [macOS build instructions and release gates](macos.md). PR CI builds and smoke-tests Apple Silicon and Intel packages; no Mac release has been published.

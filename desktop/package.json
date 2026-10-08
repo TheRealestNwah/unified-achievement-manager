@@ -12,7 +12,8 @@
     "start": "npm run build:server && npm run build && electron .",
     "typecheck": "tsc --noEmit",
     "postinstall": "node node_modules/electron/install.js",
-    "dist": "npm run build:server && node scripts/stage-server.mjs && npm run build && electron-builder --win --publish never"
+    "dist": "npm run build:server && node scripts/stage-server.mjs && npm run build && electron-builder --win --publish never",
+    "dist:mac": "npm run build:server && node scripts/stage-server.mjs && npm run build && electron-builder --mac --publish never"
   },
   "devDependencies": {
     "@types/node": "24.13.6",
@@ -31,7 +32,8 @@
     },
     "files": [
       "dist/**/*",
-      "package.json"
+      "package.json",
+      "build/trayTemplate*.png"
     ],
     "extraResources": [
       {
@@ -88,7 +90,19 @@
         "owner": "TheRealestNwah",
         "repo": "unified-achievement-manager"
       }
-    ]
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "artifactName": "Unified-Achievement-Manager-${version}-mac-${arch}.${ext}",
+      "category": "public.app-category.entertainment",
+      "icon": "build/icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "notarize": false
+    }
   },
   "dependencies": {
     "@xhayper/discord-rpc": "^1.5.1",

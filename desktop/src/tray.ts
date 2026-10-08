@@ -1,4 +1,5 @@
-import { app, BrowserWindow, Menu, Tray } from "electron";
+import { app, BrowserWindow, Menu, nativeImage, Tray } from "electron";
+import path from "path";
 import { checkForUpdatesNow } from "./updater";
 
 // "Keep running in the system tray" and "Start with Windows" (see #249).
@@ -36,7 +37,7 @@ let quitting = false;
 let hintShown = false;
 
 export function launchedHidden(): boolean {
-    return process.argv.includes(HIDDEN_LAUNCH_ARG);
+    return process.argv.includes(HIDDEN_LAUNCH_ARG) || (process.platform === "darwin" && app.isPackaged && app.getLoginItemSettings().wasOpenedAtLogin);
 }
 
 // Set once a real quit starts, so the window's close handler lets it close.
@@ -64,13 +65,17 @@ async function fetchSettings(serverUrl: string): Promise<DesktopSettings | null>
 // electron.exe.
 function applyLoginItem(enabled: boolean): void {
     if (!app.isPackaged) return;
-    const current = app.getLoginItemSettings({ args: [HIDDEN_LAUNCH_ARG] }).openAtLogin;
-    if (current !== enabled) app.setLoginItemSettings({ openAtLogin: enabled, args: [HIDDEN_LAUNCH_ARG] });
+    const options = process.platform === "win32" ? { args: [HIDDEN_LAUNCH_ARG] } : {};
+    const current = app.getLoginItemSettings(options).openAtLogin;
+    if (current !== enabled) app.setLoginItemSettings({ openAtLogin: enabled, ...options });
 }
 
 async function ensureTray(getWindow: () => BrowserWindow | null): Promise<void> {
     if (tray) return;
-    const icon = await app.getFileIcon(process.execPath, { size: "small" });
+    const icon = process.platform === "darwin"
+        ? nativeImage.createFromPath(path.join(__dirname, "..", "build", "trayTemplate.png"))
+        : await app.getFileIcon(process.execPath, { size: "small" });
+    if (process.platform === "darwin") icon.setTemplateImage(true);
     tray = new Tray(icon);
     tray.setToolTip("Unified Achievement Manager");
     tray.setContextMenu(
@@ -127,12 +132,13 @@ export function stopTray(): void {
 // Closing the window hides it to the tray instead of quitting, while that
 // setting is on and a real quit isn't under way.
 export function handleWindowClose(event: Electron.Event, window: BrowserWindow): void {
-    if (quitting || !settings.keepInTray || !tray) return;
+    // Mac's close button hides the window; Dock activation brings it back.
+    if (quitting || (process.platform !== "darwin" && (!settings.keepInTray || !tray))) return;
     event.preventDefault();
     window.hide();
-    if (!hintShown) {
+    if (process.platform === "win32" && !hintShown) {
         hintShown = true;
-        tray.displayBalloon({
+        tray?.displayBalloon({
             title: "Still running",
             content: "Unified Achievement Manager keeps syncing in the background. Right-click the tray icon to quit.",
         });

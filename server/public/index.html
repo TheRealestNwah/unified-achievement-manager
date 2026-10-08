@@ -1365,7 +1365,7 @@
                         </div>
                         <div class="platform-row">
                             <span class="platform-name">Unlock notifications</span>
-                            <span class="platform-note">A Windows notification when a sync finds new achievements, platinums, or a level-up while the app isn't in front.</span>
+                            <span class="platform-note">A desktop notification when a sync finds new achievements, platinums, or a level-up while the app isn't in front.</span>
                             <div class="platform-actions">
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
                                     <input type="checkbox" role="switch" aria-label="Unlock notifications" id="desktop-unlock-notifications-toggle" data-desktop-setting="unlockNotifications" /> <span class="toggle-state" aria-hidden="true"></span>
@@ -4853,6 +4853,20 @@ async function initDiscordPresenceRow() {
 async function initDesktopSettingsRows(setup) {
     if (!setup.desktopApp) return;
     document.getElementById("desktop-settings-section").classList.remove("hidden");
+    if (window.uamDesktop?.platform === "darwin") {
+        const loginToggle = document.getElementById("desktop-start-with-windows-toggle");
+        const loginRow = loginToggle.closest(".platform-row");
+        loginRow.querySelector(".platform-name").textContent = "Start at login";
+        loginRow.querySelector(".platform-note").textContent = "Starts when you sign in. macOS may require approval in System Settings → General → Login Items; preview builds may need to be added there manually.";
+        loginToggle.setAttribute("aria-label", "Start at login");
+        const trayRow = document.getElementById("desktop-keep-in-tray-toggle").closest(".platform-row");
+        trayRow.querySelector(".platform-name").textContent = "Show menu bar icon";
+        trayRow.querySelector(".platform-note").textContent = "Adds sync and quit actions to the menu bar. Closing the window keeps syncing; click the Dock icon to reopen, or press ⌘Q to quit.";
+        document.getElementById("desktop-keep-in-tray-toggle").setAttribute("aria-label", "Show menu bar icon");
+        const updateToggle = document.getElementById("desktop-automatic-updates-toggle");
+        updateToggle.disabled = true;
+        updateToggle.closest(".platform-row").querySelector(".platform-note").textContent = "Mac previews are updated manually. Check now opens the builds page; automatic updates require signed Mac releases.";
+    }
     // Runs in the Electron main process, which shows its own result dialogs
     // (see #496). Missing in an app older than the preload that provides it.
     const checkUpdatesBtn = document.getElementById("desktop-check-updates-btn");

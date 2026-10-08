@@ -93,3 +93,7 @@ never expected.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## macOS development preview
+
+See [macOS build instructions and release gates](docs/macos.md). PR CI builds and smoke-tests Apple Silicon and Intel packages; no Mac release has been published.

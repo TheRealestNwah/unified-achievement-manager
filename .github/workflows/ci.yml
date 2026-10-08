@@ -104,3 +104,49 @@ jobs:
             desktop/release/Unified-Achievement-Manager-Setup-*.exe.blockmap
             desktop/release/latest.yml
           retention-days: 14
+
+  macos-installer:
+    name: macos-installer (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            desktop/package-lock.json
+      - name: Check native build architecture
+        run: node -e 'if (process.arch !== "${{ matrix.arch }}") process.exit(1)'
+      - run: npm ci
+        working-directory: server
+      - run: npm ci
+        working-directory: desktop
+      - run: npm run typecheck
+        working-directory: desktop
+      - run: npm run dist:mac
+        working-directory: desktop
+      - name: Install DMG, launch twice, quit, and remove app
+        working-directory: desktop
+        run: node scripts/smoke-test-macos.mjs release/Unified-Achievement-Manager-*-mac-${{ matrix.arch }}.dmg
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: Unified-Achievement-Manager-mac-${{ matrix.arch }}
+          path: |
+            desktop/release/*-mac-${{ matrix.arch }}.dmg
+            desktop/release/*-mac-${{ matrix.arch }}.zip
+            desktop/release/smoke-macos/
+          retention-days: 14

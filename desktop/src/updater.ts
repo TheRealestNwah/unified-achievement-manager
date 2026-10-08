@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from "electron";
+import { app, BrowserWindow, dialog, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 
 // Auto-update from this repo's GitHub Releases (see #314). electron-builder
@@ -75,7 +75,8 @@ function backgroundCheck(): void {
 
 export function startAutoUpdates(opts: UpdaterOptions): void {
     // Dev runs have no app-update.yml, and the smoke test quits in seconds.
-    if (!app.isPackaged || process.env.UAM_SMOKE_TEST === "1") return;
+    // Initial Mac builds are unsigned; Squirrel.Mac requires a signed app.
+    if (process.platform === "darwin" || !app.isPackaged || process.env.UAM_SMOKE_TEST === "1") return;
     options = opts;
     // electron-updater's own error logging would repeat what the "error"
     // handler below logs, so only its info/warn lines go to the log.
@@ -138,6 +139,17 @@ export function stopAutoUpdates(): void {
 // Help → Check for Updates, the tray menu, and Settings → Desktop app → Check
 // now (see #496). Works even with automatic updates turned off.
 export async function checkForUpdatesNow(): Promise<void> {
+    if (process.platform === "darwin") {
+        const { response } = await dialog.showMessageBox({
+            title: "Mac preview updates",
+            message: "Mac preview builds are updated manually.",
+            detail: "Automatic updates will be available once Mac builds are signed. Download the next preview from the project's GitHub Actions artifacts.",
+            buttons: ["Open builds", "Cancel"],
+            cancelId: 1,
+        });
+        if (response === 0) await shell.openExternal("https://github.com/TheRealestNwah/unified-achievement-manager/actions");
+        return;
+    }
     if (!options) {
         await dialog.showMessageBox({ title: "Check for Updates", message: "Updates are only available in the installed app." });
         return;
