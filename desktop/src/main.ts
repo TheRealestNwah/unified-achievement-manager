@@ -15,6 +15,10 @@ interface RunningApp {
     stop(): Promise<void>;
 }
 
+// Hosted runners may expose an unusable virtual GPU. Smoke mode must be able
+// to render the dashboard and capture it without depending on GPU drivers.
+if (process.env.UAM_SMOKE_TEST === "1") app.disableHardwareAcceleration();
+
 const PROJECT_URL = "https://github.com/TheRealestNwah/unified-achievement-manager";
 
 let mainWindow: BrowserWindow | null = null;
