@@ -82,7 +82,9 @@ The dashboard is a thin client over these routes. Everything needs the profile t
 
 - `POST /api/xbox/connect` (body: `{ apiKey }`), `POST /api/psn/connect` (body: `{ npsso }`), `POST /api/retro/connect` (body: `{ username, apiKey }`), `POST /api/gog/connect` (body: `{ code }`): link an account
 - `GET /api/gog/login-url`: the GOG login page whose redirect carries the `code` for `/api/gog/connect`
-- `POST /api/steam/sync`, `POST /api/xbox/sync`, `POST /api/psn/sync`, `POST /api/retro/sync`, `POST /api/gog/sync`: pull each platform's library and unlocks, and recompute the score
+- `POST /api/rpcs3/users` (body: `{ folder }`): the RPCS3 users in an RPCS3 folder, with how many games each has trophies in; `POST /api/rpcs3/connect` (body: `{ folder, userId }`): read that user's trophies from that folder. RPCS3 is a local folder, not an online account
+- `POST /api/steam/sync`, `POST /api/xbox/sync`, `POST /api/psn/sync`, `POST /api/retro/sync`, `POST /api/gog/sync`, `POST /api/rpcs3/sync`: pull each platform's library and unlocks, and recompute the score
+- `GET /rpcs3-icons/:communicationId/:file`: an RPCS3 game or trophy icon (`ICON0.PNG`, `TROP###.PNG`), read from the connected RPCS3 folder. Outside `/api` so a page of icons doesn't count toward the API rate limit
 - `GET /api/me/accounts`: linked platforms, when each last synced, and whether a sync is running
 - `GET /api/me/sync-status`: a cheap "anything new since I last looked" check the dashboard polls, plus the next scheduled sync and which platforms are syncing now
 - `DELETE /api/me/accounts/:platformId`: disconnect a platform and remove its synced data

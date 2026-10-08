@@ -19,6 +19,7 @@ const PLATFORM_NAMES: Record<string, string> = {
     psn: "PlayStation Network",
     retroachievements: "RetroAchievements",
     gog: "GOG",
+    rpcs3: "RPCS3",
 };
 
 // Xbox is reached through OpenXBL, and it's OpenXBL's limits and outages the

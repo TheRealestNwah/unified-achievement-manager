@@ -1,6 +1,6 @@
 # Unified Achievement Manager
 
-A Windows desktop app that pulls your Steam, Xbox, PlayStation, RetroAchievements, and GOG achievements into one place, with a unified score and level modeled on PlayStation's trophy system. Everything runs on your own computer. There's no server to set up, no account with us, and nothing leaves your PC except the requests to the platforms you connect.
+A Windows desktop app that pulls your Steam, Xbox, PlayStation, RetroAchievements, GOG, and RPCS3 (PS3 emulator) achievements into one place, with a unified score and level modeled on PlayStation's trophy system. Everything runs on your own computer. There's no server to set up, no account with us, and nothing leaves your PC except the requests to the platforms you connect.
 
 - Every achievement gets a PSN-style tier (Bronze/Silver/Gold/Platinum). If a game exists on PlayStation, its native trophy tier wins, even for the Steam or Xbox version of the same achievement. Otherwise the tier comes from global unlock rarity.
 - One combined score and level across all connected platforms, following a PSN-like leveling curve.

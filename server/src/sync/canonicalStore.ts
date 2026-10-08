@@ -61,6 +61,8 @@ export async function getOrCreateCanonicalGame(
     }
 }
 
+// A game's own PlayStation trophy grade: from PSN, or from RPCS3's copy of
+// the same PS3 trophy list (see #522).
 export interface NativeTier {
     tier: string;
     tierSource: "psn_native";

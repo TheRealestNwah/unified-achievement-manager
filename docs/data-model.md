@@ -29,7 +29,7 @@ This is a **shared value lookup, not a dedup mechanism** — a user who unlocks 
 
 - `tier` — bronze/silver/gold/platinum, PSN-style
 - `tier_source` — records *why* it has that tier:
-  - `psn_native`: the game has a real PSN release; this is its actual trophy tier
+  - `psn_native`: the game has a real PSN release; this is its actual trophy tier. RPCS3 trophies use it too, since they are the same PS3 trophy list read from the emulator's files
   - `cross_platform_match`: reserved for "no PSN copy of *this* achievement, but it was matched to one that has a tier" — defined in the schema but not currently produced: when a merge involves a `psn_native` row, that row wins outright and keeps its own `tier_source` rather than relabeling the merged result
   - `rarity_fallback`: no PSN release exists at all; tier inferred from `global_unlock_rarity` on `achievement_platform_links`
 - `points` — denormalized from `tier_points` at resolution time, so scoring never needs a join at read time

@@ -1,12 +1,12 @@
 # CLAUDE.md
 
-Unified Achievement Manager: a single-user Windows desktop app (Electron + embedded PostgreSQL) that merges Steam, Xbox, PSN, RetroAchievements, and GOG achievements. The checkout folder is called `trophyverse`; the product, installer, and data folder are all "Unified Achievement Manager".
+Unified Achievement Manager: a single-user Windows desktop app (Electron + embedded PostgreSQL) that merges Steam, Xbox, PSN, RetroAchievements, GOG, and RPCS3 achievements. The checkout folder is called `trophyverse`; the product, installer, and data folder are all "Unified Achievement Manager".
 
 The default branch is `master`.
 
 ## Layout
 
-- `server/`: Express + PostgreSQL backend. `src/app.ts` is the entry point; per-platform code lives in `src/{steam,xbox,psn,retro,gog}`, with `src/matching`, `src/scoring`, and `src/sync` shared across them. The dashboard is a single page in `server/public/index.html`. Migrations and one-off repair scripts are in `src/db`.
+- `server/`: Express + PostgreSQL backend. `src/app.ts` is the entry point; per-platform code lives in `src/{steam,xbox,psn,retro,gog,rpcs3}`, with `src/matching`, `src/scoring`, and `src/sync` shared across them. The dashboard is a single page in `server/public/index.html`. Migrations and one-off repair scripts are in `src/db`.
 - `desktop/`: Electron shell (`src/main.ts`) that runs the server in-process, plus the Windows installer build (`npm run dist`, electron-builder).
 - `db/schema.sql`: schema reference.
 - `docs/`: `development.md` (running from source, API), `data-model.md` (tiers, matching, scoring), `operations.md`, `privacy.md`, `release-checklist.md`.

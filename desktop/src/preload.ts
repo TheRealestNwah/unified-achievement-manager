@@ -7,4 +7,7 @@ contextBridge.exposeInMainWorld("uamDesktop", {
     platform: process.platform,
     automaticUpdatesSupported: process.platform !== "darwin",
     checkForUpdates: (): Promise<void> => ipcRenderer.invoke("uam:check-for-updates"),
+    // Choosing the RPCS3 folder (see #522). Resolves to the folder's path, or
+    // null when the dialog is cancelled.
+    pickFolder: (title: string): Promise<string | null> => ipcRenderer.invoke("uam:pick-folder", title),
 });

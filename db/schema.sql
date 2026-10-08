@@ -85,6 +85,10 @@ create table if not exists user_platform_accounts (
 alter table user_platform_accounts add column if not exists last_sync_error text;
 alter table user_platform_accounts add column if not exists last_sync_error_at timestamptz;
 
+-- Platforms read from a folder on this computer rather than an online
+-- account (RPCS3, see #522) keep that folder here.
+alter table user_platform_accounts add column if not exists local_folder text;
+
 -- ---------------------------------------------------------------------------
 -- Games: one canonical row per real-world game, linked out to each
 -- platform's own copy of it.
@@ -444,7 +448,8 @@ insert into platforms (id, name, has_native_tiers) values
     ('steam', 'Steam', false),
     ('xbox', 'Xbox', false),
     ('retroachievements', 'RetroAchievements', false),
-    ('gog', 'GOG', false)
+    ('gog', 'GOG', false),
+    ('rpcs3', 'RPCS3', true)
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------

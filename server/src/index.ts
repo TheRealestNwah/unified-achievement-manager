@@ -11,6 +11,7 @@ import { xboxRouter } from "./xbox/routes";
 import { psnRouter } from "./psn/routes";
 import { retroRouter } from "./retro/routes";
 import { gogRouter } from "./gog/routes";
+import { rpcs3Router, rpcs3IconsRouter } from "./rpcs3/routes";
 import { scoreRouter } from "./scoring/routes";
 import { gamesRouter } from "./games/routes";
 import { matchingRouter } from "./matching/routes";
@@ -112,6 +113,7 @@ app.use("/api/xbox", xboxRouter);
 app.use("/api/psn", psnRouter);
 app.use("/api/retro", retroRouter);
 app.use("/api/gog", gogRouter);
+app.use("/api/rpcs3", rpcs3Router);
 app.use("/api/me", scoreRouter);
 app.use("/api/me", gamesRouter);
 app.use("/api/matching", matchingRouter);
@@ -131,6 +133,7 @@ app.use((req, res, next) => {
     }
     next();
 });
+app.use("/rpcs3-icons", rpcs3IconsRouter);
 app.use("/uploads", express.static(config.uploadsDir, { index: false }));
 app.use(express.static(path.join(__dirname, "..", "public"), { index: false }));
 

@@ -5,6 +5,7 @@ import { syncPsnAccount } from "../psn/sync";
 import { exchangeRefreshTokenForTokens } from "../psn/client";
 import { syncRetroAccount } from "../retro/sync";
 import { syncGogAccount } from "../gog/sync";
+import { syncRpcs3Account } from "../rpcs3/sync";
 import { exchangeRefreshTokenForTokens as exchangeGogRefreshTokenForTokens } from "../gog/client";
 import { SyncSummary } from "./types";
 import { config } from "../config";
@@ -103,6 +104,14 @@ async function syncByPlatform(account: PlatformAccountRow): Promise<SyncSummary>
                 [encryptCredential(tokens.accessToken, config.credentialEncryptionKey), encryptCredential(tokens.refreshToken, config.credentialEncryptionKey), account.id]
             );
             return syncGogAccount(account.id, tokens.accessToken, account.platform_account_id);
+        }
+
+        case "rpcs3": {
+            // A folder on this computer, not a login (see #522).
+            const result = await pool.query("select local_folder from user_platform_accounts where id = $1", [account.id]);
+            const folder = result.rows[0]?.local_folder as string | null;
+            if (!folder) throw new Error("Pick your RPCS3 folder in Settings.");
+            return syncRpcs3Account(account.id, folder, account.platform_account_id);
         }
 
         default:

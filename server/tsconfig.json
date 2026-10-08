@@ -13,7 +13,8 @@
   },
   "include": ["src"],
   // Kept out of the production build's dist/ output. CI still typechecks
-  // *.test.ts via the separate tsconfig.test.json (vitest transpiles but
-  // never typechecks them, so this is the only thing that does).
-  "exclude": ["src/**/*.test.ts"]
+  // *.test.ts (and the *.test-support.ts helpers they share) via the
+  // separate tsconfig.test.json (vitest transpiles but never typechecks
+  // them, so this is the only thing that does).
+  "exclude": ["src/**/*.test.ts", "src/**/*.test-support.ts"]
 }

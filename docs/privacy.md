@@ -7,13 +7,15 @@ Unified Achievement Manager runs entirely on your computer. There's no Unified A
 Everything is kept in your Windows user's data folder, `%APPDATA%\Unified Achievement Manager` (see [operations.md](operations.md)):
 
 - **Your profile:** the name you gave it and the app's generated ID for it. If you connect Steam, your Steam account ID and display name, returned by Steam's own sign-in page.
-- **Library data:** for each linked platform, the account ID and display name, owned games, achievement definitions, unlock times, and the derived score and level.
+- **Library data:** for each linked platform, the account ID and display name, owned games, achievement definitions, unlock times, and the derived score and level. For RPCS3, the path to your RPCS3 folder.
 - **Credentials:** your Steam Web API key, Xbox/OpenXBL key, PSN and GOG tokens, RetroAchievements key, and SteamGridDB key if you add one. These are encrypted with AES-256-GCM before they're written to the database. The encryption key is in `secrets.json` in the same folder. That keeps credentials unreadable in a copied database file on its own, but it doesn't protect them from someone who can already open your Windows account's files.
 - **Sessions:** the dashboard's session is stored in the app's database. There's no sign-in: the app only answers requests from this computer, addressed to itself.
 - **Your content:** cover art and achievement icons you add.
 - **Logs:** app and database logs in the data folder. They aren't meant to contain credentials, but check them before sharing them with anyone.
 
 The app's database and web server only accept connections from your own computer (`127.0.0.1`).
+
+**RPCS3** is read from files on your computer rather than over the network: the app reads the trophy files in the RPCS3 folder you pick (each game's `TROPUSR.DAT`, `TROPCONF.SFM` and icons) and never changes them. It doesn't read RPCS3's settings, including your RPCN login, and doesn't contact RPCN.
 
 ## What is sent where
 
