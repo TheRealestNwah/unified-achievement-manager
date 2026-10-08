@@ -1961,7 +1961,7 @@ function renderActivity(items, { append = false } = {}) {
     const html = items
         .map(
             (a) => `
-        <div class="activity-item">
+        <div class="activity-item"${a.description ? ` title="${escapeHtml(a.description)}"` : ""}>
             ${
                 a.icon_url
                     ? `<img class="achievement-icon" src="${escapeHtml(a.icon_url)}" alt="" loading="lazy" />`

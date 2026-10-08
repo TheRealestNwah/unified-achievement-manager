@@ -198,7 +198,7 @@ export async function getGameCompletionCountsForUser(userId: string): Promise<Ga
 export async function getRecentActivity(userId: string, limit = 20, offset = 0) {
     const result = await pool.query(
         `select
-            ca.name, ca.tier, ca.points,
+            ca.name, ca.description, ca.tier, ca.points,
             -- Same override-first icon as getAchievementsForGame (see #32, #166).
             coalesce(
                 (select icon_url from user_achievement_icon_overrides where user_id = $1 and canonical_achievement_id = ca.id),
