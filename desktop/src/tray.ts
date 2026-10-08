@@ -52,6 +52,13 @@ export function showWindow(window: BrowserWindow | null): void {
     window.focus();
 }
 
+// Hidden with no way back other than the tray. A minimized window doesn't
+// count: it's on the taskbar, though Electron's isVisible() is false for it
+// on Windows, which made the settings poll keep restoring it (see #514).
+function isHiddenWindow(window: BrowserWindow | null): window is BrowserWindow {
+    return !!window && !window.isVisible() && !window.isMinimized();
+}
+
 async function fetchSettings(serverUrl: string): Promise<DesktopSettings | null> {
     try {
         const res = await fetch(`${serverUrl}/api/setup/desktop-settings`);
@@ -111,7 +118,7 @@ async function refresh(serverUrl: string, getWindow: () => BrowserWindow | null)
         // Launched hidden at login but the tray has since been turned off:
         // there'd be no way back to the window, so show it.
         const window = getWindow();
-        if (window && !window.isVisible()) showWindow(window);
+        if (isHiddenWindow(window)) showWindow(window);
     }
 }
 
@@ -119,7 +126,7 @@ export async function startTray(serverUrl: string, getWindow: () => BrowserWindo
     await refresh(serverUrl, getWindow);
     // A hidden launch only stays hidden if the tray actually came up.
     const window = getWindow();
-    if (!tray && window && !window.isVisible()) showWindow(window);
+    if (!tray && isHiddenWindow(window)) showWindow(window);
     pollTimer = setInterval(() => void refresh(serverUrl, getWindow), POLL_INTERVAL_MS);
 }
 
