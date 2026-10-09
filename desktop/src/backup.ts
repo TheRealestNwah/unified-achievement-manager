@@ -31,9 +31,17 @@ function tar(args: string[]): Promise<void> {
     });
 }
 
-export function defaultBackupName(now = new Date()): string {
+function datedName(kind: string, now: Date): string {
     const pad = (n: number) => String(n).padStart(2, "0");
-    return `Unified Achievement Manager backup ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.tar.gz`;
+    return `Unified Achievement Manager ${kind} ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.tar.gz`;
+}
+
+export function defaultBackupName(now = new Date()): string {
+    return datedName("backup", now);
+}
+
+export function defaultExportName(now = new Date()): string {
+    return datedName("export", now);
 }
 
 export async function backupDataFolder(dataDir: string, archivePath: string): Promise<void> {
@@ -101,4 +109,43 @@ export async function restoreDataFolder(dataDir: string, archivePath: string): P
         fs.rmSync(staging, { recursive: true, force: true });
     }
     return previous;
+}
+
+// Exports (see #528) are the portable counterpart: the server writes the
+// tables as JSON lines into a scratch folder, which is archived the same way.
+// The server's functions are passed in because they live in its bundle.
+export interface PortableData {
+    exportPortableData(dataDir: string, outDir: string, appVersion: string): Promise<unknown>;
+    importPortableData(dataDir: string, fromDir: string): Promise<string>;
+}
+
+export async function exportToArchive(portable: PortableData, dataDir: string, archivePath: string, appVersion: string): Promise<void> {
+    const staging = path.join(dataDir, `exporting ${timestamp()}`);
+    const partial = `${archivePath}.partial`;
+    fs.rmSync(partial, { force: true });
+    try {
+        await portable.exportPortableData(dataDir, staging, appVersion);
+        await tar(["-czf", partial, "-C", staging, "."]);
+        fs.renameSync(partial, archivePath);
+    } finally {
+        fs.rmSync(partial, { force: true });
+        fs.rmSync(staging, { recursive: true, force: true });
+    }
+}
+
+// Returns the folder the replaced data went to.
+export async function importFromArchive(portable: PortableData, dataDir: string, archivePath: string): Promise<string> {
+    const staging = path.join(dataDir, `importing ${timestamp()}`);
+    fs.mkdirSync(staging, { recursive: true });
+    try {
+        await tar(["-xzf", archivePath, "-C", staging]).catch((err: Error) => {
+            throw new Error(`That file couldn't be opened as an export (${err.message}).`);
+        });
+        if (missingBackupParts(staging).length === 0) {
+            throw new Error("That file is a backup, not an export. Use File → Restore from Backup… for it, on a computer of the same kind it was made on.");
+        }
+        return await portable.importPortableData(dataDir, staging);
+    } finally {
+        fs.rmSync(staging, { recursive: true, force: true });
+    }
 }

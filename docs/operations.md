@@ -24,9 +24,11 @@ The program itself is installed separately (by default in `%LOCALAPPDATA%\Progra
 
 To move to another PC: back up on the old one, install Unified Achievement Manager on the new one, and use **File → Restore from Backup…** there.
 
+Backups copy the database's own files, so they only restore on the same kind of computer (Windows to Windows, or a Mac with the same chip). To move between Windows and a Mac, use **File → Export for Another Computer…** instead. It saves your library, platform logins, settings, and uploaded art as a portable `.tar.gz` (it includes your logins and their key too, so keep it private). On the other computer, **File → Import from Another Computer…** replaces that copy's data with it and restarts; as with a restore, the data it replaces is moved into a `before import <date>` folder rather than deleted. An export from an older version imports into a newer one, but not the other way round: update the app first. Folder settings (such as RPCS3's trophy folder) point at the old computer's paths, so pick them again. If you keep using both computers, let only one of them sync PSN and GOG: each sync renews the login and can sign the other copy out.
+
 You can also back up by hand: quit the app (closing the window quits it, unless **Keep running in the tray** is on in Settings; then right-click the tray icon and choose **Quit**), and copy the files listed above. Restore by quitting the app and putting them back. `secrets.json` and `postgres\` only work together, and a copy taken while the app is running may not be consistent.
 
-**Settings → Export** gives you a portable JSON or CSV of every achievement in your library and your unlocks too, but it isn't something the app can import back.
+**Settings → Export** gives you a portable JSON or CSV of every achievement in your library and your unlocks too, but it isn't something the app can import back. Use **File → Export for Another Computer…** for that.
 
 ## Removing everything
 
