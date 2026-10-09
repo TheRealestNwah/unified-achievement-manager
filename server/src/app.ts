@@ -4,6 +4,9 @@ import { startEmbeddedDatabase } from "./runtime/embeddedDatabase";
 import { resolveAppPort } from "./runtime/appPort";
 import { watchDatabase } from "./runtime/databaseWatchdog";
 
+// The desktop app's File → Export/Import (see #528) run these with the server stopped.
+export { exportPortableData, importPortableData, PortableImportError } from "./runtime/portableData";
+
 // Entry point for the self-contained app: no .env, no external PostgreSQL.
 // Everything lives in one per-user data folder.
 

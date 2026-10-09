@@ -6,7 +6,7 @@ import { startDiscordPresence, stopDiscordPresence } from "./discordPresence";
 import { automaticUpdatesEnabled, handleWindowClose, HIDDEN_LAUNCH_ARG, launchedHidden, markQuitting, showWindow, startTray, stopTray, unlockNotificationsEnabled } from "./tray";
 import { startUnlockNotifications, stopUnlockNotifications } from "./notifications";
 import { loadWindowState, trackWindowState } from "./windowState";
-import { backupDataFolder, defaultBackupName, restoreDataFolder } from "./backup";
+import { backupDataFolder, defaultBackupName, defaultExportName, exportToArchive, importFromArchive, type PortableData, restoreDataFolder } from "./backup";
 import { checkForUpdatesNow, startAutoUpdates, stopAutoUpdates } from "./updater";
 
 interface RunningApp {
@@ -160,6 +160,8 @@ function buildMenu(): void {
                     { type: "separator" },
                     { label: "Back Up…", click: () => void backUp() },
                     { label: "Restore from Backup…", click: () => void restoreFromBackup() },
+                    { label: "Export for Another Computer…", click: () => void exportData() },
+                    { label: "Import from Another Computer…", click: () => void importData() },
                     { type: "separator" },
                     { role: process.platform === "darwin" ? "close" : "quit" },
                 ],
@@ -323,6 +325,70 @@ async function restoreFromBackup(): Promise<void> {
         });
     });
 }
+// The server bundle is already loaded by start(); this just reaches its
+// export/import functions (see #528).
+function portableData(): PortableData {
+    return require(serverEntry()) as PortableData;
+}
+
+async function exportData(): Promise<void> {
+    const options: Electron.SaveDialogOptions = {
+        title: "Export for Another Computer",
+        defaultPath: path.join(app.getPath("documents"), defaultExportName()),
+        filters: [{ name: "Export", extensions: ["gz"] }],
+    };
+    const { canceled, filePath } = mainWindow ? await dialog.showSaveDialog(mainWindow, options) : await dialog.showSaveDialog(options);
+    if (canceled || !filePath) return;
+    await withServerStopped("Exporting&hellip; the app will restart when it's done.", async () => {
+        await exportToArchive(portableData(), dataDir, filePath, app.getVersion());
+        console.log(`Exported to ${filePath}`);
+        await dialog.showMessageBox({
+            title: "Export complete",
+            message: "Your library, logins, and settings are exported.",
+            detail: `${filePath}
+
+Use File → Import from Another Computer… to load it on another computer, Windows or Mac. The export includes your platform logins - keep it somewhere private.`,
+        });
+    });
+}
+
+async function importData(): Promise<void> {
+    const options: Electron.OpenDialogOptions = {
+        title: "Import from Another Computer",
+        defaultPath: app.getPath("documents"),
+        filters: [{ name: "Export", extensions: ["gz"] }],
+        properties: ["openFile"],
+    };
+    const { canceled, filePaths } = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+    if (canceled || filePaths.length === 0) return;
+    const { response } = await dialog.showMessageBox({
+        type: "warning",
+        title: "Import from Another Computer",
+        message: "Replace everything in the app with this export?",
+        detail: `${filePaths[0]}
+
+Your current library, logins, and settings are moved aside into the data folder (not deleted), and the app restarts.
+
+If you keep using the computer the export came from, let only one of them sync PSN and GOG: each sync renews the login and can sign the other copy out.`,
+        buttons: ["Import", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+    });
+    if (response !== 0) return;
+    await withServerStopped("Importing&hellip; the app will restart when it's done.", async () => {
+        const previous = await importFromArchive(portableData(), dataDir, filePaths[0]);
+        console.log(`Imported ${filePaths[0]}; previous data kept in ${previous}`);
+        await dialog.showMessageBox({
+            title: "Import complete",
+            message: "The export has been imported.",
+            detail: `Your previous data was kept in:
+${previous}
+
+Delete that folder once you're happy with the import. Folder settings such as RPCS3's may need choosing again on this computer.`,
+        });
+    });
+}
+
 async function start(): Promise<void> {
     captureLogs();
     console.log(`Starting Unified Achievement Manager ${app.getVersion()} (data: ${dataDir})`);
