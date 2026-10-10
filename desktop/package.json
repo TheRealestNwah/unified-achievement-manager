@@ -1,7 +1,7 @@
 {
   "name": "unified-achievement-manager-desktop",
   "productName": "Unified Achievement Manager",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "license": "MIT",
   "description": "Unified Achievement Manager desktop app: every platform's achievements in one place, running entirely on your computer.",
