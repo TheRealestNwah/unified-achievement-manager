@@ -7,3 +7,6 @@ desktop/staging/
 desktop/release/
 server/.dev-data/
 AGENTS.md
+
+# Private agent notes (CLAUDE.md is shared)
+CLAUDE.local.md
