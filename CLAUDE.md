@@ -48,3 +48,17 @@ Integration tests **truncate tables**, so never point them at real data. Use the
 - The installer is unsigned for now (`CSC_IDENTITY_AUTO_DISCOVERY=false` in CI).
 - Releases follow `docs/release-checklist.md`, and every release or tag needs explicit permission.
 - There is intentionally no Dependabot (removed in #472): the owner prefers updating dependencies by hand for this solo project. Don't re-add it without asking.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
