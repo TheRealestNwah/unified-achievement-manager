@@ -85,6 +85,16 @@ The 50%-gold-share trigger was tuned against real synced data, not guessed: a na
 
 This was tracked as [issue #10](https://github.com/TheRealestNwah/unified-achievement-manager/issues/10).
 
+## Sync runs one pipeline behind per-platform adapters
+
+Every platform syncs through the same sync pipeline (`server/src/sync/pipeline.ts`). A platform adapter, kept beside that platform's client, answers only two questions: which games the linked account owns, and what one game's achievement list is. The pipeline does everything that writes to the library: canonical games and achievement links, unlocks and revocations, ownership, per-game rarity tiers, reconciliation, saving refreshed tokens, and change markers. Terms are defined in `GLOSSARY.md`.
+
+- **Change markers** (`change_markers`) let a sync skip a game that can't have changed. The adapter chooses the value. The pipeline saves it only after the game is fully recorded, so a sync cut off partway resumes where it stopped.
+- **Every owned game counts**, including ones with no achievements or that couldn't be read this time. That total is the summary's games count, and reconciliation uses the full list so a skipped game is never treated as lost.
+- **A thrown error aborts the sync.** An adapter that can't read one game asks to skip it instead, and the pipeline logs it and carries on.
+
+`runAccountSync` stays the entry point for routes and the scheduler. It looks the adapter up by platform ID. RPCS3 and GOG run through the pipeline so far; Steam, Xbox, PSN and RetroAchievements still have their own sync files and move over next.
+
 ## Not yet modeled
 
 - Auth/session tables beyond what's in `db/schema.sql` — sessions are handled by `connect-pg-simple`, not part of the canonical/link model this doc describes.
