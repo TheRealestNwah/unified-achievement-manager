@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Only the in-flight bookkeeping is under test here (see #323); the platform
-// sync and the database are stubs.
-const syncSteamAccount = vi.fn();
-vi.mock("../steam/sync", () => ({ syncSteamAccount: (...args: unknown[]) => syncSteamAccount(...args) }));
+// Only the in-flight bookkeeping is under test here (see #323); the sync
+// pipeline and the database are stubs.
+const runSyncPipeline = vi.fn();
+vi.mock("./pipeline", () => ({ runSyncPipeline: (...args: unknown[]) => runSyncPipeline(...args) }));
+vi.mock("./adapters", () => ({ platformAdapters: { steam: { platformId: "steam" } } }));
 vi.mock("../db", () => ({ pool: { query: vi.fn().mockResolvedValue({ rows: [] }) } }));
 vi.mock("../config", () => ({ config: { credentialEncryptionKey: "unused" } }));
 
@@ -26,13 +27,13 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
-    syncSteamAccount.mockReset();
+    runSyncPipeline.mockReset();
 });
 
 describe("runAccountSync one-sync-per-account (#323)", () => {
     it("joins a sync already running for the same account instead of starting another", async () => {
         const pending = deferred<{ gamesProcessed: number; achievementsUnlocked: number }>();
-        syncSteamAccount.mockReturnValueOnce(pending.promise);
+        runSyncPipeline.mockReturnValueOnce(pending.promise);
 
         const first = runAccountSync(account("a"));
         const second = runAccountSync(account("a"));
@@ -41,22 +42,22 @@ describe("runAccountSync one-sync-per-account (#323)", () => {
         pending.resolve({ gamesProcessed: 3, achievementsUnlocked: 1 });
         await expect(first).resolves.toEqual({ gamesProcessed: 3, achievementsUnlocked: 1 });
         await expect(second).resolves.toEqual({ gamesProcessed: 3, achievementsUnlocked: 1 });
-        expect(syncSteamAccount).toHaveBeenCalledTimes(1);
+        expect(runSyncPipeline).toHaveBeenCalledTimes(1);
         expect(syncingAccountIds().size).toBe(0);
     });
 
     it("runs different accounts side by side", async () => {
-        syncSteamAccount.mockResolvedValue({ gamesProcessed: 0, achievementsUnlocked: 0 });
+        runSyncPipeline.mockResolvedValue({ gamesProcessed: 0, achievementsUnlocked: 0 });
         await Promise.all([runAccountSync(account("a")), runAccountSync(account("b"))]);
-        expect(syncSteamAccount).toHaveBeenCalledTimes(2);
+        expect(runSyncPipeline).toHaveBeenCalledTimes(2);
     });
 
     it("clears the account after a failure so the next sync starts fresh", async () => {
-        syncSteamAccount.mockRejectedValueOnce(new Error("Steam said no"));
+        runSyncPipeline.mockRejectedValueOnce(new Error("Steam said no"));
         await expect(runAccountSync(account("a"))).rejects.toThrow("Steam said no");
         expect(syncingAccountIds().size).toBe(0);
 
-        syncSteamAccount.mockResolvedValueOnce({ gamesProcessed: 1, achievementsUnlocked: 0 });
+        runSyncPipeline.mockResolvedValueOnce({ gamesProcessed: 1, achievementsUnlocked: 0 });
         await expect(runAccountSync(account("a"))).resolves.toEqual({ gamesProcessed: 1, achievementsUnlocked: 0 });
     });
 });

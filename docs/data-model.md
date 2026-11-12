@@ -93,7 +93,7 @@ Every platform syncs through the same sync pipeline (`server/src/sync/pipeline.t
 - **Every owned game counts**, including ones with no achievements or that couldn't be read this time. That total is the summary's games count, and reconciliation uses the full list so a skipped game is never treated as lost.
 - **A thrown error aborts the sync.** An adapter that can't read one game asks to skip it instead, and the pipeline logs it and carries on.
 
-`runAccountSync` stays the entry point for routes and the scheduler. It looks the adapter up by platform ID. RPCS3 and GOG run through the pipeline so far; Steam, Xbox, PSN and RetroAchievements still have their own sync files and move over next.
+`runAccountSync` stays the entry point for routes and the scheduler. It looks the adapter up by platform ID. RPCS3, GOG, Steam and Xbox run through the pipeline so far; PSN and RetroAchievements still have their own sync files and move over next. Steam's and Xbox's older skip tables (`steam_game_sync_state`, `xbox_title_sync_state`) are copied into `change_markers` and dropped when the schema is applied.
 
 ## Not yet modeled
 

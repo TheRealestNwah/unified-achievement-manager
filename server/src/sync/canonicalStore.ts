@@ -183,7 +183,7 @@ export async function revokeUnlockIfPresent(userPlatformAccountId: string, achie
 // Maps a platform's raw owned-game IDs (appids, titleIds, etc.) to the
 // canonical games already linked for them. Used by reconcileMissingOwnership
 // below to see what a platform currently reports as owned independent of any
-// per-sync achievement-fetch skip-cache (see steam/sync.ts) - a game a
+// per-sync change marker (see sync/pipeline.ts) - a game a
 // platform still lists is never "missing" even if this sync skipped
 // re-fetching its achievements.
 export async function getCanonicalGameIdsForPlatformGames(platformId: string, platformGameIds: string[]): Promise<string[]> {
@@ -314,7 +314,7 @@ export async function reconcileMissingOwnership(
 
 // Shared by every platform's sync job: maps its raw owned-game-id list to
 // canonical games and reconciles ownership in one call, instead of each
-// sync.ts repeating the getCanonicalGameIdsForPlatformGames +
+// sync repeating the getCanonicalGameIdsForPlatformGames +
 // reconcileMissingOwnership pair by hand.
 export async function reconcileOwnershipForPlatform(
     userPlatformAccountId: string,

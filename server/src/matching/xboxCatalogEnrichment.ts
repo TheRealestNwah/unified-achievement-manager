@@ -96,7 +96,7 @@ async function enrichGame(apiKey: string, gameId: string, title: string): Promis
     );
     if (existingLink.rows[0]) return false;
 
-    // Reuses the exact same function xbox/sync.ts's real per-user sync
+    // Reuses the exact same function the Xbox adapter's real per-user sync
     // calls - it has no dependency on the API key's own account owning or
     // having played this title, only on the titleId being valid.
     const achievements = await getAchievementsForTitle(apiKey, titleId);

@@ -1,6 +1,4 @@
 import { pool } from "../db";
-import { syncSteamAccount } from "../steam/sync";
-import { syncXboxAccount } from "../xbox/sync";
 import { syncPsnAccount } from "../psn/sync";
 import { exchangeRefreshTokenForTokens } from "../psn/client";
 import { syncRetroAccount } from "../retro/sync";
@@ -20,8 +18,7 @@ export interface PlatformAccountRow {
 }
 
 // Syncs one linked account. Platforms with an adapter (sync/adapters.ts) run
-// through the sync pipeline; the rest still have their own sync function.
-// Dispatches to the right platform's sync function for one linked account,
+// through the sync pipeline; the rest still have their own sync function,
 // including PSN's refresh-then-sync dance (its access tokens last roughly an
 // hour, so every sync refreshes unconditionally rather than tracking expiry).
 // Shared by each platform's own /sync route and the background scheduler
@@ -83,12 +80,6 @@ async function syncByPlatform(account: PlatformAccountRow): Promise<SyncSummary>
     const refreshToken = account.refresh_token ? decryptCredential(account.refresh_token, config.credentialEncryptionKey) : null;
 
     switch (account.platform_id) {
-        case "steam":
-            return syncSteamAccount(account.id, account.platform_account_id);
-
-        case "xbox":
-            return syncXboxAccount(account.id, accessToken!, account.platform_account_id);
-
         case "psn": {
             const tokens = await exchangeRefreshTokenForTokens(refreshToken!);
             await pool.query(

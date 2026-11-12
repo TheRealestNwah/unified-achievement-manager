@@ -3,10 +3,11 @@ import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 const integrationEnabled = process.env.INTEGRATION_TESTS === "true";
 const integration = integrationEnabled ? describe : describe.skip;
 
-// The Steam sync itself is stubbed - this is about what runAccountSync
+// The sync pipeline itself is stubbed - this is about what runAccountSync
 // records around it, not about talking to Steam.
-const syncSteamAccount = vi.fn();
-vi.mock("../steam/sync", () => ({ syncSteamAccount: (...args: unknown[]) => syncSteamAccount(...args) }));
+const runSyncPipeline = vi.fn();
+vi.mock("./pipeline", () => ({ runSyncPipeline: (...args: unknown[]) => runSyncPipeline(...args) }));
+vi.mock("./adapters", () => ({ platformAdapters: { steam: { platformId: "steam" } } }));
 
 integration("runAccountSync sync-error tracking (#282)", () => {
     let pool: import("pg").Pool;
@@ -36,13 +37,13 @@ integration("runAccountSync sync-error tracking (#282)", () => {
     });
 
     it("records a failure's message and clears it after the next success", async () => {
-        syncSteamAccount.mockRejectedValueOnce(new Error("Steam said no"));
+        runSyncPipeline.mockRejectedValueOnce(new Error("Steam said no"));
         await expect(runAccountSync(account)).rejects.toThrow("Steam said no");
         const failed = await errorColumns();
         expect(failed.last_sync_error).toBe("Steam said no");
         expect(failed.last_sync_error_at).toBeInstanceOf(Date);
 
-        syncSteamAccount.mockResolvedValueOnce({ gamesProcessed: 0, achievementsUnlocked: 0 });
+        runSyncPipeline.mockResolvedValueOnce({ gamesProcessed: 0, achievementsUnlocked: 0 });
         await runAccountSync(account);
         expect(await errorColumns()).toEqual({ last_sync_error: null, last_sync_error_at: null });
     });
