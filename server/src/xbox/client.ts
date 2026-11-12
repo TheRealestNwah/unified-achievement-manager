@@ -264,8 +264,8 @@ function x360IconUrl(titleId: number, imageId: number | undefined): string | und
 // for this one field: confirmed against a live account, some genuinely
 // earned achievements come back with timeUnlocked set to a bogus sentinel
 // (1752-12-31) instead of a real date - centuries before Xbox existed. See
-// #41. Treated as absent rather than trusted, so callers fall back to their
-// own default (xbox/sync.ts uses now()) same as when the platform gives no
+// #41. Treated as absent rather than trusted, so callers treat the date as
+// unknown, the same as when the platform gives no
 // timestamp at all.
 const XBOX_360_LAUNCH = Date.UTC(2005, 10, 22); // Nov 22, 2005
 

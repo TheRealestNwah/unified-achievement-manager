@@ -34,7 +34,7 @@ export const RPCS3_PLATFORM_ID = "rpcs3";
 //   "PS3" alone or "PS3,PSVITA" is legacy-only, but "PS3,PS4" is a genuine
 //   cross-gen release of the SAME game and must not trip this.
 // - xbox: sync only ever sets this to the literal "Xbox 360" (see
-//   xbox/sync.ts) when the modern achievements endpoint had nothing and the
+//   xbox/adapter.ts) when the modern achievements endpoint had nothing and the
 //   legacy 360 endpoint did - already an unambiguous legacy-only signal.
 // - steam: no generation concept - a Steam listing is never treated as legacy.
 // - rpcs3: a PS3 emulator, so every RPCS3 game is a PS3 release (see #523).

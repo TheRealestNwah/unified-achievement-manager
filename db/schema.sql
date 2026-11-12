@@ -349,30 +349,6 @@ create table if not exists user_achievement_icon_overrides (
     primary key (user_id, canonical_achievement_id)
 );
 
--- Lets Steam sync skip re-fetching a game's achievement schema/unlocks/global
--- rarity when nothing about that game could have changed since last sync -
--- see #21. Steam-specific (keyed on appid, not a canonical game_id) since
--- this is purely a sync-performance cache, not shared account/library state.
-create table if not exists steam_game_sync_state (
-    user_platform_account_id uuid not null references user_platform_accounts(id) on delete cascade,
-    appid                    integer not null,
-    playtime_forever         integer not null,
-    rtime_last_played        integer not null,
-    primary key (user_platform_account_id, appid)
-);
-
--- The Xbox equivalent (see #384): each title's progress summary from
--- OpenXBL's title list, so sync only re-fetches titles whose progress
--- changed. Without it every sync re-fetched every title and ran through
--- OpenXBL's hourly request allowance. Written after a title is fully
--- processed, so a sync cut off by a 429 resumes where it stopped.
-create table if not exists xbox_title_sync_state (
-    user_platform_account_id uuid not null references user_platform_accounts(id) on delete cascade,
-    title_id                 text not null,
-    progress                 text not null,
-    primary key (user_platform_account_id, title_id)
-);
-
 -- Change markers for the sync pipeline (see GLOSSARY.md): one value per
 -- owned game that only changes when its achievements might have. Sync skips
 -- a game whose marker matches, and saves the new one only after the game is
@@ -384,9 +360,31 @@ create table if not exists change_markers (
     primary key (user_platform_account_id, platform_game_id)
 );
 
+-- Before the sync pipeline, Steam and Xbox kept their own skip tables (see
+-- #21, #384). Carry their rows over as change markers, in the same format the
+-- adapters now produce, so the first sync after upgrading doesn't re-fetch
+-- every game, then drop them.
+do $$
+begin
+    if to_regclass('steam_game_sync_state') is not null then
+        insert into change_markers (user_platform_account_id, platform_game_id, marker)
+        select user_platform_account_id, appid::text, playtime_forever || ':' || rtime_last_played
+        from steam_game_sync_state
+        on conflict do nothing;
+        drop table steam_game_sync_state;
+    end if;
+    if to_regclass('xbox_title_sync_state') is not null then
+        insert into change_markers (user_platform_account_id, platform_game_id, marker)
+        select user_platform_account_id, title_id, progress
+        from xbox_title_sync_state
+        on conflict do nothing;
+        drop table xbox_title_sync_state;
+    end if;
+end $$;
+
 -- getGlobalAchievementPercentages is re-fetched per owned game on every full
 -- sync, but global rarity shifts slowly - see #27. Shared across every user
--- of the app (unlike steam_game_sync_state above, which is per-account),
+-- of the app (unlike change markers above, which are per account),
 -- since one game's global percentages are the same for everyone who owns it.
 create table if not exists steam_global_rarity_cache (
     appid       integer primary key,
