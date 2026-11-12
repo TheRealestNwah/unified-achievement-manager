@@ -373,6 +373,17 @@ create table if not exists xbox_title_sync_state (
     primary key (user_platform_account_id, title_id)
 );
 
+-- Change markers for the sync pipeline (see GLOSSARY.md): one value per
+-- owned game that only changes when its achievements might have. Sync skips
+-- a game whose marker matches, and saves the new one only after the game is
+-- fully recorded. Each platform adapter decides what its marker is.
+create table if not exists change_markers (
+    user_platform_account_id uuid not null references user_platform_accounts(id) on delete cascade,
+    platform_game_id         text not null,
+    marker                   text not null,
+    primary key (user_platform_account_id, platform_game_id)
+);
+
 -- getGlobalAchievementPercentages is re-fetched per owned game on every full
 -- sync, but global rarity shifts slowly - see #27. Shared across every user
 -- of the app (unlike steam_game_sync_state above, which is per-account),
