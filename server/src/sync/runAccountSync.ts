@@ -1,12 +1,7 @@
 import { pool } from "../db";
-import { syncPsnAccount } from "../psn/sync";
-import { exchangeRefreshTokenForTokens } from "../psn/client";
-import { syncRetroAccount } from "../retro/sync";
 import { SyncSummary } from "./types";
 import { platformAdapters } from "./adapters";
 import { runSyncPipeline } from "./pipeline";
-import { config } from "../config";
-import { decryptCredential, encryptCredential } from "../security/credentials";
 
 export interface PlatformAccountRow {
     id: string;
@@ -17,13 +12,9 @@ export interface PlatformAccountRow {
     refresh_token: string | null;
 }
 
-// Syncs one linked account. Platforms with an adapter (sync/adapters.ts) run
-// through the sync pipeline; the rest still have their own sync function,
-// including PSN's refresh-then-sync dance (its access tokens last roughly an
-// hour, so every sync refreshes unconditionally rather than tracking expiry).
-// Shared by each platform's own /sync route and the background scheduler
-// (scheduler.ts) so this per-platform logic - including PSN's token refresh -
-// only lives in one place.
+// Syncs one linked account through the sync pipeline, using the platform's
+// adapter (sync/adapters.ts). Shared by each platform's own /sync route and
+// the background scheduler (scheduler.ts).
 //
 // One sync per account at a time (see #323): pressing Sync while the
 // scheduler is already working through that account joins the running sync
@@ -74,25 +65,6 @@ export async function recordSyncError(accountId: string, err: unknown): Promise<
 
 async function syncByPlatform(account: PlatformAccountRow): Promise<SyncSummary> {
     const adapter = platformAdapters[account.platform_id];
-    if (adapter) return runSyncPipeline(adapter, account.id);
-
-    const accessToken = account.access_token ? decryptCredential(account.access_token, config.credentialEncryptionKey) : null;
-    const refreshToken = account.refresh_token ? decryptCredential(account.refresh_token, config.credentialEncryptionKey) : null;
-
-    switch (account.platform_id) {
-        case "psn": {
-            const tokens = await exchangeRefreshTokenForTokens(refreshToken!);
-            await pool.query(
-                "update user_platform_accounts set access_token = $1, refresh_token = $2 where id = $3",
-                [encryptCredential(tokens.accessToken, config.credentialEncryptionKey), encryptCredential(tokens.refreshToken, config.credentialEncryptionKey), account.id]
-            );
-            return syncPsnAccount(account.id, tokens.accessToken);
-        }
-
-        case "retroachievements":
-            return syncRetroAccount(account.id, account.platform_account_id, accessToken!);
-
-        default:
-            throw new Error(`No sync handler for platform: ${account.platform_id}`);
-    }
+    if (!adapter) throw new Error(`No sync handler for platform: ${account.platform_id}`);
+    return runSyncPipeline(adapter, account.id);
 }
