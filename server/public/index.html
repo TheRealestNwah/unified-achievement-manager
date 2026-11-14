@@ -1234,7 +1234,9 @@
                             </defs>
                             <circle cx="54" cy="54" r="46" fill="none" stroke="var(--ring-track)" stroke-width="9"/>
                             <circle id="level-ring-fill" cx="54" cy="54" r="46" fill="none" stroke="url(#tierSweep)" stroke-width="9" stroke-linecap="round" stroke-dasharray="289.03" stroke-dashoffset="289.03"/>
-                            <path d="M18 30A46 46 0 0 1 54 8" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" class="ring-shimmer"/>
+                            <!-- Shine from 10 to 12 o'clock on the ring itself. The SVG is
+                                 rotated -90deg, so these points are a quarter turn clockwise. -->
+                            <path d="M77 14.16A46 46 0 0 1 100 54" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" class="ring-shimmer"/>
                         </svg>
                         <div class="n">
                             <span class="num" id="level-number">-</span>
