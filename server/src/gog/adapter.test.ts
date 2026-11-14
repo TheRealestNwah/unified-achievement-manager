@@ -11,7 +11,7 @@ vi.mock("./client", () => client);
 
 import { gogAdapter } from "./adapter";
 
-const account = { id: "account", platformAccountId: "gog-user", accessToken: "old-access", refreshToken: "old-refresh", localFolder: null };
+const account = { platformAccountId: "gog-user", accessToken: "old-access", refreshToken: "old-refresh", localFolder: null };
 
 beforeEach(() => {
     vi.resetAllMocks();

@@ -8,7 +8,6 @@ import { NativeTier } from "./canonicalStore";
 
 // The stored linked account, with credentials already decrypted.
 export interface LinkedAccount {
-    id: string;
     platformAccountId: string;
     accessToken: string | null;
     refreshToken: string | null;

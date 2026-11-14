@@ -12,7 +12,6 @@ describe("RPCS3 adapter", () => {
     let root: string;
     let trophyDir: string;
     const account = (localFolder: string | null): LinkedAccount => ({
-        id: "account",
         platformAccountId: "00000001",
         accessToken: null,
         refreshToken: null,

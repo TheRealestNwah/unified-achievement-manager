@@ -10,7 +10,7 @@ vi.mock("./client", () => client);
 
 import { parseRetroDate, retroAdapter } from "./adapter";
 
-const account = { id: "account", platformAccountId: "ra-user", accessToken: "ra-key", refreshToken: null, localFolder: null };
+const account = { platformAccountId: "ra-user", accessToken: "ra-key", refreshToken: null, localFolder: null };
 
 beforeEach(() => {
     vi.resetAllMocks();

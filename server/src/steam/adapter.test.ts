@@ -13,7 +13,7 @@ vi.mock("./globalRarityCache", () => ({ getCachedGlobalPercentages }));
 
 import { steamAdapter } from "./adapter";
 
-const account = { id: "account", platformAccountId: "steam-id", accessToken: null, refreshToken: null, localFolder: null };
+const account = { platformAccountId: "steam-id", accessToken: null, refreshToken: null, localFolder: null };
 
 beforeEach(() => {
     vi.resetAllMocks();
