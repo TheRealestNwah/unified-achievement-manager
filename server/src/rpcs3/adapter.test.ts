@@ -42,9 +42,11 @@ describe("RPCS3 adapter", () => {
         const owned = await session.listOwnedGames();
         expect(owned.map((g) => g.platformGameId).sort()).toEqual(["NPWR11111_00", "NPWR22222_00"]);
 
-        expect(await session.fetchAchievementList({ platformGameId: "NPWR22222_00" })).toMatchObject({ kind: "skip" });
+        const game = (id: string) => owned.find((g) => g.platformGameId === id)!;
 
-        const list = await session.fetchAchievementList({ platformGameId: "NPWR11111_00" });
+        expect(await session.fetchAchievementList(game("NPWR22222_00"))).toMatchObject({ kind: "skip" });
+
+        const list = await session.fetchAchievementList(game("NPWR11111_00"));
         expect(list).toMatchObject({ kind: "achievements", title: "Test & Game", coverImageUrl: "/rpcs3-icons/NPWR11111_00/ICON0.PNG" });
         if (list.kind !== "achievements") throw new Error("expected achievements");
         expect(list.achievements.map((a) => ({ id: a.id, tier: a.nativeTier, icon: a.iconUrl, unlocked: a.unlocked, at: a.unlockedAt }))).toEqual([

@@ -26,14 +26,14 @@ async function connect() {
 describe("RetroAchievements adapter", () => {
     it("lists owned games with the account's username and API key", async () => {
         const { owned } = await connect();
-        expect(owned).toEqual([{ platformGameId: "1446" }]);
+        expect(owned).toEqual([{ platformGameId: "1446", details: { gameId: "1446", title: "Sonic the Hedgehog", coverImageUrl: "sonic.png" } }]);
         expect(client.getUserGames).toHaveBeenCalledWith("ra-user", "ra-key");
     });
 
     it("reports no achievements for a game without any", async () => {
         client.getGameProgress.mockResolvedValue([]);
-        const { session } = await connect();
-        expect(await session.fetchAchievementList({ platformGameId: "1446" })).toEqual({ kind: "none" });
+        const { session, owned } = await connect();
+        expect(await session.fetchAchievementList(owned[0])).toEqual({ kind: "none" });
     });
 
     it("maps achievements, reading RA's timezone-less dates as UTC", async () => {
@@ -41,9 +41,9 @@ describe("RetroAchievements adapter", () => {
             { id: "1", name: "Ring Collector", description: "Get 100 rings", isUnlocked: true, unlockedAt: "2026-03-04 05:06:07", globalUnlockRarity: 30, iconUrl: "r.png" },
             { id: "2", name: "Speedrun", description: "Fast", isUnlocked: false },
         ]);
-        const { session } = await connect();
+        const { session, owned } = await connect();
 
-        expect(await session.fetchAchievementList({ platformGameId: "1446" })).toEqual({
+        expect(await session.fetchAchievementList(owned[0])).toEqual({
             kind: "achievements",
             title: "Sonic the Hedgehog",
             coverImageUrl: "sonic.png",

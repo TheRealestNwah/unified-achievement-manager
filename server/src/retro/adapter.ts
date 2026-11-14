@@ -18,21 +18,17 @@ export function parseRetroDate(value: string): Date {
     return new Date(`${value.replace(" ", "T")}Z`);
 }
 
-export const retroAdapter: PlatformAdapter = {
+export const retroAdapter: PlatformAdapter<RetroGameSummary> = {
     platformId: "retroachievements",
 
     async connect(account) {
         // The user's own RA username and web API key.
         const username = account.platformAccountId;
         const apiKey = account.accessToken!;
-        const games = new Map<string, RetroGameSummary>();
 
         return {
             async listOwnedGames() {
-                return (await getUserGames(username, apiKey)).map((game) => {
-                    games.set(game.gameId, game);
-                    return { platformGameId: game.gameId };
-                });
+                return (await getUserGames(username, apiKey)).map((game) => ({ platformGameId: game.gameId, details: game }));
             },
 
             async fetchAchievementList(game) {
@@ -40,7 +36,7 @@ export const retroAdapter: PlatformAdapter = {
                 await sleep(REQUEST_DELAY_MS);
                 if (achievements.length === 0) return { kind: "none" };
 
-                const summary = games.get(game.platformGameId)!;
+                const summary = game.details;
                 return {
                     kind: "achievements",
                     title: summary.title,

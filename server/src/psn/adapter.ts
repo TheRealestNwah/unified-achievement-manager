@@ -1,27 +1,23 @@
 import { PlatformAdapter } from "../sync/platformAdapter";
 import { exchangeRefreshTokenForTokens, getTitleTrophies, getUserTitles, getUserTrophiesEarnedForTitle, PsnTitle } from "./client";
 
-export const psnAdapter: PlatformAdapter = {
+export const psnAdapter: PlatformAdapter<PsnTitle> = {
     platformId: "psn",
 
     async connect(account) {
         // PSN access tokens last roughly an hour, so every sync refreshes
         // unconditionally rather than tracking expiry.
         const tokens = await exchangeRefreshTokenForTokens(account.refreshToken!);
-        const titles = new Map<string, PsnTitle>();
 
         return {
             refreshedCredentials: { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken },
 
             async listOwnedGames() {
-                return (await getUserTitles(tokens.accessToken)).map((title) => {
-                    titles.set(title.npCommunicationId, title);
-                    return { platformGameId: title.npCommunicationId };
-                });
+                return (await getUserTitles(tokens.accessToken)).map((title) => ({ platformGameId: title.npCommunicationId, details: title }));
             },
 
             async fetchAchievementList(game) {
-                const title = titles.get(game.platformGameId)!;
+                const title = game.details;
                 const [definitions, earned] = await Promise.all([
                     getTitleTrophies(tokens.accessToken, title.npCommunicationId, title.npServiceName),
                     getUserTrophiesEarnedForTitle(tokens.accessToken, title.npCommunicationId, title.npServiceName),

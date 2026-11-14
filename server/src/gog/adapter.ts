@@ -17,7 +17,7 @@ export const gogAdapter: PlatformAdapter = {
             refreshedCredentials: { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken },
 
             async listOwnedGames() {
-                return (await getOwnedGameIds(tokens.accessToken)).map((platformGameId) => ({ platformGameId }));
+                return (await getOwnedGameIds(tokens.accessToken)).map((platformGameId) => ({ platformGameId, details: undefined }));
             },
 
             async fetchAchievementList(game) {

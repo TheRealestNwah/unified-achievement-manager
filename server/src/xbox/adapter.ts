@@ -1,21 +1,20 @@
 import { PlatformAdapter } from "../sync/platformAdapter";
 import { getAchievementsForTitle, getTitles, getX360AchievementsForTitle, XboxTitleSummary } from "./client";
 
-export const xboxAdapter: PlatformAdapter = {
+export const xboxAdapter: PlatformAdapter<XboxTitleSummary> = {
     platformId: "xbox",
 
     async connect(account) {
         // The user's OpenXBL API key.
         const apiKey = account.accessToken!;
         const xuid = account.platformAccountId;
-        const titles = new Map<string, XboxTitleSummary>();
 
         return {
             async listOwnedGames() {
                 return (await getTitles(apiKey)).map((title) => {
-                    titles.set(title.titleId, title);
                     return {
                         platformGameId: title.titleId,
+                        details: title,
                         // Same idea as Steam's playtime marker: a title's
                         // unlocked count, gamerscore, and last-played time
                         // can't all stay put while its unlocks change, so
@@ -31,7 +30,7 @@ export const xboxAdapter: PlatformAdapter = {
             },
 
             async fetchAchievementList(game) {
-                const title = titles.get(game.platformGameId)!;
+                const title = game.details;
                 let achievements = await getAchievementsForTitle(apiKey, title.titleId);
                 // Which endpoint actually had data doubles as the only
                 // reliable console-generation signal OpenXBL gives us - see

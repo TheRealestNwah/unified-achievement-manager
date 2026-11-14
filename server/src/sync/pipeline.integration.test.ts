@@ -105,7 +105,7 @@ integration("sync pipeline", () => {
     });
 
     it("records games, unlocks and locked achievements, and counts every owned game", async () => {
-        platform.owned = [{ platformGameId: "g1" }, { platformGameId: "g2" }, { platformGameId: "empty" }, { platformGameId: "none", hasAchievements: false }];
+        platform.owned = [{ platformGameId: "g1", details: undefined }, { platformGameId: "g2", details: undefined }, { platformGameId: "empty", details: undefined }, { platformGameId: "none", details: undefined, hasAchievements: false }];
         platform.lists.set("g1", list("Game One", [achievement("a", true), achievement("b", false)]));
         platform.lists.set("g2", list("Game Two", [achievement("c", true, { unlockedAt: null })]));
         platform.lists.set("empty", list("Empty Game", []));
@@ -133,7 +133,7 @@ integration("sync pipeline", () => {
     });
 
     it("revokes an unlock the platform now reports as locked", async () => {
-        platform.owned = [{ platformGameId: "g1" }];
+        platform.owned = [{ platformGameId: "g1", details: undefined }];
         platform.lists.set("g1", list("Game One", [achievement("a", true)]));
         await sync();
 
@@ -144,7 +144,7 @@ integration("sync pipeline", () => {
     });
 
     it("skips a game whose change marker is unchanged, and fetches it again once it changes", async () => {
-        platform.owned = [{ platformGameId: "g1", changeMarker: "v1" }, { platformGameId: "empty", changeMarker: "e1" }];
+        platform.owned = [{ platformGameId: "g1", details: undefined, changeMarker: "v1" }, { platformGameId: "empty", details: undefined, changeMarker: "e1" }];
         platform.lists.set("g1", list("Game One", [achievement("a", true)]));
         await sync();
         // Saved for an empty list too, so it isn't fetched every time.
@@ -154,7 +154,7 @@ integration("sync pipeline", () => {
         expect(await sync()).toMatchObject({ gamesProcessed: 2, achievementsUnlocked: 0 });
         expect(platform.fetched).toEqual([]);
 
-        platform.owned = [{ platformGameId: "g1", changeMarker: "v2" }, { platformGameId: "empty", changeMarker: "e1" }];
+        platform.owned = [{ platformGameId: "g1", details: undefined, changeMarker: "v2" }, { platformGameId: "empty", details: undefined, changeMarker: "e1" }];
         platform.lists.set("g1", list("Game One", [achievement("a", true), achievement("b", true)]));
         expect(await sync()).toMatchObject({ achievementsUnlocked: 1 });
         expect(platform.fetched).toEqual(["g1"]);
@@ -162,7 +162,7 @@ integration("sync pipeline", () => {
     });
 
     it("aborts on a thrown error, keeping markers only for games fully recorded first", async () => {
-        platform.owned = [{ platformGameId: "g1", changeMarker: "v1" }, { platformGameId: "g2", changeMarker: "v1" }];
+        platform.owned = [{ platformGameId: "g1", details: undefined, changeMarker: "v1" }, { platformGameId: "g2", details: undefined, changeMarker: "v1" }];
         platform.lists.set("g1", list("Game One", [achievement("a", true)]));
         platform.lists.set("g2", new Error("Rate limited"));
 
@@ -180,7 +180,7 @@ integration("sync pipeline", () => {
 
     it("logs a game the adapter skips, carries on, and still treats it as owned", async () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-        platform.owned = [{ platformGameId: "g1" }, { platformGameId: "g2" }];
+        platform.owned = [{ platformGameId: "g1", details: undefined }, { platformGameId: "g2", details: undefined }];
         platform.lists.set("g1", list("Game One", [achievement("a", true)]));
         platform.lists.set("g2", list("Game Two", [achievement("b", true)]));
         await sync();
@@ -196,12 +196,12 @@ integration("sync pipeline", () => {
     });
 
     it("reconciles a game missing from the owned list after repeated absences", async () => {
-        platform.owned = [{ platformGameId: "g1" }, { platformGameId: "g2" }];
+        platform.owned = [{ platformGameId: "g1", details: undefined }, { platformGameId: "g2", details: undefined }];
         platform.lists.set("g1", list("Game One", [achievement("a", true)]));
         platform.lists.set("g2", list("Game Two", [achievement("b", true)]));
         await sync();
 
-        platform.owned = [{ platformGameId: "g1" }];
+        platform.owned = [{ platformGameId: "g1", details: undefined }];
         const results = [await sync(), await sync(), await sync()];
         expect(results.map((r) => r.gamesReconciled)).toEqual([0, 0, 1]);
         expect(results[2].achievementsRevoked).toBe(1);
