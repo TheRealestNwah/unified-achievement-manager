@@ -40,22 +40,14 @@ integration("sync data integrity", () => {
 
         achievementLinkId = await canonicalStore.getOrCreateAchievementLink(
             gameId,
-            "steam",
-            "integration-app",
-            "integration-achievement",
-            "Integration Achievement",
-            "An integration-test achievement",
-            25
+            { platformId: "steam", platformGameId: "integration-app", platformAchievementId: "integration-achievement" },
+            { name: "Integration Achievement", description: "An integration-test achievement", rarity: 25 }
         );
         expect(
             await canonicalStore.getOrCreateAchievementLink(
                 gameId,
-                "steam",
-                "integration-app",
-                "integration-achievement",
-                "Integration Achievement",
-                "An integration-test achievement",
-                25
+                { platformId: "steam", platformGameId: "integration-app", platformAchievementId: "integration-achievement" },
+                { name: "Integration Achievement", description: "An integration-test achievement", rarity: 25 }
             )
         ).toBe(achievementLinkId);
 

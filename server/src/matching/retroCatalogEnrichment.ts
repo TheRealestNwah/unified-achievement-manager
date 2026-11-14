@@ -130,14 +130,8 @@ async function enrichGame(apiKey: string, gameId: string, title: string): Promis
     for (const achievement of achievements) {
         await getOrCreateAchievementLink(
             gameId,
-            "retroachievements",
-            raGameId,
-            achievement.id,
-            achievement.name,
-            achievement.description,
-            achievement.globalUnlockRarity,
-            undefined,
-            achievement.iconUrl
+            { platformId: "retroachievements", platformGameId: raGameId, platformAchievementId: achievement.id },
+            { name: achievement.name, description: achievement.description, rarity: achievement.globalUnlockRarity, iconUrl: achievement.iconUrl }
         );
     }
 

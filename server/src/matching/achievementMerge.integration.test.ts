@@ -17,8 +17,8 @@ integration("mergeAchievements keeps each user's icon override (#342)", () => {
     }
 
     async function achievementPair(suffix: string): Promise<[string, string]> {
-        const a = await canonicalStore.getOrCreateAchievementLink(gameId, "steam", "icon-merge", `a-${suffix}`, `Icon ${suffix}`, undefined, 40);
-        const b = await canonicalStore.getOrCreateAchievementLink(gameId, "xbox", "icon-merge-x", `b-${suffix}`, `Icon ${suffix}`, undefined, 40);
+        const a = await canonicalStore.getOrCreateAchievementLink(gameId, { platformId: "steam", platformGameId: "icon-merge", platformAchievementId: `a-${suffix}` }, { name: `Icon ${suffix}`, rarity: 40 });
+        const b = await canonicalStore.getOrCreateAchievementLink(gameId, { platformId: "xbox", platformGameId: "icon-merge-x", platformAchievementId: `b-${suffix}` }, { name: `Icon ${suffix}`, rarity: 40 });
         return [await canonicalIdFor(a), await canonicalIdFor(b)];
     }
 

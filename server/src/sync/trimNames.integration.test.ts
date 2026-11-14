@@ -24,7 +24,7 @@ integration("padded titles and achievement names (#364)", () => {
 
     it("stores the trimmed title and name, and keeps the platform's raw ones", async () => {
         const gameId = await canonicalStore.getOrCreateCanonicalGame("psn", "flower", " Flower\n");
-        const linkId = await canonicalStore.getOrCreateAchievementLink(gameId, "psn", "flower", "1", `\tBeginning${NBSP}`, undefined, 10);
+        const linkId = await canonicalStore.getOrCreateAchievementLink(gameId, { platformId: "psn", platformGameId: "flower", platformAchievementId: "1" }, { name: `\tBeginning${NBSP}`, rarity: 10 });
 
         const game = await pool.query(
             "select g.title, gpl.platform_title from games g join game_platform_links gpl on gpl.game_id = g.id where g.id = $1",
@@ -41,7 +41,7 @@ integration("padded titles and achievement names (#364)", () => {
 
     it("trims rows stored before the fix when the schema is applied", async () => {
         const gameId = await canonicalStore.getOrCreateCanonicalGame("steam", "old", "Old Game");
-        const linkId = await canonicalStore.getOrCreateAchievementLink(gameId, "steam", "old", "1", "Old Name", undefined, 10);
+        const linkId = await canonicalStore.getOrCreateAchievementLink(gameId, { platformId: "steam", platformGameId: "old", platformAchievementId: "1" }, { name: "Old Name", rarity: 10 });
         await pool.query("update games set title = $1 where id = $2", [`Uncharted 2${NBSP} `, gameId]);
         await pool.query(
             "update canonical_achievements set name = $1 where id = (select canonical_achievement_id from achievement_platform_links where id = $2)",

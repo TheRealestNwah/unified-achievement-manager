@@ -11,10 +11,14 @@ integration("getNewUnlocksSince (#250)", () => {
     let accountId: string;
 
     async function unlock(gameId: string, n: number, tier: string, unlockedAt: string) {
-        const linkId = await canonicalStore.getOrCreateAchievementLink(gameId, "steam", `new-unlocks-${gameId}`, `ach-${n}`, `Achievement ${n}`, undefined, undefined, {
+        const linkId = await canonicalStore.getOrCreateAchievementLink(
+            gameId,
+            { platformId: "steam", platformGameId: `new-unlocks-${gameId}`, platformAchievementId: `ach-${n}` },
+            { name: `Achievement ${n}`, nativeTier: {
             tier,
             tierSource: "psn_native",
-        });
+        } }
+        );
         await canonicalStore.recordUnlock(accountId, linkId, new Date(unlockedAt));
     }
 
