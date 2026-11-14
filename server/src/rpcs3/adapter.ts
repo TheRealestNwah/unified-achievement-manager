@@ -12,24 +12,24 @@ export function rpcs3IconUrl(communicationId: string, file: string | null): stri
 // Reads one RPCS3 user's trophies from the RPCS3 folder (see #522). Each
 // trophy folder is one owned game, named after its NP communication ID - the
 // same ID PSN uses for the game's trophy list.
-export const rpcs3Adapter: PlatformAdapter = {
+export const rpcs3Adapter: PlatformAdapter<{ trophyFolder: string }> = {
     platformId: "rpcs3",
 
     async connect(account) {
         // A folder on this computer, not a login.
         const folder = account.localFolder;
         if (!folder) throw new Error("Pick your RPCS3 folder in Settings.");
-        const gameFolders = new Map(listTrophyFolders(folder, account.platformAccountId).map((f) => [path.basename(f), f]));
+        const trophyFolders = listTrophyFolders(folder, account.platformAccountId);
 
         return {
             async listOwnedGames() {
-                return [...gameFolders.keys()].map((platformGameId) => ({ platformGameId }));
+                return trophyFolders.map((trophyFolder) => ({ platformGameId: path.basename(trophyFolder), details: { trophyFolder } }));
             },
 
             async fetchAchievementList(game) {
                 let set;
                 try {
-                    set = await readTrophySet(gameFolders.get(game.platformGameId)!);
+                    set = await readTrophySet(game.details.trophyFolder);
                 } catch (err) {
                     // Missing files, or RPCS3 writing them right now.
                     return { kind: "skip", reason: err instanceof Error ? err.message : String(err) };

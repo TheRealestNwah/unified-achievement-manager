@@ -32,15 +32,15 @@ describe("PSN adapter", () => {
         const { session, owned } = await connect();
         expect(client.exchangeRefreshTokenForTokens).toHaveBeenCalledWith("old-refresh");
         expect(session.refreshedCredentials).toEqual({ accessToken: "new-access", refreshToken: "new-refresh" });
-        expect(owned).toEqual([{ platformGameId: "NPWR1" }]);
+        expect(owned).toEqual([{ platformGameId: "NPWR1", details: expect.objectContaining({ trophyTitleName: "Uncharted" }) }]);
         expect(client.getUserTitles).toHaveBeenCalledWith("new-access");
     });
 
     it("reports no achievements for an empty trophy list", async () => {
         client.getTitleTrophies.mockResolvedValue([]);
         client.getUserTrophiesEarnedForTitle.mockResolvedValue([]);
-        const { session } = await connect();
-        expect(await session.fetchAchievementList({ platformGameId: "NPWR1" })).toEqual({ kind: "none" });
+        const { session, owned } = await connect();
+        expect(await session.fetchAchievementList(owned[0])).toEqual({ kind: "none" });
     });
 
     it("maps trophies with their native tier, rarity and earned dates", async () => {
@@ -52,9 +52,9 @@ describe("PSN adapter", () => {
             { trophyId: 0, earned: true, earnedDateTime: "2026-01-02T03:04:05Z", trophyEarnedRate: "4.5" },
             { trophyId: 1, earned: false, trophyEarnedRate: "60.0" },
         ]);
-        const { session } = await connect();
+        const { session, owned } = await connect();
 
-        expect(await session.fetchAchievementList({ platformGameId: "NPWR1" })).toEqual({
+        expect(await session.fetchAchievementList(owned[0])).toEqual({
             kind: "achievements",
             title: "Uncharted",
             coverImageUrl: "u.png",

@@ -21,8 +21,14 @@ export interface Credentials {
     refreshToken: string;
 }
 
-export interface OwnedGame {
+// `details` is whatever the adapter learned about the game while listing it
+// (a name, a cover, a folder). The pipeline never reads it; it hands the game
+// back to fetchAchievementList with its details, so an adapter doesn't need a
+// side table filled by listOwnedGames. Adapters that need nothing set it to
+// undefined.
+export interface OwnedGame<Details = undefined> {
     platformGameId: string;
+    details: Details;
     // Changes only when the game's achievements might have. When it matches
     // the marker saved after the last full recording, the game is skipped.
     changeMarker?: string;
@@ -59,15 +65,20 @@ export type AchievementListResult =
     | { kind: "skip"; reason: string };
 
 // One sync's connection to a platform.
-export interface PlatformSession {
+export interface PlatformSession<Details = undefined> {
     // Set when connecting rotated the account's tokens; the pipeline saves them.
     refreshedCredentials?: Credentials;
-    listOwnedGames(): Promise<OwnedGame[]>;
-    fetchAchievementList(game: OwnedGame): Promise<AchievementListResult>;
+    listOwnedGames(): Promise<OwnedGame<Details>[]>;
+    // Called only with games this session's listOwnedGames returned.
+    fetchAchievementList(game: OwnedGame<Details>): Promise<AchievementListResult>;
 }
 
-export interface PlatformAdapter {
+export interface PlatformAdapter<Details = undefined> {
     platformId: string;
     // Throwing here, or from either session method, aborts the whole sync.
-    connect(account: LinkedAccount): Promise<PlatformSession>;
+    connect(account: LinkedAccount): Promise<PlatformSession<Details>>;
 }
+
+// Any platform's adapter, whatever its details: what the pipeline and the
+// adapter registry work with.
+export type AnyPlatformAdapter = PlatformAdapter<unknown>;

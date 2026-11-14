@@ -25,14 +25,14 @@ describe("GOG adapter", () => {
         expect(session.refreshedCredentials).toEqual({ accessToken: "new-access", refreshToken: "new-refresh" });
 
         client.getOwnedGameIds.mockResolvedValue(["1", "2"]);
-        expect(await session.listOwnedGames()).toEqual([{ platformGameId: "1" }, { platformGameId: "2" }]);
+        expect(await session.listOwnedGames()).toEqual([{ platformGameId: "1", details: undefined }, { platformGameId: "2", details: undefined }]);
         expect(client.getOwnedGameIds).toHaveBeenCalledWith("new-access");
     });
 
     it("reports no achievements without looking the product up", async () => {
         client.getAchievementsForGame.mockResolvedValue([]);
         const session = await gogAdapter.connect(account);
-        expect(await session.fetchAchievementList({ platformGameId: "1" })).toEqual({ kind: "none" });
+        expect(await session.fetchAchievementList({ platformGameId: "1", details: undefined })).toEqual({ kind: "none" });
         expect(client.getProduct).not.toHaveBeenCalled();
     });
 
@@ -44,7 +44,7 @@ describe("GOG adapter", () => {
         client.getProduct.mockResolvedValue({ title: "Some Game", coverImageUrl: "https://cover" });
 
         const session = await gogAdapter.connect(account);
-        expect(await session.fetchAchievementList({ platformGameId: "1" })).toEqual({
+        expect(await session.fetchAchievementList({ platformGameId: "1", details: undefined })).toEqual({
             kind: "achievements",
             title: "Some Game",
             coverImageUrl: "https://cover",

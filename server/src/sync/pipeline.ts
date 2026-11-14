@@ -10,13 +10,13 @@ import {
     recordUnlock,
     revokeUnlockIfPresent,
 } from "./canonicalStore";
-import { AchievementEntry, LinkedAccount, OwnedGame, PlatformAdapter } from "./platformAdapter";
+import { AchievementEntry, AnyPlatformAdapter, LinkedAccount, OwnedGame } from "./platformAdapter";
 import { SyncSummary } from "./types";
 
 // The sync pipeline (see GLOSSARY.md): turns what one platform adapter
 // reports into library changes. The same steps run for every platform, so a
 // fix here is a fix for all of them.
-export async function runSyncPipeline(adapter: PlatformAdapter, accountId: string): Promise<SyncSummary> {
+export async function runSyncPipeline(adapter: AnyPlatformAdapter, accountId: string): Promise<SyncSummary> {
     const account = await loadLinkedAccount(accountId);
     const platformId = adapter.platformId;
 
@@ -77,7 +77,7 @@ async function recordAchievement(
     accountId: string,
     platformId: string,
     gameId: string,
-    game: OwnedGame,
+    game: OwnedGame<unknown>,
     achievement: AchievementEntry
 ): Promise<"unlocked" | "revoked" | "unchanged"> {
     const linkId = await getOrCreateAchievementLink(

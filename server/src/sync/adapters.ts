@@ -4,10 +4,10 @@ import { retroAdapter } from "../retro/adapter";
 import { rpcs3Adapter } from "../rpcs3/adapter";
 import { steamAdapter } from "../steam/adapter";
 import { xboxAdapter } from "../xbox/adapter";
-import { PlatformAdapter } from "./platformAdapter";
+import { AnyPlatformAdapter } from "./platformAdapter";
 
 // Each platform's adapter, by platform ID.
-export const platformAdapters: Record<string, PlatformAdapter> = {
+export const platformAdapters: Record<string, AnyPlatformAdapter> = {
     [gogAdapter.platformId]: gogAdapter,
     [psnAdapter.platformId]: psnAdapter,
     [retroAdapter.platformId]: retroAdapter,

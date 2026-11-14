@@ -24,15 +24,17 @@ beforeEach(() => {
 describe("Steam adapter", () => {
     it("marks each owned game with its playtime and last-played time", async () => {
         const session = await steamAdapter.connect(account);
-        expect(await session.listOwnedGames()).toEqual([{ platformGameId: "620", changeMarker: "90:1700000000" }]);
+        expect(await session.listOwnedGames()).toEqual([
+            { platformGameId: "620", changeMarker: "90:1700000000", details: expect.objectContaining({ name: "Portal 2" }) },
+        ]);
         expect(client.getOwnedGames).toHaveBeenCalledWith("steam-id");
     });
 
     it("reports no achievements when the schema is empty", async () => {
         client.getSchemaForGame.mockResolvedValue([]);
         const session = await steamAdapter.connect(account);
-        await session.listOwnedGames();
-        expect(await session.fetchAchievementList({ platformGameId: "620" })).toEqual({ kind: "none" });
+        const [game] = await session.listOwnedGames();
+        expect(await session.fetchAchievementList(game)).toEqual({ kind: "none" });
         expect(client.getPlayerAchievements).not.toHaveBeenCalled();
     });
 
@@ -48,9 +50,9 @@ describe("Steam adapter", () => {
             { apiname: "ACH_C", achieved: 1, unlocktime: 0 },
         ]);
         const session = await steamAdapter.connect(account);
-        await session.listOwnedGames();
+        const [game] = await session.listOwnedGames();
 
-        expect(await session.fetchAchievementList({ platformGameId: "620" })).toEqual({
+        expect(await session.fetchAchievementList(game)).toEqual({
             kind: "achievements",
             title: "Portal 2",
             coverImageUrl: "https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900.jpg",

@@ -41,18 +41,18 @@ describe("Xbox adapter", () => {
     it("marks titles by progress and flags ones with no achievements (#384)", async () => {
         const { owned } = await connect();
         expect(owned).toEqual([
-            { platformGameId: "100", changeMarker: "5|1|10|t1", hasAchievements: true },
+            { platformGameId: "100", changeMarker: "5|1|10|t1", hasAchievements: true, details: expect.objectContaining({ name: "Halo" }) },
             // No progress summary, so no marker: always fetched.
-            { platformGameId: "200", changeMarker: undefined, hasAchievements: true },
-            { platformGameId: "300", changeMarker: "0|0|0|t1", hasAchievements: false },
+            { platformGameId: "200", changeMarker: undefined, hasAchievements: true, details: expect.objectContaining({ name: "No Progress" }) },
+            { platformGameId: "300", changeMarker: "0|0|0|t1", hasAchievements: false, details: expect.objectContaining({ name: "An App" }) },
         ]);
         expect(client.getTitles).toHaveBeenCalledWith("api-key");
     });
 
     it("maps a modern title's achievements with no console label", async () => {
         client.getAchievementsForTitle.mockResolvedValue([achievement]);
-        const { session } = await connect();
-        expect(await session.fetchAchievementList({ platformGameId: "100" })).toEqual({
+        const { session, owned } = await connect();
+        expect(await session.fetchAchievementList(owned[0])).toEqual({
             kind: "achievements",
             title: "Halo",
             coverImageUrl: "halo.jpg",
@@ -67,8 +67,8 @@ describe("Xbox adapter", () => {
     it("falls back to the legacy endpoint and labels the title Xbox 360 (#36)", async () => {
         client.getAchievementsForTitle.mockResolvedValue([]);
         client.getX360AchievementsForTitle.mockResolvedValue([{ ...achievement, isUnlocked: false, timeUnlocked: undefined }]);
-        const { session } = await connect();
-        const result = await session.fetchAchievementList({ platformGameId: "100" });
+        const { session, owned } = await connect();
+        const result = await session.fetchAchievementList(owned[0]);
         expect(client.getX360AchievementsForTitle).toHaveBeenCalledWith("api-key", "xuid", "100");
         expect(result).toMatchObject({ kind: "achievements", consoleVariant: "Xbox 360", achievements: [{ unlocked: false, unlockedAt: null }] });
     });
@@ -76,7 +76,7 @@ describe("Xbox adapter", () => {
     it("reports no achievements when neither endpoint has any", async () => {
         client.getAchievementsForTitle.mockResolvedValue([]);
         client.getX360AchievementsForTitle.mockResolvedValue([]);
-        const { session } = await connect();
-        expect(await session.fetchAchievementList({ platformGameId: "100" })).toEqual({ kind: "none" });
+        const { session, owned } = await connect();
+        expect(await session.fetchAchievementList(owned[0])).toEqual({ kind: "none" });
     });
 });

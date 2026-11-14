@@ -1,5 +1,5 @@
 import { PlatformAdapter } from "../sync/platformAdapter";
-import { getOwnedGames, getPlayerAchievements, getSchemaForGame } from "./client";
+import { getOwnedGames, getPlayerAchievements, getSchemaForGame, OwnedGame as SteamOwnedGame } from "./client";
 import { getCachedGlobalPercentages } from "./globalRarityCache";
 
 // Steam's CDN serves box art at a predictable per-appid URL - no API call
@@ -31,24 +31,21 @@ export function steamChangeMarker(playtimeForever: number, rtimeLastPlayed: numb
     return `${playtimeForever}:${rtimeLastPlayed}`;
 }
 
-export const steamAdapter: PlatformAdapter = {
+export const steamAdapter: PlatformAdapter<SteamOwnedGame> = {
     platformId: "steam",
 
     async connect(account) {
         // The app's own Steam Web API key (see config); the account is just a SteamID.
         const steamId = account.platformAccountId;
-        const names = new Map<string, string>();
 
         return {
             async listOwnedGames() {
                 const games = await getOwnedGames(steamId);
-                return games.map((game) => {
-                    names.set(String(game.appid), game.name);
-                    return {
-                        platformGameId: String(game.appid),
-                        changeMarker: steamChangeMarker(game.playtime_forever, game.rtime_last_played),
-                    };
-                });
+                return games.map((game) => ({
+                    platformGameId: String(game.appid),
+                    changeMarker: steamChangeMarker(game.playtime_forever, game.rtime_last_played),
+                    details: game,
+                }));
             },
 
             async fetchAchievementList(game) {
@@ -64,7 +61,7 @@ export const steamAdapter: PlatformAdapter = {
 
                 return {
                     kind: "achievements",
-                    title: names.get(game.platformGameId) ?? game.platformGameId,
+                    title: game.details.name ?? game.platformGameId,
                     coverImageUrl: steamCoverUrl(appid),
                     achievements: schema.map((achievement) => {
                         const unlock = unlockByName.get(achievement.name);
