@@ -68,17 +68,27 @@ export interface NativeTier {
     tierSource: "psn_native";
 }
 
-export async function getOrCreateAchievementLink(
-    gameId: string,
-    platformId: string,
-    platformGameId: string,
-    platformAchievementId: string,
-    name: string,
-    description: string | undefined,
-    globalRarity: number | undefined,
-    nativeTier?: NativeTier,
-    iconUrl?: string
-): Promise<string> {
+// Which platform achievement a link is for.
+export interface PlatformAchievementRef {
+    platformId: string;
+    platformGameId: string;
+    platformAchievementId: string;
+}
+
+// What the platform says about that achievement. The same fields as an
+// adapter's AchievementEntry, so the pipeline can pass one straight in.
+export interface PlatformAchievementInfo {
+    name: string;
+    description?: string;
+    // Share of players who unlocked it, 0-100, when the platform reports one.
+    rarity?: number;
+    nativeTier?: NativeTier;
+    iconUrl?: string;
+}
+
+export async function getOrCreateAchievementLink(gameId: string, ref: PlatformAchievementRef, info: PlatformAchievementInfo): Promise<string> {
+    const { platformId, platformGameId, platformAchievementId } = ref;
+    const { name, description, rarity: globalRarity, nativeTier, iconUrl } = info;
     // Platform achievement IDs are typically only unique within one game
     // (e.g. Steam's api names, Xbox's small per-title integer IDs), so the
     // lookup must be scoped by the platform's game ID too.

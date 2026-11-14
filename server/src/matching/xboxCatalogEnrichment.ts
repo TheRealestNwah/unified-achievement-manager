@@ -114,14 +114,8 @@ async function enrichGame(apiKey: string, gameId: string, title: string): Promis
     for (const achievement of achievements) {
         await getOrCreateAchievementLink(
             gameId,
-            "xbox",
-            titleId,
-            achievement.id,
-            achievement.name,
-            achievement.description,
-            achievement.rarityPercent,
-            undefined,
-            achievement.iconUrl
+            { platformId: "xbox", platformGameId: titleId, platformAchievementId: achievement.id },
+            { name: achievement.name, description: achievement.description, rarity: achievement.rarityPercent, iconUrl: achievement.iconUrl }
         );
     }
 

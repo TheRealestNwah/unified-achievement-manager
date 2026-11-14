@@ -12,8 +12,8 @@ integration("bulk achievement-candidate review (#252)", () => {
     // One Steam and one Xbox achievement in the same game, plus a pending
     // candidate proposing they're the same - returns the candidate's id.
     async function candidatePair(n: number): Promise<string> {
-        const steamLink = await canonicalStore.getOrCreateAchievementLink(gameId, "steam", "bulk-app", `steam-${n}`, `Steam ${n}`, undefined, undefined);
-        const xboxLink = await canonicalStore.getOrCreateAchievementLink(gameId, "xbox", "bulk-title", `xbox-${n}`, `Xbox ${n}`, undefined, undefined);
+        const steamLink = await canonicalStore.getOrCreateAchievementLink(gameId, { platformId: "steam", platformGameId: "bulk-app", platformAchievementId: `steam-${n}` }, { name: `Steam ${n}` });
+        const xboxLink = await canonicalStore.getOrCreateAchievementLink(gameId, { platformId: "xbox", platformGameId: "bulk-title", platformAchievementId: `xbox-${n}` }, { name: `Xbox ${n}` });
         const target = await pool.query("select canonical_achievement_id from achievement_platform_links where id = $1", [steamLink]);
         const candidate = await pool.query(
             `insert into achievement_match_candidates (achievement_platform_link_id, candidate_canonical_achievement_id, confidence)
@@ -61,7 +61,7 @@ integration("bulk achievement-candidate review (#252)", () => {
         const [a, b] = [await candidatePair(10), await candidatePair(11)];
         // A second Xbox achievement from the same list, proposed as the same
         // achievement as the one a's Xbox link already merges into.
-        const extraXbox = await canonicalStore.getOrCreateAchievementLink(gameId, "xbox", "bulk-title", "xbox-10b", "Xbox 10b", undefined, undefined);
+        const extraXbox = await canonicalStore.getOrCreateAchievementLink(gameId, { platformId: "xbox", platformGameId: "bulk-title", platformAchievementId: "xbox-10b" }, { name: "Xbox 10b" });
         const aTarget = await pool.query("select candidate_canonical_achievement_id as id from achievement_match_candidates where id = $1", [a]);
         const conflict = (
             await pool.query(
@@ -80,8 +80,8 @@ integration("bulk achievement-candidate review (#252)", () => {
 
     it("records a near-match once however many times matching runs, and keeps it rejected (#345, #480)", async () => {
         const game = await canonicalStore.getOrCreateCanonicalGame("steam", "rerun-app", "Rerun Game");
-        await canonicalStore.getOrCreateAchievementLink(game, "steam", "rerun-app", "s1", "TR1 | Codex of Peru", undefined, undefined);
-        const xboxLink = await canonicalStore.getOrCreateAchievementLink(game, "xbox", "rerun-title", "x1", "TR Codex of Peru", undefined, undefined);
+        await canonicalStore.getOrCreateAchievementLink(game, { platformId: "steam", platformGameId: "rerun-app", platformAchievementId: "s1" }, { name: "TR1 | Codex of Peru" });
+        const xboxLink = await canonicalStore.getOrCreateAchievementLink(game, { platformId: "xbox", platformGameId: "rerun-title", platformAchievementId: "x1" }, { name: "TR Codex of Peru" });
         const rows = async () =>
             (await pool.query("select id, status from achievement_match_candidates where achievement_platform_link_id = $1", [xboxLink])).rows;
 
@@ -101,8 +101,8 @@ integration("bulk achievement-candidate review (#252)", () => {
         const game = await canonicalStore.getOrCreateCanonicalGame("steam", "tag-app", "FFX/X-2");
         const steam = ["Mega Strike", "All Together", "Learning!", "Sphere Hunter", "Sphere Hunter"];
         const xbox = ["FFX: Mega Strike", "FFX: All Together", "FFX: Learning!", "FFX: Sphere Hunter", "FFX-2: Sphere Hunter", "FFX-2: Teamwork!", "FFX-2: Just Starting"];
-        for (const [i, name] of steam.entries()) await canonicalStore.getOrCreateAchievementLink(game, "steam", "tag-app", `s${i}`, name, undefined, undefined);
-        for (const [i, name] of xbox.entries()) await canonicalStore.getOrCreateAchievementLink(game, "xbox", "tag-title", `x${i}`, name, undefined, undefined);
+        for (const [i, name] of steam.entries()) await canonicalStore.getOrCreateAchievementLink(game, { platformId: "steam", platformGameId: "tag-app", platformAchievementId: `s${i}` }, { name });
+        for (const [i, name] of xbox.entries()) await canonicalStore.getOrCreateAchievementLink(game, { platformId: "xbox", platformGameId: "tag-title", platformAchievementId: `x${i}` }, { name });
 
         await matcher.matchAchievementsForGame(game);
 
@@ -122,9 +122,9 @@ integration("bulk achievement-candidate review (#252)", () => {
 
     it("never proposes a target that already has an achievement from the same list (#362)", async () => {
         const game = await canonicalStore.getOrCreateCanonicalGame("steam", "sith-app", "Sith Game");
-        await canonicalStore.getOrCreateAchievementLink(game, "steam", "sith-app", "s1", "Sith Frenzy", undefined, undefined);
-        const warrior = await canonicalStore.getOrCreateAchievementLink(game, "psn", "sith-list", "p1", "Sith Warrior", undefined, undefined);
-        await canonicalStore.getOrCreateAchievementLink(game, "psn", "sith-list", "p2", "Sith Frenzy", undefined, undefined);
+        await canonicalStore.getOrCreateAchievementLink(game, { platformId: "steam", platformGameId: "sith-app", platformAchievementId: "s1" }, { name: "Sith Frenzy" });
+        const warrior = await canonicalStore.getOrCreateAchievementLink(game, { platformId: "psn", platformGameId: "sith-list", platformAchievementId: "p1" }, { name: "Sith Warrior" });
+        await canonicalStore.getOrCreateAchievementLink(game, { platformId: "psn", platformGameId: "sith-list", platformAchievementId: "p2" }, { name: "Sith Frenzy" });
 
         await matcher.matchAchievementsForGame(game);
         await matcher.matchAchievementsForGame(game);
@@ -145,8 +145,8 @@ integration("bulk achievement-candidate review (#252)", () => {
 
     it("keeps an ordinary exact name match auto-merging", async () => {
         const game = await canonicalStore.getOrCreateCanonicalGame("steam", "plain-app", "Plain Game");
-        await canonicalStore.getOrCreateAchievementLink(game, "steam", "plain-app", "s1", "First Blood", undefined, undefined);
-        const xboxLink = await canonicalStore.getOrCreateAchievementLink(game, "xbox", "plain-title", "x1", "First Blood", undefined, undefined);
+        await canonicalStore.getOrCreateAchievementLink(game, { platformId: "steam", platformGameId: "plain-app", platformAchievementId: "s1" }, { name: "First Blood" });
+        const xboxLink = await canonicalStore.getOrCreateAchievementLink(game, { platformId: "xbox", platformGameId: "plain-title", platformAchievementId: "x1" }, { name: "First Blood" });
         await matcher.matchAchievementsForGame(game);
         const status = await pool.query("select status from achievement_match_candidates where achievement_platform_link_id = $1", [xboxLink]);
         expect(status.rows).toEqual([{ status: "confirmed" }]);

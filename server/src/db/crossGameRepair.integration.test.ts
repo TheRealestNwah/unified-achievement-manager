@@ -37,19 +37,23 @@ integration("schema.sql repair of achievements stranded on another game (#363)",
 
         // The stranded shape: one canonical row on the classic game carrying
         // the remake's Steam and PSN links alongside the RA one.
-        const ra = await canonicalStore.getOrCreateAchievementLink(classic, "retroachievements", "10077", "62927", "Grim Reaper", undefined, 5);
-        const steam = await canonicalStore.getOrCreateAchievementLink(remake, "steam", "883710", "G", "Grim Reaper", undefined, 5);
-        const psn = await canonicalStore.getOrCreateAchievementLink(remake, "psn", "NPWR15179_00", "41", "Grim Reaper", undefined, 5, {
+        const ra = await canonicalStore.getOrCreateAchievementLink(classic, { platformId: "retroachievements", platformGameId: "10077", platformAchievementId: "62927" }, { name: "Grim Reaper", rarity: 5 });
+        const steam = await canonicalStore.getOrCreateAchievementLink(remake, { platformId: "steam", platformGameId: "883710", platformAchievementId: "G" }, { name: "Grim Reaper", rarity: 5 });
+        const psn = await canonicalStore.getOrCreateAchievementLink(
+            remake,
+            { platformId: "psn", platformGameId: "NPWR15179_00", platformAchievementId: "41" },
+            { name: "Grim Reaper", rarity: 5, nativeTier: {
             tier: "bronze",
             tierSource: "psn_native",
-        });
+        } }
+        );
         const stranded = (await gameOf(ra)).id;
         await pool.query("update achievement_platform_links set canonical_achievement_id = $1 where id = any($2)", [
             stranded,
             [steam, psn],
         ]);
         // A remake-only achievement that ended up there too, with nothing left behind.
-        const moved = await canonicalStore.getOrCreateAchievementLink(remake, "steam", "883710", "L", "Leon", undefined, 5);
+        const moved = await canonicalStore.getOrCreateAchievementLink(remake, { platformId: "steam", platformGameId: "883710", platformAchievementId: "L" }, { name: "Leon", rarity: 5 });
         const movedId = (await gameOf(moved)).id;
         await pool.query("update canonical_achievements set game_id = $1 where id = $2", [classic, movedId]);
 

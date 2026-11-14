@@ -43,18 +43,14 @@ integration("splitPlatformLink", () => {
         await canonicalStore.recordOwnership(steamAccountId, steamGameId);
         await canonicalStore.recordOwnership(xboxAccountId, xboxGameId);
 
-        await canonicalStore.getOrCreateAchievementLink(steamGameId, "steam", "split-steam-app", "S1", "Shared", "same on both", 50);
-        await canonicalStore.getOrCreateAchievementLink(steamGameId, "steam", "split-steam-app", "S2", "Steam only", "only here", 50);
+        await canonicalStore.getOrCreateAchievementLink(steamGameId, { platformId: "steam", platformGameId: "split-steam-app", platformAchievementId: "S1" }, { name: "Shared", description: "same on both", rarity: 50 });
+        await canonicalStore.getOrCreateAchievementLink(steamGameId, { platformId: "steam", platformGameId: "split-steam-app", platformAchievementId: "S2" }, { name: "Steam only", description: "only here", rarity: 50 });
         xboxUnlockedLinkId = await canonicalStore.getOrCreateAchievementLink(
             xboxGameId,
-            "xbox",
-            "split-xbox-title",
-            "X1",
-            "Shared",
-            "same on both",
-            50
+            { platformId: "xbox", platformGameId: "split-xbox-title", platformAchievementId: "X1" },
+            { name: "Shared", description: "same on both", rarity: 50 }
         );
-        await canonicalStore.getOrCreateAchievementLink(xboxGameId, "xbox", "split-xbox-title", "X2", "Xbox only", "only here", 50);
+        await canonicalStore.getOrCreateAchievementLink(xboxGameId, { platformId: "xbox", platformGameId: "split-xbox-title", platformAchievementId: "X2" }, { name: "Xbox only", description: "only here", rarity: 50 });
         await canonicalStore.recordUnlock(xboxAccountId, xboxUnlockedLinkId, new Date("2026-01-01T00:00:00Z"));
 
         await gameMatcher.matchGames();
@@ -133,12 +129,8 @@ integration("splitPlatformLink", () => {
         await canonicalStore.recordOwnership(steamAccountId, secondGameId);
         const unlockedLinkId = await canonicalStore.getOrCreateAchievementLink(
             secondGameId,
-            "steam",
-            "split-steam-second",
-            "T1",
-            "Second list",
-            "only on the second list",
-            50
+            { platformId: "steam", platformGameId: "split-steam-second", platformAchievementId: "T1" },
+            { name: "Second list", description: "only on the second list", rarity: 50 }
         );
         await canonicalStore.recordUnlock(steamAccountId, unlockedLinkId, new Date("2026-01-02T00:00:00Z"));
         await gameMatcher.mergeGames(steamGameId, secondGameId);

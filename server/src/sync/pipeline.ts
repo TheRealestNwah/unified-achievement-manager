@@ -86,14 +86,8 @@ async function recordAchievement(
 ): Promise<"unlocked" | "revoked" | "unchanged"> {
     const linkId = await getOrCreateAchievementLink(
         gameId,
-        platformId,
-        game.platformGameId,
-        achievement.id,
-        achievement.name,
-        achievement.description,
-        achievement.rarity,
-        achievement.nativeTier,
-        achievement.iconUrl
+        { platformId, platformGameId: game.platformGameId, platformAchievementId: achievement.id },
+        achievement
     );
     if (!achievement.unlocked) {
         // The platform now reports it locked: correct a stored unlock rather

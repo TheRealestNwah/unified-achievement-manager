@@ -53,13 +53,8 @@ integration("getFunStats tier totals", () => {
                 achievementIndex++;
                 const linkId = await canonicalStore.getOrCreateAchievementLink(
                     gameId,
-                    "steam",
-                    "fun-stats-app",
-                    `fun-stats-achievement-${achievementIndex}`,
-                    `Achievement ${achievementIndex}`,
-                    undefined,
-                    undefined,
-                    { tier, tierSource: "psn_native" }
+                    { platformId: "steam", platformGameId: "fun-stats-app", platformAchievementId: `fun-stats-achievement-${achievementIndex}` },
+                    { name: `Achievement ${achievementIndex}`, nativeTier: { tier, tierSource: "psn_native" } }
                 );
                 await canonicalStore.recordUnlock(accountId, linkId, new Date(`2026-01-${10 + achievementIndex}T00:00:00Z`));
             }
@@ -86,12 +81,8 @@ integration("getFunStats tier totals", () => {
         const { getRecentActivity } = await import("./queries");
         const linkId = await canonicalStore.getOrCreateAchievementLink(
             gameId,
-            "steam",
-            "fun-stats-app",
-            "fun-stats-described",
-            "Described Achievement",
-            "Beat the game on hard",
-            undefined
+            { platformId: "steam", platformGameId: "fun-stats-app", platformAchievementId: "fun-stats-described" },
+            { name: "Described Achievement", description: "Beat the game on hard" }
         );
         await canonicalStore.recordUnlock(accountId, linkId, new Date("2026-03-01T00:00:00Z"));
         const [latest] = await getRecentActivity(userId, 1, 0);
@@ -104,13 +95,8 @@ integration("getFunStats tier totals", () => {
         await canonicalStore.recordOwnership(accountId, otherGameId);
         const linkId = await canonicalStore.getOrCreateAchievementLink(
             otherGameId,
-            "steam",
-            "fun-stats-other-app",
-            "fun-stats-other-achievement",
-            "Other Achievement",
-            undefined,
-            undefined,
-            { tier: "gold", tierSource: "psn_native" }
+            { platformId: "steam", platformGameId: "fun-stats-other-app", platformAchievementId: "fun-stats-other-achievement" },
+            { name: "Other Achievement", nativeTier: { tier: "gold", tierSource: "psn_native" } }
         );
         await canonicalStore.recordUnlock(accountId, linkId, new Date("2026-02-01T00:00:00Z"));
         const before = await getFunStats(userId);
@@ -147,11 +133,11 @@ integration("getFunStats tier totals", () => {
         const { getGamesForUser, getGameCompletionCountsForUser } = await import("./queries");
         const rarityGameId = await canonicalStore.getOrCreateCanonicalGame("steam", "rarity-app", "Rarity Game");
         await canonicalStore.recordOwnership(accountId, rarityGameId);
-        const steamLink = await canonicalStore.getOrCreateAchievementLink(rarityGameId, "steam", "rarity-app", "r1", "Owned One", undefined, undefined);
+        const steamLink = await canonicalStore.getOrCreateAchievementLink(rarityGameId, { platformId: "steam", platformGameId: "rarity-app", platformAchievementId: "r1" }, { name: "Owned One" });
         await canonicalStore.recordUnlock(accountId, steamLink, new Date("2026-03-01T00:00:00Z"));
         // Catalog enrichment: an Xbox list for the same game, never owned there.
-        await canonicalStore.getOrCreateAchievementLink(rarityGameId, "xbox", "rarity-title", "x1", "Owned One", undefined, 2);
-        await canonicalStore.getOrCreateAchievementLink(rarityGameId, "xbox", "rarity-title", "x2", "Xbox Only", undefined, 3);
+        await canonicalStore.getOrCreateAchievementLink(rarityGameId, { platformId: "xbox", platformGameId: "rarity-title", platformAchievementId: "x1" }, { name: "Owned One", rarity: 2 });
+        await canonicalStore.getOrCreateAchievementLink(rarityGameId, { platformId: "xbox", platformGameId: "rarity-title", platformAchievementId: "x2" }, { name: "Xbox Only", rarity: 3 });
 
         const [game] = await getGamesForUser(userId, { gameId: rarityGameId });
         expect(game.total_achievements).toBe(1);

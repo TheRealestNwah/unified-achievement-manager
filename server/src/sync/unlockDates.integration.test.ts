@@ -14,7 +14,7 @@ integration("unlocks with no known date (#423)", () => {
     async function link(game: string, n: number) {
         const gameId = await canonicalStore.getOrCreateCanonicalGame("xbox", game, `Game ${game}`);
         await canonicalStore.recordOwnership(accountId, gameId);
-        return canonicalStore.getOrCreateAchievementLink(gameId, "xbox", game, `ach-${n}`, `${game} achievement ${n}`, undefined, undefined);
+        return canonicalStore.getOrCreateAchievementLink(gameId, { platformId: "xbox", platformGameId: game, platformAchievementId: `ach-${n}` }, { name: `${game} achievement ${n}` });
     }
 
     async function unlockedAt(linkId: string): Promise<Date | null> {

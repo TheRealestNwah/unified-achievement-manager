@@ -10,10 +10,14 @@ integration("matching RPCS3 games with PSN (#523)", () => {
     let achievementMatcher: typeof import("./achievementMatcher");
 
     async function trophy(gameId: string, platformId: string, listId: string, trophyId: string, name: string) {
-        return canonicalStore.getOrCreateAchievementLink(gameId, platformId, listId, trophyId, name, undefined, undefined, {
+        return canonicalStore.getOrCreateAchievementLink(
+            gameId,
+            { platformId, platformGameId: listId, platformAchievementId: trophyId },
+            { name, nativeTier: {
             tier: "bronze",
             tierSource: "psn_native",
-        });
+        } }
+        );
     }
 
     async function candidatesFor(gameId: string) {

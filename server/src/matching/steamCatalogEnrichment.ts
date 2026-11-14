@@ -89,14 +89,8 @@ async function enrichGame(gameId: string, title: string): Promise<boolean> {
         // rarity data, which is the whole point of this enrichment step.
         await getOrCreateAchievementLink(
             gameId,
-            "steam",
-            String(appId),
-            achievement.name,
-            achievement.displayName,
-            achievement.description,
-            globalPercentages.get(achievement.name),
-            undefined,
-            achievement.iconUrl
+            { platformId: "steam", platformGameId: String(appId), platformAchievementId: achievement.name },
+            { name: achievement.displayName, description: achievement.description, rarity: globalPercentages.get(achievement.name), iconUrl: achievement.iconUrl }
         );
     }
 
