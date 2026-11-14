@@ -9,7 +9,7 @@ The default branch is `master`.
 - `server/`: Express + PostgreSQL backend. `src/app.ts` is the entry point; per-platform code lives in `src/{steam,xbox,psn,retro,gog,rpcs3}`, with `src/matching`, `src/scoring`, and `src/sync` shared across them. Syncing runs through one pipeline in `src/sync/pipeline.ts`; each platform supplies a small adapter (`adapter.ts`) beside its client. Domain terms are in `GLOSSARY.md`. The dashboard is a single page in `server/public/index.html`. Migrations and one-off repair scripts are in `src/db`.
 - `desktop/`: Electron shell (`src/main.ts`) that runs the server in-process, plus the Windows installer build (`npm run dist`, electron-builder).
 - `db/schema.sql`: schema reference.
-- `docs/`: `development.md` (running from source, API), `data-model.md` (tiers, matching, scoring), `operations.md`, `privacy.md`, `release-checklist.md`.
+- `docs/`: `development.md` (running from source, API), `data-model.md` (tiers, matching, scoring, sync), `operations.md`, `privacy.md`, `release-checklist.md`.
 - `ROADMAP.md`: planned and released work.
 
 ## Build, lint, test

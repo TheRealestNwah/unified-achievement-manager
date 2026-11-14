@@ -61,3 +61,13 @@ describe("runAccountSync one-sync-per-account (#323)", () => {
         await expect(runAccountSync(account("a"))).resolves.toEqual({ gamesProcessed: 1, achievementsUnlocked: 0 });
     });
 });
+
+describe("runAccountSync platform lookup", () => {
+    it("throws for a platform with no adapter, without running the pipeline", async () => {
+        await expect(runAccountSync({ ...account("x"), platform_id: "atari" })).rejects.toThrow(
+            "No platform adapter for platform: atari",
+        );
+        expect(runSyncPipeline).not.toHaveBeenCalled();
+        expect(syncingAccountIds().size).toBe(0);
+    });
+});

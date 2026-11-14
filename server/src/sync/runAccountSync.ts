@@ -65,6 +65,6 @@ export async function recordSyncError(accountId: string, err: unknown): Promise<
 
 async function syncByPlatform(account: PlatformAccountRow): Promise<SyncSummary> {
     const adapter = platformAdapters[account.platform_id];
-    if (!adapter) throw new Error(`No sync handler for platform: ${account.platform_id}`);
+    if (!adapter) throw new Error(`No platform adapter for platform: ${account.platform_id}`);
     return runSyncPipeline(adapter, account.id);
 }
