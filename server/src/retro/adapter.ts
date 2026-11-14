@@ -1,3 +1,4 @@
+import { toAchievementEntry } from "../sync/achievementEntry";
 import { PlatformAdapter } from "../sync/platformAdapter";
 import { getGameProgress, getUserGames, RetroGameSummary } from "./client";
 
@@ -45,15 +46,12 @@ export const retroAdapter: PlatformAdapter = {
                     kind: "achievements",
                     title: summary.title,
                     coverImageUrl: summary.coverImageUrl,
-                    achievements: achievements.map((a) => ({
-                        id: a.id,
-                        name: a.name,
-                        description: a.description,
-                        rarity: a.globalUnlockRarity,
-                        iconUrl: a.iconUrl,
-                        unlocked: a.isUnlocked,
-                        unlockedAt: a.isUnlocked && a.unlockedAt ? parseRetroDate(a.unlockedAt) : null,
-                    })),
+                    achievements: achievements.map((a) =>
+                        toAchievementEntry(a, {
+                            rarity: a.globalUnlockRarity,
+                            unlockedAt: a.unlockedAt ? parseRetroDate(a.unlockedAt) : null,
+                        }),
+                    ),
                 };
             },
         };
