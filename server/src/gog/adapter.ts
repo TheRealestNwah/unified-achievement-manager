@@ -1,3 +1,4 @@
+import { toAchievementEntry } from "../sync/achievementEntry";
 import { PlatformAdapter } from "../sync/platformAdapter";
 import { exchangeRefreshTokenForTokens, getAchievementsForGame, getOwnedGameIds, getProduct } from "./client";
 
@@ -29,14 +30,9 @@ export const gogAdapter: PlatformAdapter = {
                     kind: "achievements",
                     title: product.title,
                     coverImageUrl: product.coverImageUrl,
-                    achievements: achievements.map((a) => ({
-                        id: a.id,
-                        name: a.name,
-                        description: a.description,
-                        iconUrl: a.iconUrl,
-                        unlocked: a.isUnlocked,
-                        unlockedAt: a.unlockedAt ? new Date(a.unlockedAt) : null,
-                    })),
+                    achievements: achievements.map((a) =>
+                        toAchievementEntry(a, { unlockedAt: a.unlockedAt ? new Date(a.unlockedAt) : null }),
+                    ),
                 };
             },
         };

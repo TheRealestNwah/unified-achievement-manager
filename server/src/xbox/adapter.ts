@@ -1,3 +1,4 @@
+import { toAchievementEntry } from "../sync/achievementEntry";
 import { PlatformAdapter } from "../sync/platformAdapter";
 import { getAchievementsForTitle, getTitles, getX360AchievementsForTitle, XboxTitleSummary } from "./client";
 
@@ -59,15 +60,12 @@ export const xboxAdapter: PlatformAdapter = {
                     title: title.name,
                     coverImageUrl: title.coverImageUrl,
                     consoleVariant,
-                    achievements: achievements.map((a) => ({
-                        id: a.id,
-                        name: a.name,
-                        description: a.description,
-                        rarity: a.rarityPercent,
-                        iconUrl: a.iconUrl,
-                        unlocked: a.isUnlocked,
-                        unlockedAt: a.timeUnlocked ? new Date(a.timeUnlocked) : null,
-                    })),
+                    achievements: achievements.map((a) =>
+                        toAchievementEntry(a, {
+                            rarity: a.rarityPercent,
+                            unlockedAt: a.timeUnlocked ? new Date(a.timeUnlocked) : null,
+                        }),
+                    ),
                 };
             },
         };
