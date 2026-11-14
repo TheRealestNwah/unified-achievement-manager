@@ -10,7 +10,7 @@ vi.mock("./client", () => client);
 
 import { xboxAdapter } from "./adapter";
 
-const account = { id: "account", platformAccountId: "xuid", accessToken: "api-key", refreshToken: null, localFolder: null };
+const account = { platformAccountId: "xuid", accessToken: "api-key", refreshToken: null, localFolder: null };
 
 const achievement = {
     id: "a1",

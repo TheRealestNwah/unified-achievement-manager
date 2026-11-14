@@ -17,6 +17,8 @@ import { SyncSummary } from "./types";
 // reports into library changes. The same steps run for every platform, so a
 // fix here is a fix for all of them.
 export async function runSyncPipeline(adapter: AnyPlatformAdapter, accountId: string): Promise<SyncSummary> {
+    // Read fresh rather than taken from the caller's row: the scheduler's row
+    // can predate a token rotation by an earlier sync, and an unlink since.
     const account = await loadLinkedAccount(accountId);
     const platformId = adapter.platformId;
 
@@ -38,6 +40,8 @@ export async function runSyncPipeline(adapter: AnyPlatformAdapter, accountId: st
             continue;
         }
 
+        // An empty list (an RPCS3 set with no trophies, say) is treated like
+        // "none", so no canonical game is created for it.
         if (list.kind === "achievements" && list.achievements.length > 0) {
             const gameId = await getOrCreateCanonicalGame(platformId, game.platformGameId, list.title, list.coverImageUrl, list.consoleVariant);
             await recordOwnership(accountId, gameId);
@@ -101,13 +105,12 @@ async function recordAchievement(
 
 async function loadLinkedAccount(accountId: string): Promise<LinkedAccount> {
     const result = await pool.query(
-        "select id, platform_account_id, access_token, refresh_token, local_folder from user_platform_accounts where id = $1",
+        "select platform_account_id, access_token, refresh_token, local_folder from user_platform_accounts where id = $1",
         [accountId]
     );
     const row = result.rows[0];
     if (!row) throw new Error("This account is no longer linked.");
     return {
-        id: row.id,
         platformAccountId: row.platform_account_id,
         accessToken: row.access_token ? decryptCredential(row.access_token, config.credentialEncryptionKey) : null,
         refreshToken: row.refresh_token ? decryptCredential(row.refresh_token, config.credentialEncryptionKey) : null,

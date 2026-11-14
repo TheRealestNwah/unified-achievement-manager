@@ -11,7 +11,7 @@ vi.mock("./client", () => client);
 
 import { psnAdapter } from "./adapter";
 
-const account = { id: "account", platformAccountId: "psn-user", accessToken: "old-access", refreshToken: "old-refresh", localFolder: null };
+const account = { platformAccountId: "psn-user", accessToken: "old-access", refreshToken: "old-refresh", localFolder: null };
 
 beforeEach(() => {
     vi.resetAllMocks();
