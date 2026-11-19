@@ -1,3 +1,4 @@
+import { execFile } from "child_process";
 import { app, BrowserWindow, dialog, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 
@@ -39,7 +40,11 @@ async function promptRestart(): Promise<void> {
         const { response } = await showMessage({
             title: "Update ready",
             message: `Unified Achievement Manager ${downloadedVersion} is ready to install.`,
-            detail: "Restart now to finish updating, or it'll install the next time you quit.",
+            // The silent install takes a few minutes with nothing on screen,
+            // and reopening the old version meanwhile breaks it (see #548).
+            detail:
+                "Restart now to finish updating, or it'll install the next time you quit.\n\n" +
+                "Installing takes a few minutes with nothing on screen. The app reopens by itself when it's done.",
             buttons: ["Restart now", "Later"],
             defaultId: 0,
             cancelId: 1,
@@ -134,6 +139,35 @@ export function stopAutoUpdates(): void {
     if (firstCheck) clearTimeout(firstCheck);
     if (interval) clearInterval(interval);
     firstCheck = interval = null;
+}
+
+// The installer's process is named after its file,
+// Unified-Achievement-Manager-Setup-<version>.exe (see "artifactName").
+function installerRunning(): Promise<boolean> {
+    return new Promise((resolve) => {
+        execFile(
+            "tasklist",
+            ["/FI", "IMAGENAME eq Unified-Achievement-Manager-Setup*", "/FO", "CSV", "/NH"],
+            { windowsHide: true },
+            (err, stdout) => resolve(!err && stdout.includes("Unified-Achievement-Manager-Setup"))
+        );
+    });
+}
+
+const INSTALLER_EXIT_WAIT_MS = 15_000;
+
+// True when an update is still installing, so starting now would lock the
+// files it's replacing and leave the old version in place (see #548). When
+// the installer reopens the app itself it exits within moments, so give it
+// a short while before deciding.
+export async function updateStillInstalling(): Promise<boolean> {
+    if (process.platform !== "win32" || !app.isPackaged) return false;
+    const deadline = Date.now() + INSTALLER_EXIT_WAIT_MS;
+    while (await installerRunning()) {
+        if (Date.now() >= deadline) return true;
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    return false;
 }
 
 // Help → Check for Updates, the tray menu, and Settings → Desktop app → Check

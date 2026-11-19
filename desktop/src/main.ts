@@ -7,7 +7,7 @@ import { automaticUpdatesEnabled, handleWindowClose, HIDDEN_LAUNCH_ARG, launched
 import { startUnlockNotifications, stopUnlockNotifications } from "./notifications";
 import { loadWindowState, trackWindowState } from "./windowState";
 import { backupDataFolder, defaultBackupName, defaultExportName, exportToArchive, importFromArchive, type PortableData, restoreDataFolder } from "./backup";
-import { checkForUpdatesNow, startAutoUpdates, stopAutoUpdates } from "./updater";
+import { checkForUpdatesNow, startAutoUpdates, stopAutoUpdates, updateStillInstalling } from "./updater";
 
 interface RunningApp {
     url: string;
@@ -392,6 +392,16 @@ Delete that folder once you're happy with the import. Folder settings such as RP
 async function start(): Promise<void> {
     captureLogs();
     console.log(`Starting Unified Achievement Manager ${app.getVersion()} (data: ${dataDir})`);
+    if (await updateStillInstalling()) {
+        console.log("An update is still installing; not starting.");
+        await dialog.showMessageBox({
+            title: "Update in progress",
+            message: "Unified Achievement Manager is still installing an update.",
+            detail: "It reopens by itself when the update is done. This can take a few minutes.",
+        });
+        app.exit(0);
+        return;
+    }
     buildMenu();
     // Windows attributes notifications (see #250) to this ID; it matches
     // electron-builder's appId so they show under the app's own name.
