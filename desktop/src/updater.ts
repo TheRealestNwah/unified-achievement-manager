@@ -1,4 +1,6 @@
 import { execFile } from "child_process";
+import fs from "fs";
+import path from "path";
 import { app, BrowserWindow, dialog, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 
@@ -27,6 +29,66 @@ let interval: ReturnType<typeof setInterval> | null = null;
 let downloadedVersion: string | null = null;
 let manualCheck = false;
 let prompting = false;
+// The version a "Restart now" last failed to install, if this launch is the
+// one that came back without it.
+let failedVersion: string | null = null;
+
+const LATEST_RELEASE_URL = "https://github.com/TheRealestNwah/unified-achievement-manager/releases/latest";
+
+// "Restart now" records what it's installing, so the next launch can tell
+// whether the silent installer actually replaced the app (see #551). It
+// can't report failure itself: it reopens the old version either way.
+interface UpdateAttempt {
+    from: string;
+    to: string;
+}
+
+function attemptFile(): string {
+    return path.join(app.getPath("userData"), "update-attempt.json");
+}
+
+function recordAttempt(to: string): void {
+    try {
+        fs.writeFileSync(attemptFile(), JSON.stringify({ from: app.getVersion(), to } satisfies UpdateAttempt));
+    } catch (err) {
+        console.warn("Couldn't record the update attempt:", err);
+    }
+}
+
+function takeAttempt(): UpdateAttempt | null {
+    try {
+        const attempt = JSON.parse(fs.readFileSync(attemptFile(), "utf8")) as UpdateAttempt;
+        fs.rmSync(attemptFile(), { force: true });
+        return attempt;
+    } catch {
+        return null;
+    }
+}
+
+async function reportFailedUpdate(version: string): Promise<void> {
+    const { response } = await showMessage({
+        type: "warning",
+        title: "Update didn't install",
+        message: `Unified Achievement Manager ${version} didn't install.`,
+        detail: `You're still on ${app.getVersion()}. Download the installer and run it to update; your data is kept.`,
+        buttons: ["Download installer", "Not now"],
+        defaultId: 0,
+        cancelId: 1,
+    });
+    if (response === 0) await shell.openExternal(LATEST_RELEASE_URL);
+}
+
+function checkLastAttempt(): void {
+    const attempt = takeAttempt();
+    if (!attempt) return;
+    if (app.getVersion() !== attempt.from) {
+        console.log(`Updated from ${attempt.from} to ${app.getVersion()}`);
+        return;
+    }
+    console.error(`Update to ${attempt.to} didn't install; still on ${attempt.from}`);
+    failedVersion = attempt.to;
+    void reportFailedUpdate(attempt.to);
+}
 
 function showMessage(box: Electron.MessageBoxOptions): Promise<Electron.MessageBoxReturnValue> {
     const window = options?.getWindow();
@@ -51,6 +113,7 @@ async function promptRestart(): Promise<void> {
         });
         if (response !== 0) return;
         await options.beforeInstall();
+        recordAttempt(downloadedVersion);
         // Silent, then relaunch - the assisted installer's wizard isn't needed
         // for an update into the same folder.
         autoUpdater.quitAndInstall(true, true);
@@ -88,6 +151,7 @@ export function startAutoUpdates(opts: UpdaterOptions): void {
     autoUpdater.logger = { info: console.info, warn: console.warn, error: () => undefined, debug: () => undefined };
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
+    checkLastAttempt();
 
     autoUpdater.on("update-available", (info) => {
         console.log(`Update ${info.version} available, downloading`);
@@ -126,6 +190,10 @@ export function startAutoUpdates(opts: UpdaterOptions): void {
     autoUpdater.on("update-downloaded", (info) => {
         console.log(`Update ${info.version} downloaded`);
         downloadedVersion = info.version;
+        // Just failed to install: the failure notice already offered the
+        // installer, so don't ask to restart into the same failure again.
+        // It still tries on quit, and a manual check still offers it.
+        if (info.version === failedVersion) return;
         // Launched hidden in the tray: don't pop a dialog out of nowhere; it
         // installs on quit, or the next manual check offers the restart.
         if (opts.getWindow()?.isVisible()) void promptRestart();
