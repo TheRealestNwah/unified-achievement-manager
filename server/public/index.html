@@ -78,7 +78,6 @@
     ::-webkit-scrollbar { width: 10px; }
     ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 8px; }
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    @keyframes ringShimmer { 0%, 100% { opacity: .3; } 50% { opacity: .9; } }
     @media (prefers-reduced-motion: reduce) {
         * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
     }
@@ -450,7 +449,6 @@
         box-shadow: 0 0 0 var(--space-xs) var(--card-inset);
     }
     .level-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
-    .level-ring .ring-shimmer { animation: ringShimmer 5s ease-in-out infinite; }
     .level-ring .n {
         position: absolute;
         inset: 0;
@@ -1234,9 +1232,6 @@
                             </defs>
                             <circle cx="54" cy="54" r="46" fill="none" stroke="var(--ring-track)" stroke-width="9"/>
                             <circle id="level-ring-fill" cx="54" cy="54" r="46" fill="none" stroke="url(#tierSweep)" stroke-width="9" stroke-linecap="round" stroke-dasharray="289.03" stroke-dashoffset="289.03"/>
-                            <!-- Shine from 10 to 12 o'clock on the ring itself. The SVG is
-                                 rotated -90deg, so these points are a quarter turn clockwise. -->
-                            <path d="M77 14.16A46 46 0 0 1 100 54" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" class="ring-shimmer"/>
                         </svg>
                         <div class="n">
                             <span class="num" id="level-number">-</span>
