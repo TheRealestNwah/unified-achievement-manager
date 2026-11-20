@@ -174,8 +174,7 @@ export async function startServer(): Promise<RunningServer> {
     const stop = () => {
         if (!shutdownPromise) {
             console.log("Shutting down: draining HTTP connections and closing the database pool.");
-            stopScheduler();
-            shutdownPromise = shutdownServer(server);
+            shutdownPromise = stopScheduler().then(() => shutdownServer(server));
         }
         return shutdownPromise;
     };

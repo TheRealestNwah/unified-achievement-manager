@@ -19,14 +19,30 @@ let intervalMinutes: number | null = null;
 let nextRunAt: Date | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
+let inFlight: Promise<void> | null = null;
 
-export function startScheduler(fallbackIntervalMinutes: number): () => void {
+// How long shutdown waits for a sync in progress to wind down before the
+// database closes under it (see #557).
+const SHUTDOWN_WAIT_MS = 5000;
+
+export function startScheduler(fallbackIntervalMinutes: number): () => Promise<void> {
     started = true;
     defaultIntervalMinutes = fallbackIntervalMinutes;
     void applySchedulerInterval({ runNow: true });
-    return () => {
+    return async () => {
         started = false;
         clearTimer();
+        // A run in progress stops at its next account; let it finish recording
+        // its outcome so it doesn't hit the closed pool.
+        if (!inFlight) return;
+        let waitTimer: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([
+            inFlight,
+            new Promise<void>((resolve) => {
+                waitTimer = setTimeout(resolve, SHUTDOWN_WAIT_MS);
+            }),
+        ]);
+        clearTimeout(waitTimer);
     };
 }
 
@@ -79,10 +95,11 @@ function clearTimer(): void {
 function runScheduledSyncOnce(onlyStaleForMinutes: number | null = null): void {
     if (running) return;
     running = true;
-    runScheduledSync(onlyStaleForMinutes)
+    inFlight = runScheduledSync(onlyStaleForMinutes)
         .catch((err) => console.error("Scheduled sync failed:", err))
         .finally(() => {
             running = false;
+            inFlight = null;
         });
 }
 
