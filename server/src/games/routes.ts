@@ -229,7 +229,27 @@ const MAX_GAME_TITLE_LENGTH = 200;
 // games.title for an existing game, so the choice sticks.
 gamesRouter.put("/games/:gameId/title", requireAuth, async (req, res, next) => {
     try {
-        const { gamePlatformLinkId, title } = req.body ?? {};
+        const { gamePlatformLinkId, title, reset } = req.body ?? {};
+        if (reset === true) {
+            // Back to a platform's own name (see #556). Which entry's name wins
+            // is arbitrary but stable for a game linked on several platforms.
+            if (!(await userOwnsGame(req.user!.id, req.params.gameId))) {
+                return res.status(404).json({ error: "Game not found in your library" });
+            }
+            const result = await pool.query(
+                `update games g set title = btrim(first.platform_title, E' \\t\\r\\n' || chr(160))
+                 from (
+                     select platform_title from game_platform_links
+                     where game_id = $1 and btrim(platform_title, E' \\t\\r\\n' || chr(160)) <> ''
+                     order by platform_title, id limit 1
+                 ) first
+                 where g.id = $1
+                 returning g.title`,
+                [req.params.gameId]
+            );
+            if (!result.rows[0]) return res.status(400).json({ error: "This game has no platform name to go back to" });
+            return res.json({ title: result.rows[0].title });
+        }
         if (typeof title === "string") {
             const trimmed = title.trim();
             if (!trimmed) return res.status(400).json({ error: "The name can't be empty" });

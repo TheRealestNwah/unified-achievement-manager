@@ -58,6 +58,8 @@ export async function recordSyncError(accountId: string, err: unknown): Promise<
             message.slice(0, MAX_SYNC_ERROR_LENGTH),
         ]);
     } catch (recordErr) {
+        // The app is quitting and the pool is already closed: nothing to record to (see #557).
+        if (pool.ended) return;
         // Never hide the original sync error behind a failure to record it.
         console.error("Couldn't record a sync error:", recordErr);
     }

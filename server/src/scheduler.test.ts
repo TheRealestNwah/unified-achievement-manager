@@ -80,4 +80,35 @@ describe("scheduler shutdown (#408)", () => {
         expect(consoleError).not.toHaveBeenCalled();
         vi.restoreAllMocks();
     });
+
+    it("waits for a sync in progress before reporting that it has stopped (#557)", async () => {
+        const { startScheduler } = await import("./scheduler");
+        getSyncIntervalMinutes.mockResolvedValue(60);
+        queryMock.mockResolvedValueOnce({ rows: [{ id: "a", user_id: "u", platform_id: "steam" }] } as never);
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        vi.spyOn(console, "log").mockImplementation(() => undefined);
+        let finishSync: () => void = () => undefined;
+        runAccountSync.mockReset().mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve) => {
+                    finishSync = resolve;
+                }) as never
+        );
+
+        const stop = startScheduler(360);
+        for (let i = 0; i < 20; i++) await Promise.resolve();
+        expect(runAccountSync).toHaveBeenCalledTimes(1);
+
+        let stopped = false;
+        const stopping = stop().then(() => {
+            stopped = true;
+        });
+        for (let i = 0; i < 20; i++) await Promise.resolve();
+        expect(stopped).toBe(false);
+
+        finishSync();
+        await stopping;
+        expect(stopped).toBe(true);
+        vi.restoreAllMocks();
+    });
 });

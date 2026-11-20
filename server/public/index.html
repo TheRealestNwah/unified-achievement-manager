@@ -537,6 +537,7 @@
         font-size: 13px;
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
     }
+    .toast-action { margin-left: 12px; padding: 2px 8px; background: transparent; color: inherit; border: 1px solid currentColor; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
 
     .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
     .toolbar .tile-heading { margin: 0; }
@@ -2015,12 +2016,25 @@ async function syncNewAccounts(accounts) {
     await trackUserSync(() => syncAllPlatforms(document.getElementById("dashboard-sync-all-btn"), document.getElementById("dashboard-sync-status")));
 }
 
-function showToast(message) {
+// An optional action (e.g. Undo) adds a button and keeps the toast up longer.
+function showToast(message, action = null) {
     const toast = document.getElementById("toast");
     toast.textContent = message;
+    if (action) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "toast-action";
+        button.textContent = action.label;
+        button.addEventListener("click", () => {
+            toast.classList.add("hidden");
+            clearTimeout(state.toastTimer);
+            action.onClick();
+        });
+        toast.appendChild(button);
+    }
     toast.classList.remove("hidden");
     clearTimeout(state.toastTimer);
-    state.toastTimer = setTimeout(() => toast.classList.add("hidden"), 4000);
+    state.toastTimer = setTimeout(() => toast.classList.add("hidden"), action ? 8000 : 4000);
 }
 
 function relativeTime(isoString) {
@@ -2436,14 +2450,18 @@ function showGameContextMenu(x, y, game, anchorEl = null) {
 }
 
 async function changeGameDisplayName(game) {
-    const entered = await askText(`Display name for "${game.title}":`, { okLabel: "Save", initialValue: game.title });
-    const title = entered?.trim();
-    if (!title || title === game.title) return;
+    const entered = await askText(`Display name for "${game.title}" (leave blank to use the platform's name):`, {
+        okLabel: "Save",
+        initialValue: game.title,
+    });
+    if (entered === null || entered === undefined) return;
+    const title = entered.trim();
+    if (title === game.title) return;
     try {
         await api(`/api/me/games/${game.id}/title`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title }),
+            body: JSON.stringify(title ? { title } : { reset: true }),
         });
         await refreshGamesAndScore();
     } catch (err) {
@@ -2460,10 +2478,26 @@ async function setGameVisibility(gameId, mode) {
             body: JSON.stringify({ mode }),
         });
         status.textContent = mode === "excluded" ? "Game excluded from your score." : "Game hidden.";
+        showToast(mode === "excluded" ? "Game excluded from your score." : "Game hidden.", {
+            label: "Undo",
+            onClick: () => restoreGameVisibility(gameId),
+        });
         await refreshGamesAndScore();
         await refreshActivity();
     } catch (err) {
         status.textContent = `Couldn't update visibility: ${err.message}`;
+    }
+}
+
+async function restoreGameVisibility(gameId) {
+    try {
+        await api(`/api/me/games/${gameId}/visibility`, { method: "DELETE" });
+        document.getElementById("match-status").textContent = "";
+        showToast("Game restored.");
+        await refreshGamesAndScore();
+        await refreshActivity();
+    } catch (err) {
+        await showMessage(`Couldn't undo: ${err.message}`);
     }
 }
 
