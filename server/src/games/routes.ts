@@ -170,9 +170,10 @@ gamesRouter.get("/export", requireAuth, async (req, res, next) => {
             req.query.format === "csv" || (!req.query.format && (req.headers.accept ?? "").includes("text/csv"));
 
         if (wantsCsv) {
-            res.setHeader("Content-Type", "text/csv");
+            res.setHeader("Content-Type", "text/csv; charset=utf-8");
             res.setHeader("Content-Disposition", `attachment; filename="${exportFileName("csv")}"`);
-            res.send(toCsv(rows));
+            // The BOM makes Excel read game names like "SUPER STARDUST™ HD" as UTF-8.
+            res.send(`\uFEFF${toCsv(rows)}`);
         } else {
             res.setHeader("Content-Disposition", `attachment; filename="${exportFileName("json")}"`);
             res.json(rows);

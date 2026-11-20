@@ -598,7 +598,7 @@
     }
     .platform-row { flex-wrap: wrap; }
     .platform-name { font-weight: 600; flex-shrink: 0; white-space: nowrap; margin-right: 4px; min-width: 150px; }
-    .platform-note { font-size: 12px; color: var(--text-dim); flex: 1; min-width: 0; }
+    .platform-note { font-size: 12px; color: var(--text-dim); flex: 1; min-width: 0; overflow-wrap: anywhere; }
     .platform-note a, .platform-help a { color: var(--accent); }
     /* Two fixed slots so Sync lines up on every row, including Steam, which
        has no Disconnect button (see #174). */
@@ -819,8 +819,8 @@
     /* Narrow windows: badges and pips drop under the title instead of
        squeezing it into a sliver (see #285). */
     /* Wide windows: a fixed pip slot keeps the platform tag and counts lined up row to row. */
-    @media (min-width: 901px) {
-        .tier-pips { min-width: 150px; justify-content: flex-end; }
+    @media (min-width: 1280px) {
+        .game-badges .tier-pips { min-width: 150px; justify-content: flex-end; }
     }
     @media (max-width: 900px) {
         .game-main { flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -2270,6 +2270,8 @@ const gameSorters = {
     "unlocked-desc": (a, b) => b.unlocked_achievements - a.unlocked_achievements || byTitle(a, b),
     recent: (a, b) =>
         (b.last_unlocked_at ? Date.parse(b.last_unlocked_at) : 0) - (a.last_unlocked_at ? Date.parse(a.last_unlocked_at) : 0) ||
+        // Undated unlocks (RPCS3) still rank above a game with nothing unlocked.
+        b.unlocked_achievements - a.unlocked_achievements ||
         byTitle(a, b),
     "xp-desc": (a, b) => Number(b.points_earned) - Number(a.points_earned) || byTitle(a, b),
     "completion-desc": (a, b) => completionPct(b) - completionPct(a) || byTitle(a, b),
