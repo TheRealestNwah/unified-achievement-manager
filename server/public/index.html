@@ -47,6 +47,8 @@
         --level-from: #A78BFA;
         --level-to: #14B8A6;
         --placeholder-bg: light-dark(rgba(17,24,39,0.06), rgba(255,255,255,0.06));
+        /* Behind art that can be transparent (RPCS3's white-on-clear icons), so it stays visible in the light theme. */
+        --icon-backdrop: light-dark(#4B5160, rgba(255,255,255,0.06));
         --scrollbar-thumb: light-dark(rgba(17,24,39,0.18), rgba(255,255,255,0.18));
         --chip-accent-bg: light-dark(#EEEDFF, #2C254A);
         --chip-accent-border: light-dark(#D8D4FC, #514479);
@@ -614,7 +616,8 @@
     .settings-subnote { font-size: 14px; color: var(--text-dim); margin: 0 0 var(--space-sm); }
     .danger-row { border-color: #FCA5A5; }
     button.danger-btn { color: var(--danger); border-color: #FCA5A5; }
-    .secret-input { flex: 1; display: flex; position: relative; min-width: 0; }
+    /* Wraps below the label rather than squeezing the placeholder into a stub. */
+    .secret-input { flex: 1 1 210px; display: flex; position: relative; min-width: 0; }
     .secret-input input { flex: 1; min-width: 0; padding-right: 58px !important; }
     .secret-toggle {
         position: absolute;
@@ -695,7 +698,7 @@
         height: 100%;
         border-radius: 6px;
         object-fit: cover;
-        background: var(--placeholder-bg);
+        background: var(--icon-backdrop);
     }
     .game-cover-placeholder {
         display: flex;
@@ -815,6 +818,10 @@
     .platform-badge { white-space: nowrap; }
     /* Narrow windows: badges and pips drop under the title instead of
        squeezing it into a sliver (see #285). */
+    /* Wide windows: a fixed pip slot keeps the platform tag and counts lined up row to row. */
+    @media (min-width: 901px) {
+        .tier-pips { min-width: 150px; justify-content: flex-end; }
+    }
     @media (max-width: 900px) {
         .game-main { flex-direction: column; align-items: flex-start; gap: 6px; }
         .game-badges { justify-content: flex-start; }
@@ -968,7 +975,7 @@
         border-radius: 50%;
         object-fit: cover;
         flex-shrink: 0;
-        background: var(--placeholder-bg);
+        background: var(--icon-backdrop);
     }
     .tier-tag {
         font-size: 10px;
@@ -981,6 +988,8 @@
         white-space: nowrap;
         text-align: center;
     }
+    /* One width in achievement lists so titles start at the same x on every row. */
+    .achievement > .tier-tag { width: 76px; }
     .tier-tag.platinum { background: var(--platinum); }
     .tier-tag.gold { background: var(--gold); }
     .tier-tag.silver { background: var(--silver); }
